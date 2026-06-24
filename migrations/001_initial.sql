@@ -1,0 +1,1 @@
+-- Migration 001: Core tables + seed (implemented in Task 2)

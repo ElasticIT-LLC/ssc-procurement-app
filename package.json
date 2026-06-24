@@ -1,5 +1,5 @@
 {
-  "name": "my-app",
+  "name": "procurement",
   "version": "0.1.0",
   "description": "ElasticIT portal app — deployed via Admin UI `.eitapp` upload",
   "type": "module",
