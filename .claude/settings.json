@@ -1,0 +1,143 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(bash scripts/:*)",
+      "Bash(bash local-dev/:*)",
+      "Bash(bash -c:*)",
+      "Bash(bash:*)",
+      "Bash(sh:*)",
+      "Bash(npm install:*)",
+      "Bash(npm run:*)",
+      "Bash(npm test:*)",
+      "Bash(npm version:*)",
+      "Bash(npm ls:*)",
+      "Bash(npm outdated:*)",
+      "Bash(npx:*)",
+      "Bash(node:*)",
+      "Bash(supabase:*)",
+      "Bash(podman:*)",
+      "Bash(docker:*)",
+      "Bash(git init:*)",
+      "Bash(git status:*)",
+      "Bash(git log:*)",
+      "Bash(git diff:*)",
+      "Bash(git show:*)",
+      "Bash(git branch:*)",
+      "Bash(git remote:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git rev-parse:*)",
+      "Bash(git config:*)",
+      "Bash(git tag:*)",
+      "Bash(git stash:*)",
+      "Bash(git fetch:*)",
+      "Bash(git pull:*)",
+      "Bash(git restore:*)",
+      "Bash(ls:*)",
+      "Bash(pwd)",
+      "Bash(pwd -P)",
+      "Bash(cd:*)",
+      "Bash(mkdir:*)",
+      "Bash(cp:*)",
+      "Bash(mv:*)",
+      "Bash(tar:*)",
+      "Bash(touch:*)",
+      "Bash(printf:*)",
+      "Bash(echo:*)",
+      "Bash(cat:*)",
+      "Bash(head:*)",
+      "Bash(tail:*)",
+      "Bash(wc:*)",
+      "Bash(sort:*)",
+      "Bash(uniq:*)",
+      "Bash(grep:*)",
+      "Bash(rg:*)",
+      "Bash(find:*)",
+      "Bash(jq:*)",
+      "Bash(sed:*)",
+      "Bash(awk:*)",
+      "Bash(tr:*)",
+      "Bash(cut:*)",
+      "Bash(env)",
+      "Bash(env:*)",
+      "Bash(which:*)",
+      "Bash(command -v:*)",
+      "Bash(file:*)",
+      "Bash(stat:*)",
+      "Bash(diff:*)",
+      "Bash(true)",
+      "Bash(false)",
+      "Bash(date:*)",
+      "Bash(hostname:*)",
+      "Bash(uname:*)",
+      "Bash(openssl rand:*)",
+      "Bash(chmod:*)",
+      "Bash(curl:*)",
+      "Bash(rm -rf node_modules:*)",
+      "Bash(rm -rf dist:*)",
+      "Bash(rm -rf node_modules/.vite:*)",
+      "Bash(rm -rf .vite:*)",
+      "Bash(rm -rf .turbo:*)",
+      "Bash(rm dist/:*)",
+      "Bash(rm node_modules/:*)",
+      "Read(**)",
+      "Write(**)",
+      "Edit(**)",
+      "Glob(**)",
+      "Grep(**)"
+    ]
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/check-prereqs.sh\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/tone-reminder.sh\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/pre-commit-guard.sh\"",
+            "if": "Bash(git commit*)",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/validate-tokens.sh\""
+          },
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/validate-app.sh\"",
+            "timeout": 15
+          }
+        ]
+      }
+    ]
+  }
+}

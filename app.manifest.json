@@ -1,0 +1,21 @@
+{
+  "$schema": "./types/app-manifest.schema.json",
+  "slug": "my-app",
+  "name": "My App",
+  "icon": "Puzzle",
+  "version": "0.1.0",
+  "permissions": [
+    { "key": "apps/my-app/*", "label": "Full Access", "description": "Full access to all features", "group": "Administration" },
+    { "key": "apps/my-app/dashboard/view", "label": "View Dashboard", "description": "View dashboard and KPIs", "group": "Reports" }
+  ],
+  "pages": [
+    { "key": "dashboard", "label": "Dashboard", "permission": "apps/my-app/dashboard/view" }
+  ],
+  "notifications": [
+    {
+      "key": "example_event",
+      "label": "Example event",
+      "description": "Replace with real events your app emits. The event_type sent to send-notification will be 'my-app:example_event'. Remove this stub if your app does not emit notifications (declare \"notifications\": [] instead)."
+    }
+  ]
+}

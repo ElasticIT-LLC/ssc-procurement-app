@@ -1,0 +1,44 @@
+{
+  "name": "my-app",
+  "version": "0.1.0",
+  "description": "ElasticIT portal app — deployed via Admin UI `.eitapp` upload",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "vite build --watch",
+    "prebuild": "tsx scripts/validate.ts",
+    "build": "vite build && tsc --project tsconfig.build.json --emitDeclarationOnly",
+    "validate": "tsx scripts/validate.ts",
+    "package": "npm run build && tsx scripts/package.ts",
+    "local-dev": "cd local-dev && bash setup.sh",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "prepare": "husky"
+  },
+  "peerDependencies": {
+    "@elasticit-llc/app-bridge": ">=0.7.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@elasticit-llc/app-bridge": "file:./vendor/elasticit-llc-app-bridge-0.7.5.tgz",
+    "@elasticit-llc/ui-kit": "file:./vendor/elasticit-llc-ui-kit-0.5.4.tgz",
+    "@tailwindcss/vite": "^4.3.1",
+    "@types/archiver": "^8.0.0",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.2",
+    "archiver": "^8.0.0",
+    "concurrently": "^10.0.3",
+    "husky": "^9.1.7",
+    "jsdom": "^29.1.1",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "tailwindcss": "^4.2.1",
+    "tsx": "^4.22.4",
+    "typescript": "^6.0.3",
+    "vite": "^8.0.16",
+    "vitest": "^4.1.8"
+  },
+  "license": "UNLICENSED"
+}

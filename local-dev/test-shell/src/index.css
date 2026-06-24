@@ -1,0 +1,14 @@
+@import "tailwindcss";
+@source "../node_modules/@elasticit-llc/shell/dist/**/*.js";
+@source "../../../dist/**/*.js";
+
+@variant dark (&:where(.dark, .dark *));
+
+@layer base {
+  :root { color-scheme: dark; }
+}
+
+/* Brand tokens generated from local-dev/brand.json by @elasticit-llc/ui-kit's
+ * brandCompiler. Setup.sh seeds local-dev/brand.json from brand.json.example
+ * on first run; edit it to preview different colors/fonts. */
+@import "./generated-brand.css";

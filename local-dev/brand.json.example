@@ -1,0 +1,41 @@
+{
+  "$schema": "https://elasticit.com/brand-schema-v1.json",
+  "clientId": "demo",
+  "clientName": "Demo Company",
+
+  "mode": {
+    "default": "dark",
+    "userToggle": true
+  },
+
+  "branding": {
+    "logoFull": "/logo-wordmark.svg",
+    "logoIcon": "/logo-icon.svg",
+    "favicon": "/favicon.svg"
+  },
+
+  "theme": {
+    "colors": {
+      "brand": {
+        "primary": "#3b82f6"
+      },
+      "secondary": {
+        "primary": "#64748b"
+      }
+    },
+    "typography": {
+      "fontFamily": {
+        "heading": "'Inter', ui-sans-serif, system-ui, sans-serif",
+        "body": "'Inter', ui-sans-serif, system-ui, sans-serif"
+      },
+      "fontSources": [
+        { "family": "Inter", "weights": [400, 500, 600, 700], "source": "google" }
+      ]
+    }
+  },
+
+  "supabase": {
+    "urlEnv": "VITE_SUPABASE_URL",
+    "anonKeyEnv": "VITE_SUPABASE_ANON_KEY"
+  }
+}

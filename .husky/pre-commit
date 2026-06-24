@@ -1,0 +1,5 @@
+#!/usr/bin/env sh
+# Blocks commits when the manifest ↔ source contract is broken.
+# Runs the same validator as `npm run validate` and the Claude Code PostToolUse hook.
+
+npx --no-install tsx scripts/validate.ts

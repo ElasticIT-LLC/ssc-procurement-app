@@ -1,0 +1,25 @@
+# Supabase local development config for ElasticIT Portal apps
+# Email/password auth (no Microsoft Entra ID for local dev)
+
+project_id = "local-dev"
+
+[api]
+port = 54321
+
+[db]
+port = 54322
+
+[studio]
+port = 54323
+
+[auth]
+site_url = "http://localhost:3000"
+enable_signup = true
+
+[auth.email]
+enable_signup = true
+enable_confirmations = false
+double_confirm_changes = false
+
+[storage]
+file_size_limit = "50MiB"

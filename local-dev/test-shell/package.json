@@ -1,0 +1,29 @@
+{
+  "name": "local-dev-shell",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --port 3000 --host"
+  },
+  "dependencies": {
+    "@elasticit-llc/shell": "file:../../vendor/elasticit-llc-shell-0.17.4.tgz",
+    "@elasticit-llc/app-bridge": "file:../../vendor/elasticit-llc-app-bridge-0.7.5.tgz",
+    "@elasticit-llc/ui-kit": "file:../../vendor/elasticit-llc-ui-kit-0.5.4.tgz",
+    "@elasticit-llc/printix-app": "file:../../vendor/elasticit-llc-printix-app-0.3.10.tgz",
+    "@elasticit-llc/screening-system-app": "file:../../vendor/elasticit-llc-screening-system-app-0.5.8.tgz",
+    "@supabase/supabase-js": "^2.102.1",
+    "@tanstack/react-query": "^5.96.2",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "react-router-dom": "^7.14.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.2.1",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^4.7.0",
+    "tailwindcss": "^4.2.1",
+    "typescript": "^5.9.3",
+    "vite": "^6.4.1"
+  }
+}

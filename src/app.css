@@ -1,0 +1,98 @@
+/*
+ * App CSS — compiled at build time by Tailwind.
+ *
+ * IMPORTANT: Use @import "tailwindcss/utilities" — NOT @import "tailwindcss".
+ * The full import bundles a CSS reset + theme layer that overrides the shell's
+ * brand colors when loaded at runtime. Utilities-only avoids this.
+ *
+ * Token system (ui-kit v0.5.0+):
+ *   - Chrome (sidebar/topbar/login) is owned by the shell — always dark
+ *   - Content (this app) uses SEMANTIC tokens that flip with light/dark mode
+ *     (bg-card, bg-muted, text-foreground, bg-primary, etc.)
+ *   - Brand spectrum (brand-50…brand-900) resolves to the client's primary hue
+ *     at runtime — use for accent tints and chart series colors
+ *
+ * See: node_modules/@elasticit-llc/ui-kit/docs/app-ui-adaptation-guide.md
+ *      (also: tokens.md, brand-json.md, migration-guide.md in the same folder)
+ *
+ * Import this file in src/App.tsx.
+ */
+
+@import "tailwindcss/utilities";
+
+/* Scan this app's source for Tailwind class usage */
+@source "./";
+
+/*
+ * Exclude non-source files from Tailwind's automatic content scan. Tailwind v4
+ * walks the whole git boundary by default — docs, hook scripts, and README
+ * examples contain class-like strings (e.g. `bg-[#hex]`) that would otherwise
+ * get compiled into no-op CSS rules in the final bundle. The `@source not`
+ * directive (v4.1+) prunes those paths from the scan so only real source
+ * under `src/` drives utility generation.
+ */
+@source not "../CLAUDE.md";
+@source not "../README.md";
+@source not "../.claude/**/*";
+@source not "../scripts/**/*";
+@source not "../local-dev/**/*";
+@source not "../docs/**/*";
+@source not "../vendor/**/*";
+
+/*
+ * `@theme reference { ... }` (NOT `@theme { ... }`) — the `reference` keyword
+ * tells Tailwind: "these utilities exist, the shell will supply the values at
+ * runtime." It does NOT emit `:root` variables, so the shell's brand config
+ * + light/dark toggle stays in control. Using plain `@theme` would bake
+ * defaults into your CSS that override the shell at runtime.
+ */
+@theme reference {
+  /* ── Semantic content tokens — FLIP with .light / .dark on <html> ──────
+   * Use these for all content surfaces, text, borders, inputs, and buttons
+   * in your app. The shell provides the actual values; you just reference.
+   */
+  --color-background: var(--color-background);
+  --color-foreground: var(--color-foreground);
+  --color-card: var(--color-card);
+  --color-card-foreground: var(--color-card-foreground);
+  --color-popover: var(--color-popover);
+  --color-popover-foreground: var(--color-popover-foreground);
+  --color-muted: var(--color-muted);
+  --color-muted-foreground: var(--color-muted-foreground);
+  --color-accent: var(--color-accent);
+  --color-accent-foreground: var(--color-accent-foreground);
+  --color-border: var(--color-border);
+  --color-input: var(--color-input);
+  --color-primary: var(--color-primary);
+  --color-primary-foreground: var(--color-primary-foreground);
+  --color-primary-hover: var(--color-primary-hover);
+  --color-destructive: var(--color-destructive);
+  --color-destructive-foreground: var(--color-destructive-foreground);
+
+  /* ── Status intents — fixed across modes ─────────────────────────────
+   * Use for semantic status indicators (success badges, warning pills, etc.)
+   * Fallback hex values match the ui-kit defaults in case the shell doesn't
+   * override them.
+   */
+  --color-success: var(--color-success, #22c55e);
+  --color-warning: var(--color-warning, #eab308);
+  --color-danger: var(--color-danger, #ef4444);
+  --color-info: var(--color-info, #3b82f6);
+
+  /* ── Brand accent spectrum — resolves to client's primary hue at runtime ──
+   * Use for accent tints (e.g. `bg-brand-500/20`) and chart series colors.
+   * For solid primary elements (buttons, links), prefer `bg-primary` /
+   * `text-primary-foreground` instead — they already apply brand-500 but also
+   * handle mode-specific contrast adjustments.
+   */
+  --color-brand-50: var(--color-brand-50);
+  --color-brand-100: var(--color-brand-100);
+  --color-brand-200: var(--color-brand-200);
+  --color-brand-300: var(--color-brand-300);
+  --color-brand-400: var(--color-brand-400);
+  --color-brand-500: var(--color-brand-500);
+  --color-brand-600: var(--color-brand-600);
+  --color-brand-700: var(--color-brand-700);
+  --color-brand-800: var(--color-brand-800);
+  --color-brand-900: var(--color-brand-900);
+}

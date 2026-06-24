@@ -1,0 +1,47 @@
+# Validates token rules on every PR — mirrors .claude/hooks/validate-tokens.sh
+#
+# Why: the Claude Code hook only fires on edits made through Claude. If a
+# developer edits a file in their IDE and pushes directly, the hook never
+# runs. This workflow runs the same script in CI so no bypass path reaches
+# main.
+
+name: Validate Token Rules
+
+on:
+  pull_request:
+    paths:
+      - 'src/**/*.tsx'
+      - 'src/app.css'
+      - '.claude/hooks/validate-tokens.sh'
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run hook against changed files
+        run: |
+          set -euo pipefail
+          base="origin/${{ github.base_ref }}"
+          changed=$(git diff --name-only --diff-filter=AMR "$base"...HEAD -- 'src/**/*.tsx' 'src/app.css' || true)
+          if [ -z "$changed" ]; then
+            echo "No matching file changes"
+            exit 0
+          fi
+          echo "Validating:"
+          echo "$changed"
+          failed=0
+          while IFS= read -r f; do
+            [ -n "$f" ] || continue
+            if ! printf '{"tool_input":{"file_path":"%s"}}' "$f" | bash .claude/hooks/validate-tokens.sh; then
+              failed=1
+            fi
+          done <<< "$changed"
+          exit "$failed"

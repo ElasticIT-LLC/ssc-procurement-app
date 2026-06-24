@@ -1,0 +1,373 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ElasticIT App Manifest",
+  "description": "Declares an app's permissions, pages, database config, edge functions, vault secrets, credentials, runtime config, and post-deploy hooks for the ElasticIT portal shell.",
+  "type": "object",
+  "required": ["slug", "name", "permissions", "pages"],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "slug": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*$",
+      "description": "URL-safe app identifier (lowercase, hyphens only)"
+    },
+    "name": {
+      "type": "string",
+      "description": "Human-readable name shown in sidebar and admin UI"
+    },
+    "icon": {
+      "type": "string",
+      "description": "Emoji or icon identifier"
+    },
+    "version": {
+      "type": "string",
+      "description": "Semver version (should match package.json)"
+    },
+    "permissions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["key", "label", "description", "group"],
+        "properties": {
+          "key": {
+            "type": "string",
+            "pattern": "^apps/[a-z][a-z0-9-]*/",
+            "description": "Permission key: apps/{slug}/{resource}/{action} or apps/{slug}/*"
+          },
+          "label": {
+            "type": "string",
+            "description": "Human-readable label"
+          },
+          "description": {
+            "type": "string",
+            "description": "What this permission grants"
+          },
+          "group": {
+            "type": "string",
+            "description": "Groups permissions in the admin Roles page"
+          }
+        }
+      }
+    },
+    "pages": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["key", "label"],
+        "properties": {
+          "key": {
+            "type": "string",
+            "description": "Page slug — must match currentPage switch cases"
+          },
+          "label": {
+            "type": "string",
+            "description": "Sidebar label"
+          },
+          "permission": {
+            "type": "string",
+            "description": "Permission key required to see this page"
+          }
+        }
+      }
+    },
+    "database": {
+      "type": "object",
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": ["proxy", "schema"],
+          "description": "proxy = own Supabase project or external API, schema = schema in client's Supabase"
+        },
+        "schema": {
+          "type": "string",
+          "description": "Schema mode only: schema name (must start with app_)",
+          "pattern": "^app_[a-z][a-z0-9_]*$"
+        },
+        "migrations": {
+          "type": "array",
+          "description": "Schema mode only: migrations to apply on publish",
+          "items": {
+            "type": "object",
+            "required": ["version", "up"],
+            "properties": {
+              "version": { "type": "integer", "minimum": 1 },
+              "description": { "type": "string" },
+              "up": { "type": "string", "description": "Path to .sql file inside the app package" }
+            }
+          }
+        },
+        "tables": {
+          "type": "array",
+          "description": "Schema mode only: tables this app expects to exist (for validation + RLS)",
+          "items": {
+            "type": "object",
+            "required": ["name"],
+            "properties": {
+              "name": { "type": "string" },
+              "rls": {
+                "type": "object",
+                "properties": {
+                  "read": { "type": "string", "enum": ["authenticated", "admin"] },
+                  "write": { "type": "string", "enum": ["authenticated", "admin"] }
+                }
+              }
+            }
+          }
+        },
+        "proxy": {
+          "type": "object",
+          "properties": {
+            "vault_prefix": {
+              "type": "string",
+              "description": "Prefix for vault secret names"
+            },
+            "forward_to_functions": {
+              "type": "boolean"
+            },
+            "allowed_tables": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "allowed_rpcs": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "unscoped_rpcs": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "allowed_api_endpoints": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "write_requires_admin": {
+              "type": "boolean"
+            },
+            "tenant_isolation": {
+              "type": "object",
+              "properties": {
+                "enabled": { "type": "boolean" },
+                "column": { "type": "string" },
+                "setting_key": { "type": "string" },
+                "table_overrides": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": ["string", "null"]
+                  }
+                }
+              }
+            },
+            "api_config": {
+              "type": "object",
+              "description": "External HTTP API configuration (proxy.type='bearer_token' | 'oauth2')",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "enum": ["bearer_token", "oauth2", "api_key"]
+                },
+                "base_url": { "type": "string" },
+                "url_template": { "type": "string", "description": "Path template, e.g. '/{endpoint}'" },
+                "tenant_setting_key": { "type": "string" },
+                "vault_keys": {
+                  "type": "object",
+                  "additionalProperties": { "type": "string" },
+                  "description": "Names of vault secrets (keyed by role, e.g. client_id, client_secret, token_url for OAuth2)"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "edge_functions": {
+      "type": "array",
+      "description": "Edge functions bundled with this app, auto-deployed by publish-app to the client's Supabase. Reference the source folder inside the .eitapp package via `entrypoint`.",
+      "items": {
+        "type": "object",
+        "required": ["name", "entrypoint"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]*$",
+            "description": "Deployed function name — URL will be /functions/v1/{name}"
+          },
+          "entrypoint": {
+            "type": "string",
+            "description": "Path to index.ts (or index.js) inside the .eitapp, e.g. 'supabase/functions/my-sync/index.ts'"
+          },
+          "verify_jwt": {
+            "type": "boolean",
+            "default": false,
+            "description": "Whether Supabase's runtime should pre-verify JWTs. ElasticIT shells use Entra ES256 tokens so this must be false for functions called with shell auth."
+          },
+          "import_map": {
+            "type": "string",
+            "description": "Optional path to an import map inside the package"
+          },
+          "inherit_secrets": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Names of edge-function secrets the shell already provides (e.g. CREDENTIAL_ENCRYPTION_KEY). Declared for documentation only."
+          }
+        }
+      }
+    },
+    "vault_secrets": {
+      "type": "array",
+      "description": "PostgreSQL Vault secrets the app needs. publish-app provisions them based on `source`. Secrets are used by pg_cron jobs, trigger functions, and things that run in the DB (not the app itself).",
+      "items": {
+        "type": "object",
+        "oneOf": [
+          { "required": ["name", "source", "description"] },
+          { "required": ["key", "description"] }
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Vault secret name (preferred). `key` is kept for backward compatibility."
+          },
+          "key": {
+            "type": "string",
+            "description": "Legacy alias for `name`. Prefer `name` + `source` in new apps."
+          },
+          "source": {
+            "type": "string",
+            "enum": ["service_role", "project_url", "literal", "admin-input"],
+            "default": "admin-input",
+            "description": "Where publish-app gets the value: service_role = project's service_role JWT; project_url = https://<ref>.supabase.co; literal = use the `value` field; admin-input = publish-app skips and admin fills via Vault Secrets admin UI."
+          },
+          "value": {
+            "type": "string",
+            "description": "Only used when source='literal'"
+          },
+          "description": {
+            "type": "string",
+            "description": "What this secret is for"
+          }
+        }
+      }
+    },
+    "credential_requirements": {
+      "type": "array",
+      "description": "External API credentials the app needs. publish-app creates placeholder rows in the `credentials` table linked to this app. Admin fills in values via Admin > Credential Vault.",
+      "items": {
+        "type": "object",
+        "required": ["provider", "label", "credential_type"],
+        "properties": {
+          "provider": {
+            "type": "string",
+            "description": "Stable identifier for the vendor, e.g. 'rippling', 'stripe' — determines idempotency on re-upload."
+          },
+          "label": {
+            "type": "string",
+            "description": "Human-readable label shown in Credential Vault UI"
+          },
+          "credential_type": {
+            "type": "string",
+            "enum": ["bearer", "api_key", "oauth2", "oauth2_auth_code", "database"],
+            "description": "Matches credentials.credential_type check constraint"
+          },
+          "description": {
+            "type": "string",
+            "description": "Admin-facing instructions"
+          },
+          "metadata": {
+            "type": "object",
+            "description": "Free-form metadata rendered as help text in the Credential Vault UI. Common fields: docs_url, base_url_hint, required_scopes.",
+            "additionalProperties": true
+          }
+        }
+      }
+    },
+    "config": {
+      "type": "array",
+      "description": "Runtime config rows seeded into app_<slug>._config on publish. Use this for values that pg_cron trigger functions need (supabase_url, feature flags, etc.) since `ALTER DATABASE SET app.*` is denied on managed Supabase.",
+      "items": {
+        "type": "object",
+        "required": ["key", "source"],
+        "properties": {
+          "key": {
+            "type": "string",
+            "description": "Row key in _config table"
+          },
+          "source": {
+            "type": "string",
+            "enum": ["project_url", "literal", "admin-input"],
+            "description": "project_url = https://<ref>.supabase.co; literal = use `value`; admin-input = admin seeds via SQL later."
+          },
+          "value": {
+            "type": "string",
+            "description": "Only used when source='literal'"
+          },
+          "description": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "post_deploy_hooks": {
+      "type": "array",
+      "description": "Actions publish-app runs after a successful upload (schema migrations, edge function deploy, vault provisioning, etc. all complete). Fire-and-forget via EdgeRuntime.waitUntil — publish-app returns immediately.",
+      "items": {
+        "type": "object",
+        "required": ["type"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["invoke_function"],
+            "description": "Only invoke_function is supported today"
+          },
+          "function": {
+            "type": "string",
+            "description": "Name of the edge function to invoke (must match edge_functions[].name)"
+          },
+          "body": {
+            "type": "object",
+            "description": "JSON body passed to the function",
+            "additionalProperties": true
+          },
+          "async": {
+            "type": "boolean",
+            "default": true,
+            "description": "If true, invoke via EdgeRuntime.waitUntil (don't wait for response)"
+          },
+          "require_all_credentials_set": {
+            "type": "boolean",
+            "default": false,
+            "description": "Skip this hook if any credential_requirements[] entry still has a placeholder credential row. Admin UI will trigger pending hooks after credentials are filled."
+          }
+        }
+      }
+    },
+    "notifications": {
+      "type": "array",
+      "description": "Email-alert event types this app emits that users can opt into on the portal Notifications page. Synced into app_notifications on publish. The full event_type fired to send-notification is `{slug}:{key}`. To explicitly opt out of email alerts, declare an empty array.",
+      "items": {
+        "type": "object",
+        "required": ["key", "label"],
+        "properties": {
+          "key": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*$",
+            "description": "Snake_case event identifier within this app (e.g. sync_error). Combined with slug to form the full event_type as `{slug}:{key}`."
+          },
+          "label": {
+            "type": "string",
+            "description": "Short user-facing label shown next to the opt-in checkbox on the portal Notifications page."
+          },
+          "description": {
+            "type": "string",
+            "description": "One-sentence description of when this event fires, shown to users alongside the opt-in checkbox."
+          },
+          "sort_order": {
+            "type": "integer",
+            "default": 0,
+            "description": "Display order within this app's section of the Notifications page."
+          }
+        }
+      }
+    }
+  }
+}
