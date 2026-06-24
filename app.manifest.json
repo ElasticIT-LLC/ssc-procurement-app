@@ -2,7 +2,7 @@
   "$schema": "./types/app-manifest.schema.json",
   "slug": "procurement",
   "name": "Procurement",
-  "icon": "ShoppingCart",
+  "icon": "Package",
   "version": "0.1.0",
   "permissions": [
     { "key": "apps/procurement/*", "label": "Full Access", "description": "Full access to Procurement", "group": "Administration" },
