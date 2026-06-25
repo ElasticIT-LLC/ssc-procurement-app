@@ -6,7 +6,16 @@ const TABLES = { requests: 'purchase_requests', lineItems: 'line_items', locatio
 const RPCS = { submit: 'submit_request', decide: 'decide_line_item', order: 'order_line_item', receive: 'receive_line_item', initiateReturn: 'initiate_return', processReturn: 'process_return' } as const
 
 export interface RequestRow { id: string; requester_id: string | null; requester_name: string | null; requester_email: string | null; requester_type: string; status: RequestStatus; notes: string | null; submitted_at: string; updated_at: string }
-export interface LineItemRow { id: string; request_id: string; item_description: string | null; item_url: string | null; memo: string | null; quantity: number; status: LineItemStatus; location_id: string | null; department_id: string | null; date_needed: string | null; eta: string | null; product_image_path: string | null }
+export interface LineItemRow { id: string; request_id: string; item_description: string | null; item_url: string | null; memo: string | null; quantity: number; status: LineItemStatus; location_id: string | null; department_id: string | null; date_needed: string | null; eta: string | null; product_image_path: string | null; return_reason: string | null; return_quantity: number | null; wants_replacement: boolean | null; return_notes: string | null }
+export interface LineItemWithRequest extends LineItemRow {
+  request: {
+    id: string
+    requester_name: string | null
+    requester_email: string | null
+    notes: string | null
+    submitted_at: string
+  }
+}
 export interface Location { id: string; name: string; is_active: boolean }
 export interface Department { id: string; name: string; is_active: boolean }
 
@@ -45,8 +54,19 @@ export function useProcurementApi() {
   }
   async function processReturn(id: string, orderReplacement: boolean): Promise<void> { ok(await db().rpc(RPCS.processReturn, { p_line_item_id: id, p_order_replacement: orderReplacement })) }
 
+  async function listLineItemsByStatus(statuses: string[]): Promise<LineItemWithRequest[]> {
+    const rows = ok(await db().from(TABLES.lineItems)
+      .select('*, purchase_requests!request_id(id, requester_name, requester_email, notes, submitted_at)')
+      .in('status', statuses)
+      .order('updated_at', { ascending: false })) ?? []
+    return (rows as unknown as (LineItemRow & { purchase_requests: { id: string; requester_name: string | null; requester_email: string | null; notes: string | null; submitted_at: string } })[]).map(row => {
+      const { purchase_requests, ...item } = row
+      return { ...item, request: purchase_requests } as LineItemWithRequest
+    })
+  }
+
   async function createLocation(name: string): Promise<void> { ok(await db().from(TABLES.locations).insert({ name })) }
   async function createDepartment(name: string): Promise<void> { ok(await db().from(TABLES.departments).insert({ name })) }
 
-  return { listRequests, getRequest, listLineItems, listLocations, listDepartments, submitRequest, decideLineItem, orderLineItem, receiveLineItem, initiateReturn, processReturn, createLocation, createDepartment }
+  return { listRequests, getRequest, listLineItems, listLocations, listDepartments, submitRequest, decideLineItem, orderLineItem, receiveLineItem, initiateReturn, processReturn, listLineItemsByStatus, createLocation, createDepartment }
 }
