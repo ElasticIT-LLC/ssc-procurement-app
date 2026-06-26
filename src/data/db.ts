@@ -39,6 +39,14 @@ export function useProcurementApi() {
   async function listDepartments(): Promise<Department[]> {
     return (ok(await db().from(TABLES.departments).select('*').eq('is_active', true).order('name')) ?? []) as Department[]
   }
+  // Admin views need inactive rows too (so they can be re-activated); the active-only
+  // helpers above stay as-is for the request/purchasing dropdowns.
+  async function listAllLocations(): Promise<Location[]> {
+    return (ok(await db().from(TABLES.locations).select('*').order('name')) ?? []) as Location[]
+  }
+  async function listAllDepartments(): Promise<Department[]> {
+    return (ok(await db().from(TABLES.departments).select('*').order('name')) ?? []) as Department[]
+  }
   async function submitRequest(notes: string, lineItems: Record<string, unknown>[]): Promise<string> {
     return ok(await db().rpc(RPCS.submit, { p_notes: notes, p_line_items: lineItems })) as string
   }
@@ -70,5 +78,5 @@ export function useProcurementApi() {
   async function updateLocation(id: string, patch: { name?: string; is_active?: boolean }): Promise<void> { ok(await db().from(TABLES.locations).update(patch).eq('id', id)) }
   async function updateDepartment(id: string, patch: { name?: string; is_active?: boolean }): Promise<void> { ok(await db().from(TABLES.departments).update(patch).eq('id', id)) }
 
-  return { listRequests, getRequest, listLineItems, listLocations, listDepartments, submitRequest, decideLineItem, orderLineItem, receiveLineItem, initiateReturn, processReturn, listLineItemsByStatus, createLocation, createDepartment, updateLocation, updateDepartment }
+  return { listRequests, getRequest, listLineItems, listLocations, listDepartments, listAllLocations, listAllDepartments, submitRequest, decideLineItem, orderLineItem, receiveLineItem, initiateReturn, processReturn, listLineItemsByStatus, createLocation, createDepartment, updateLocation, updateDepartment }
 }

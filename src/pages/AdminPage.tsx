@@ -196,20 +196,15 @@ export function AdminPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  // Load all (including inactive) — listLocations/listDepartments filter is_active=true,
-  // but admin needs to see inactive rows. We query without the filter via the update path
-  // and refresh after each mutation. For the initial load we use the existing helpers
-  // but then augment via direct query for inactive rows.
+  // Admin shows ALL rows (active + inactive) so deactivated items remain visible
+  // and can be re-activated. (The active-only helpers are for the request dropdowns.)
   const load = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
-        // Uses the active-only helpers from useProcurementApi.
-      // Admin sees active items; toggled-inactive rows disappear after deactivation.
-      // Re-fetch after every mutation ensures UI stays consistent.
       const [locs, depts] = await Promise.all([
-        api.listLocations(),
-        api.listDepartments(),
+        api.listAllLocations(),
+        api.listAllDepartments(),
       ])
       setLocations(locs)
       setDepartments(depts)
