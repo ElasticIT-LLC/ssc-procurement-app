@@ -67,6 +67,8 @@ export function useProcurementApi() {
 
   async function createLocation(name: string): Promise<void> { ok(await db().from(TABLES.locations).insert({ name })) }
   async function createDepartment(name: string): Promise<void> { ok(await db().from(TABLES.departments).insert({ name })) }
+  async function updateLocation(id: string, patch: { name?: string; is_active?: boolean }): Promise<void> { ok(await db().from(TABLES.locations).update(patch).eq('id', id)) }
+  async function updateDepartment(id: string, patch: { name?: string; is_active?: boolean }): Promise<void> { ok(await db().from(TABLES.departments).update(patch).eq('id', id)) }
 
-  return { listRequests, getRequest, listLineItems, listLocations, listDepartments, submitRequest, decideLineItem, orderLineItem, receiveLineItem, initiateReturn, processReturn, listLineItemsByStatus, createLocation, createDepartment }
+  return { listRequests, getRequest, listLineItems, listLocations, listDepartments, submitRequest, decideLineItem, orderLineItem, receiveLineItem, initiateReturn, processReturn, listLineItemsByStatus, createLocation, createDepartment, updateLocation, updateDepartment }
 }
