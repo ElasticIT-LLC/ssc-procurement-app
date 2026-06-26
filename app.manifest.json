@@ -28,7 +28,8 @@
     "migrations": [
       { "version": 1, "description": "Core tables + seed", "up": "migrations/001_initial.sql" },
       { "version": 2, "description": "Workflow RPCs + row-ownership RLS", "up": "migrations/002_rpcs_and_rls.sql" },
-      { "version": 3, "description": "Records (admin_comment + item RPCs) + requester capture", "up": "migrations/003_records_and_polish.sql" }
+      { "version": 3, "description": "Records (admin_comment + item RPCs) + requester capture", "up": "migrations/003_records_and_polish.sql" },
+      { "version": 4, "description": "Enable RLS on purchase_requests + line_items (policies were inert)", "up": "migrations/004_enable_rls.sql" }
     ],
     "tables": [
       { "name": "locations",         "rls": { "read": "authenticated", "write": "admin" } },
