@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { usePermissions } from '@elasticit-llc/app-bridge'
 import { useProcurementApi, RequestRow } from '../data/db'
-import { PERMS } from '../lib/constants'
+import { PERMS, formatDate } from '../lib/constants'
 import { StatusBadge } from './StatusBadge'
 
 interface RequestsListProps {
@@ -74,8 +74,8 @@ export function RequestsList({ onNew, onSelect }: RequestsListProps) {
                 <StatusBadge status={req.status} />
               </div>
               <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
-                <span>Submitted: {new Date(req.submitted_at).toLocaleDateString()}</span>
-                <span>Updated: {new Date(req.updated_at).toLocaleDateString()}</span>
+                <span>Submitted: {formatDate(req.submitted_at)}</span>
+                <span>Updated: {formatDate(req.updated_at)}</span>
               </div>
             </button>
           ))}

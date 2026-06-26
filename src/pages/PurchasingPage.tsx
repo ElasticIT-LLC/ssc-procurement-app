@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useToast, usePermissions } from '@elasticit-llc/app-bridge'
 import { useProcurementApi, LineItemWithRequest, Location } from '../data/db'
 import { StatusBadge } from '../requester/StatusBadge'
-import { PERMS } from '../lib/constants'
+import { PERMS, formatDate } from '../lib/constants'
 
 interface OrderForm {
   date_purchased: string
@@ -148,7 +148,7 @@ export function PurchasingPage() {
 
             {item.date_needed && (
               <p className="text-xs text-muted-foreground">
-                Date needed: {new Date(item.date_needed).toLocaleDateString()}
+                Date needed: {formatDate(item.date_needed)}
               </p>
             )}
 
@@ -165,7 +165,7 @@ export function PurchasingPage() {
                 <p className="text-xs text-muted-foreground">Notes: {item.request.notes}</p>
               )}
               <p className="text-xs text-muted-foreground">
-                Submitted: {new Date(item.request.submitted_at).toLocaleDateString()}
+                Submitted: {formatDate(item.request.submitted_at)}
               </p>
             </div>
 

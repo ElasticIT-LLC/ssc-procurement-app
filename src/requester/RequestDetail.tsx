@@ -3,6 +3,7 @@ import { useToast } from '@elasticit-llc/app-bridge'
 import { useProcurementApi, RequestRow, LineItemRow } from '../data/db'
 import { StatusBadge } from './StatusBadge'
 import { ReturnForm } from './ReturnForm'
+import { formatDate } from '../lib/constants'
 
 interface RequestDetailProps {
   requestId: string
@@ -86,8 +87,8 @@ export function RequestDetail({ requestId, onBack }: RequestDetailProps) {
           <p className="text-sm text-foreground">{request.notes}</p>
         )}
         <div className="flex flex-wrap gap-4 text-xs text-muted-foreground">
-          <span>Submitted: {new Date(request.submitted_at).toLocaleDateString()}</span>
-          <span>Updated: {new Date(request.updated_at).toLocaleDateString()}</span>
+          <span>Submitted: {formatDate(request.submitted_at)}</span>
+          <span>Updated: {formatDate(request.updated_at)}</span>
           {request.requester_name && <span>By: {request.requester_name}</span>}
         </div>
       </div>
@@ -127,7 +128,7 @@ export function RequestDetail({ requestId, onBack }: RequestDetailProps) {
 
             {item.date_needed && (
               <p className="text-xs text-muted-foreground">
-                Date needed: {new Date(item.date_needed).toLocaleDateString()}
+                Date needed: {formatDate(item.date_needed)}
               </p>
             )}
 

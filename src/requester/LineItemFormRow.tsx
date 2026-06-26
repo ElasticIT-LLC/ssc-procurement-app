@@ -2,9 +2,13 @@ import { Location, Department } from '../data/db'
 
 export interface LineItemDraft {
   ship_to_name: string
+  // null = not yet chosen (placeholder shown). location_other distinguishes the
+  // explicit "Other" choice (also null id, but with the custom text input revealed).
   location_id: string | null
+  location_other: boolean
   custom_location: string
   department_id: string | null
+  department_other: boolean
   custom_department: string
   item_url: string
   item_description: string
@@ -49,8 +53,11 @@ export function LineItemFormRow({
 }: LineItemFormRowProps) {
   const set = (patch: Partial<LineItemDraft>) => onChange({ ...value, ...patch })
 
-  const showCustomLocation = value.location_id === null
-  const showCustomDepartment = value.department_id === null
+  const showCustomLocation = value.location_other
+  const showCustomDepartment = value.department_other
+  // Empty string = placeholder "Select…"; '__other__' = the Other option.
+  const locationValue = value.location_other ? '__other__' : (value.location_id ?? '')
+  const departmentValue = value.department_other ? '__other__' : (value.department_id ?? '')
 
   return (
     <div className="rounded-lg border border-border bg-card p-4 grid gap-4">
@@ -70,12 +77,12 @@ export function LineItemFormRow({
       {/* Location */}
       <Field label="Location" error={errors.location}>
         <select
-          value={value.location_id ?? '__other__'}
+          value={locationValue}
           onChange={(e) => {
             if (e.target.value === '__other__') {
-              set({ location_id: null, custom_location: '' })
+              set({ location_id: null, location_other: true, custom_location: '' })
             } else {
-              set({ location_id: e.target.value, custom_location: '' })
+              set({ location_id: e.target.value, location_other: false, custom_location: '' })
             }
           }}
           className="h-9 w-full rounded-md border border-border bg-input px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
@@ -110,12 +117,12 @@ export function LineItemFormRow({
       {/* Department */}
       <Field label="Department" error={errors.department}>
         <select
-          value={value.department_id ?? '__other__'}
+          value={departmentValue}
           onChange={(e) => {
             if (e.target.value === '__other__') {
-              set({ department_id: null, custom_department: '' })
+              set({ department_id: null, department_other: true, custom_department: '' })
             } else {
-              set({ department_id: e.target.value, custom_department: '' })
+              set({ department_id: e.target.value, department_other: false, custom_department: '' })
             }
           }}
           className="h-9 w-full rounded-md border border-border bg-input px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"

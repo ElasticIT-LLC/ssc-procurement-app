@@ -15,3 +15,16 @@ export const PERMS = {
   approve: 'apps/procurement/approvals/act', purchase: 'apps/procurement/purchasing/manage',
   returns: 'apps/procurement/returns/manage', admin: 'apps/procurement/admin/manage',
 } as const
+
+// Render a date/timestamp without the UTC off-by-one shift. `new Date('YYYY-MM-DD')`
+// parses date-only strings as UTC midnight, which renders a day early in timezones
+// behind UTC. For date-only strings we parse the parts as LOCAL; full timestamps
+// (with a 'T') are already zoned, so we pass them through to Date directly.
+export function formatDate(value: string | null | undefined, options?: Intl.DateTimeFormatOptions): string {
+  if (!value) return ''
+  const dateOnly = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value)
+  const d = dateOnly
+    ? new Date(Number(dateOnly[1]), Number(dateOnly[2]) - 1, Number(dateOnly[3]))
+    : new Date(value)
+  return d.toLocaleDateString(options ? 'en-US' : undefined, options)
+}

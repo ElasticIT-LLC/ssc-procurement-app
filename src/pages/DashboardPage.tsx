@@ -3,7 +3,7 @@ import { useShellContext } from '@elasticit-llc/app-bridge'
 import { usePermissions } from '@elasticit-llc/app-bridge'
 import { useProcurementApi, RequestRow, LineItemWithRequest } from '../data/db'
 import { StatusBadge } from '../requester/StatusBadge'
-import { PERMS } from '../lib/constants'
+import { PERMS, formatDate } from '../lib/constants'
 
 interface KpiCardProps {
   label: string
@@ -138,7 +138,7 @@ export function DashboardPage() {
                       {req.requester_name ?? req.requester_email ?? 'Request'}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      Updated {new Date(req.updated_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                      Updated {formatDate(req.updated_at, { month: 'short', day: 'numeric', year: 'numeric' })}
                     </p>
                   </div>
                   <StatusBadge status={req.status} />

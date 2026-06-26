@@ -3,10 +3,10 @@ import type { LineItemStatus, RequestStatus } from '../lib/constants'
 
 const SCHEMA = 'app_procurement'
 const TABLES = { requests: 'purchase_requests', lineItems: 'line_items', locations: 'locations', departments: 'departments' } as const
-const RPCS = { submit: 'submit_request', decide: 'decide_line_item', order: 'order_line_item', receive: 'receive_line_item', initiateReturn: 'initiate_return', processReturn: 'process_return' } as const
+const RPCS = { submit: 'submit_request', decide: 'decide_line_item', order: 'order_line_item', receive: 'receive_line_item', initiateReturn: 'initiate_return', processReturn: 'process_return', setComment: 'set_line_item_comment', deleteItem: 'delete_line_item' } as const
 
 export interface RequestRow { id: string; requester_id: string | null; requester_name: string | null; requester_email: string | null; requester_type: string; status: RequestStatus; notes: string | null; submitted_at: string; updated_at: string }
-export interface LineItemRow { id: string; request_id: string; item_description: string | null; item_url: string | null; memo: string | null; quantity: number; status: LineItemStatus; location_id: string | null; department_id: string | null; date_needed: string | null; eta: string | null; product_image_path: string | null; return_reason: string | null; return_quantity: number | null; wants_replacement: boolean | null; return_notes: string | null }
+export interface LineItemRow { id: string; request_id: string; item_description: string | null; item_url: string | null; memo: string | null; quantity: number; status: LineItemStatus; location_id: string | null; custom_location: string | null; department_id: string | null; custom_department: string | null; date_needed: string | null; eta: string | null; admin_comment: string | null; product_image_path: string | null; return_reason: string | null; return_quantity: number | null; wants_replacement: boolean | null; return_notes: string | null; created_at: string }
 export interface LineItemWithRequest extends LineItemRow {
   request: {
     id: string
@@ -15,6 +15,13 @@ export interface LineItemWithRequest extends LineItemRow {
     notes: string | null
     submitted_at: string
   }
+}
+// One flat row per line item for the Records table: line-item fields + admin_comment,
+// the request it belongs to, and the resolved location/department names.
+export interface LineItemDetailed extends LineItemRow {
+  request: { requester_name: string | null; requester_email: string | null; notes: string | null; submitted_at: string; status: RequestStatus }
+  location: { name: string } | null
+  department: { name: string } | null
 }
 export interface Location { id: string; name: string; is_active: boolean }
 export interface Department { id: string; name: string; is_active: boolean }
@@ -73,10 +80,26 @@ export function useProcurementApi() {
     })
   }
 
+  async function listAllLineItemsDetailed(): Promise<LineItemDetailed[]> {
+    const rows = ok(await db().from(TABLES.lineItems)
+      .select('*, purchase_requests!request_id(requester_name, requester_email, notes, submitted_at, status), locations!location_id(name), departments!department_id(name)')
+      .order('created_at', { ascending: false })) ?? []
+    return (rows as unknown as (LineItemRow & {
+      purchase_requests: { requester_name: string | null; requester_email: string | null; notes: string | null; submitted_at: string; status: RequestStatus }
+      locations: { name: string } | null
+      departments: { name: string } | null
+    })[]).map(row => {
+      const { purchase_requests, locations, departments, ...item } = row
+      return { ...item, request: purchase_requests, location: locations, department: departments } as LineItemDetailed
+    })
+  }
+  async function setLineItemComment(id: string, comment: string): Promise<void> { ok(await db().rpc(RPCS.setComment, { p_line_item_id: id, p_comment: comment })) }
+  async function deleteLineItem(id: string): Promise<void> { ok(await db().rpc(RPCS.deleteItem, { p_line_item_id: id })) }
+
   async function createLocation(name: string): Promise<void> { ok(await db().from(TABLES.locations).insert({ name })) }
   async function createDepartment(name: string): Promise<void> { ok(await db().from(TABLES.departments).insert({ name })) }
   async function updateLocation(id: string, patch: { name?: string; is_active?: boolean }): Promise<void> { ok(await db().from(TABLES.locations).update(patch).eq('id', id)) }
   async function updateDepartment(id: string, patch: { name?: string; is_active?: boolean }): Promise<void> { ok(await db().from(TABLES.departments).update(patch).eq('id', id)) }
 
-  return { listRequests, getRequest, listLineItems, listLocations, listDepartments, listAllLocations, listAllDepartments, submitRequest, decideLineItem, orderLineItem, receiveLineItem, initiateReturn, processReturn, listLineItemsByStatus, createLocation, createDepartment, updateLocation, updateDepartment }
+  return { listRequests, getRequest, listLineItems, listLocations, listDepartments, listAllLocations, listAllDepartments, submitRequest, decideLineItem, orderLineItem, receiveLineItem, initiateReturn, processReturn, listLineItemsByStatus, listAllLineItemsDetailed, setLineItemComment, deleteLineItem, createLocation, createDepartment, updateLocation, updateDepartment }
 }

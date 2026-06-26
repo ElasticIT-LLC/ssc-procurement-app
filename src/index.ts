@@ -7,5 +7,6 @@ export const setup = (api: AppAPI) => {
   api.registerPage('approvals', lazy(() => import('./pages/ApprovalsPage')))
   api.registerPage('purchasing', lazy(() => import('./pages/PurchasingPage')))
   api.registerPage('returns', lazy(() => import('./pages/ReturnsPage')))
+  api.registerPage('records', lazy(() => import('./records/RecordsPage')))
   api.registerPage('admin', lazy(() => import('./pages/AdminPage')))
 }

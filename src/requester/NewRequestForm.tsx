@@ -12,8 +12,10 @@ function emptyItem(): LineItemDraft {
   return {
     ship_to_name: '',
     location_id: null,
+    location_other: false,
     custom_location: '',
     department_id: null,
+    department_other: false,
     custom_department: '',
     item_url: '',
     item_description: '',
