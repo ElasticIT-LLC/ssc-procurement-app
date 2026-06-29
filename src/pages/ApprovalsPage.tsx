@@ -13,6 +13,7 @@ export function ApprovalsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
+  const [imageUrls, setImageUrls] = useState<Record<string, string>>({})
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -20,6 +21,9 @@ export function ApprovalsPage() {
     try {
       const data = await api.listLineItemsByStatus(['pending', 'on_hold'])
       setItems(data)
+      const urls: Record<string, string> = {}
+      await Promise.all(data.filter((i) => i.product_image_path).map(async (i) => { const u = await api.getProductImageUrl(i.product_image_path as string); if (u) urls[i.id] = u }))
+      setImageUrls(urls)
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to load items')
     } finally {
@@ -90,6 +94,15 @@ export function ApprovalsPage() {
             </div>
             <StatusBadge status={item.status} />
           </div>
+
+          {/* Product image or retry capture */}
+          {imageUrls[item.id] ? (
+            <img src={imageUrls[item.id]} alt="Product" className="max-w-[240px] rounded-md border border-border" />
+          ) : item.item_url ? (
+            <button type="button" disabled={busyId === item.id} onClick={async () => { setBusyId(item.id); await api.captureAndNotify(item.request.id, item.id); await load(); setBusyId(null) }} className="self-start inline-flex items-center rounded-md border border-border px-2.5 py-1 text-xs font-medium text-muted-foreground hover:bg-muted disabled:opacity-50">
+              Product image unavailable — Retry capture
+            </button>
+          ) : null}
 
           {/* Item URL */}
           {item.item_url && (

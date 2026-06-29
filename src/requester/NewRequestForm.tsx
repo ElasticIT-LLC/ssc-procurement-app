@@ -101,9 +101,15 @@ export function NewRequestForm({ onCancel, onSuccess }: NewRequestFormProps) {
         substitution_ok: item.substitution_ok,
         date_needed: item.date_needed,
       }))
-      await api.submitRequest(notes, lineItems)
+      const requestId = await api.submitRequest(notes, lineItems)
       showToast({ message: 'Request submitted successfully', type: 'success' })
       onSuccess()
+      // Fire-and-forget capture + approver notification; report the outcome.
+      api.captureAndNotify(requestId).then((res) => {
+        if (!res) return
+        const captured = res.items.filter((i) => i.captured).length
+        showToast({ message: `Captured ${captured}/${res.items.length} product images, notified ${res.recipients} approver(s)`, type: captured === res.items.length ? 'success' : 'info' })
+      })
     } catch (err: unknown) {
       showToast({ message: err instanceof Error ? err.message : 'Failed to submit request', type: 'error' })
     } finally {

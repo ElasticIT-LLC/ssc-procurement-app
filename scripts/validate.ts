@@ -174,7 +174,20 @@ for (const file of srcFiles) {
     }
   }
 
-  collect(/\.from\(\s*['"]([^'"]+)['"]/g, fromCalls)
+  // Exclude storage bucket calls (supabase.storage.from('bucket')) — those are
+  // not proxy table calls and must not be flagged as missing from allowed_tables.
+  {
+    const re = /\.from\(\s*['"]([^'"]+)['"]/g
+    let m: RegExpExecArray | null
+    while ((m = re.exec(content)) !== null) {
+      const preceding = content.slice(Math.max(0, m.index - 20), m.index)
+      if (/\.storage\s*$/.test(preceding)) continue
+      const key = m[1]
+      const line = lineOf(content, m.index)
+      if (!fromCalls.has(key)) fromCalls.set(key, [])
+      fromCalls.get(key)!.push({ file: rel(file), line })
+    }
+  }
   collect(/\.rpc\(\s*['"]([^'"]+)['"]/g, rpcCalls)
   collect(/\.api\(\s*['"]([^'"]+)['"]/g, apiCalls)
   collect(/hasPermission\(\s*['"]([^'"]+)['"]/g, permissionChecks)

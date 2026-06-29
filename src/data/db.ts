@@ -120,5 +120,22 @@ export function useProcurementApi() {
   async function updateLocation(id: string, patch: { name?: string; is_active?: boolean }): Promise<void> { ok(await db().from(TABLES.locations).update(patch).eq('id', id)) }
   async function updateDepartment(id: string, patch: { name?: string; is_active?: boolean }): Promise<void> { ok(await db().from(TABLES.departments).update(patch).eq('id', id)) }
 
-  return { listRequests, getRequest, listLineItems, listLocations, listDepartments, listAllLocations, listAllDepartments, submitRequest, decideLineItem, orderLineItem, receiveLineItem, initiateReturn, processReturn, listLineItemsByStatus, listAllLineItemsDetailed, countLineItems, setLineItemComment, deleteLineItem, createLocation, createDepartment, updateLocation, updateDepartment, fireNotification }
+  async function captureAndNotify(requestId: string, onlyLineItemId?: string) {
+    try {
+      const { data, error } = await supabase.functions.invoke('procurement-capture-and-notify', {
+        body: { request_id: requestId, only_line_item_id: onlyLineItemId ?? null },
+      })
+      if (error) throw error
+      return data as { items: { line_item_id: string; captured: boolean; error?: string }[]; email_sent: boolean; recipients: number }
+    } catch (e) {
+      console.error('captureAndNotify failed:', e)
+      return null
+    }
+  }
+  async function getProductImageUrl(path: string): Promise<string | null> {
+    const { data } = await supabase.storage.from('product-images').createSignedUrl(path, 3600)
+    return data?.signedUrl ?? null
+  }
+
+  return { listRequests, getRequest, listLineItems, listLocations, listDepartments, listAllLocations, listAllDepartments, submitRequest, decideLineItem, orderLineItem, receiveLineItem, initiateReturn, processReturn, listLineItemsByStatus, listAllLineItemsDetailed, countLineItems, setLineItemComment, deleteLineItem, createLocation, createDepartment, updateLocation, updateDepartment, fireNotification, captureAndNotify, getProductImageUrl }
 }
