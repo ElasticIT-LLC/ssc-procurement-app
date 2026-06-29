@@ -93,6 +93,13 @@ export function useProcurementApi() {
       return { ...item, request: purchase_requests, location: locations, department: departments } as LineItemDetailed
     })
   }
+  // Count-only query (head:true returns no rows, just the exact count). RLS scopes it to
+  // what the caller may read — all items for an admin, only their own for a requester.
+  async function countLineItems(): Promise<number> {
+    const res = await db().from(TABLES.lineItems).select('*', { count: 'exact', head: true })
+    if (res.error) throw new Error(res.error.message)
+    return res.count ?? 0
+  }
   async function setLineItemComment(id: string, comment: string): Promise<void> { ok(await db().rpc(RPCS.setComment, { p_line_item_id: id, p_comment: comment })) }
   async function deleteLineItem(id: string): Promise<void> { ok(await db().rpc(RPCS.deleteItem, { p_line_item_id: id })) }
 
@@ -101,5 +108,5 @@ export function useProcurementApi() {
   async function updateLocation(id: string, patch: { name?: string; is_active?: boolean }): Promise<void> { ok(await db().from(TABLES.locations).update(patch).eq('id', id)) }
   async function updateDepartment(id: string, patch: { name?: string; is_active?: boolean }): Promise<void> { ok(await db().from(TABLES.departments).update(patch).eq('id', id)) }
 
-  return { listRequests, getRequest, listLineItems, listLocations, listDepartments, listAllLocations, listAllDepartments, submitRequest, decideLineItem, orderLineItem, receiveLineItem, initiateReturn, processReturn, listLineItemsByStatus, listAllLineItemsDetailed, setLineItemComment, deleteLineItem, createLocation, createDepartment, updateLocation, updateDepartment }
+  return { listRequests, getRequest, listLineItems, listLocations, listDepartments, listAllLocations, listAllDepartments, submitRequest, decideLineItem, orderLineItem, receiveLineItem, initiateReturn, processReturn, listLineItemsByStatus, listAllLineItemsDetailed, countLineItems, setLineItemComment, deleteLineItem, createLocation, createDepartment, updateLocation, updateDepartment }
 }

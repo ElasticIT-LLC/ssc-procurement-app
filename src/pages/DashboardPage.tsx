@@ -27,6 +27,7 @@ export function DashboardPage() {
   const api = useProcurementApi()
 
   const [requests, setRequests] = useState<RequestRow[]>([])
+  const [totalItems, setTotalItems] = useState(0)
   const [approvalItems, setApprovalItems] = useState<LineItemWithRequest[]>([])
   const [purchaseItems, setPurchaseItems] = useState<LineItemWithRequest[]>([])
   const [returnItems, setReturnItems] = useState<LineItemWithRequest[]>([])
@@ -42,13 +43,14 @@ export function DashboardPage() {
     setLoading(true)
     setError(null)
     try {
-      const fetches: Promise<unknown>[] = [api.listRequests()]
+      const fetches: Promise<unknown>[] = [api.listRequests(), api.countLineItems()]
       if (canApprove) fetches.push(api.listLineItemsByStatus(['pending', 'on_hold']))
       if (canPurchase) fetches.push(api.listLineItemsByStatus(['approved']))
       if (canReturns) fetches.push(api.listLineItemsByStatus(['returned']))
 
-      const [reqs, ...rest] = await Promise.all(fetches)
+      const [reqs, itemCount, ...rest] = await Promise.all(fetches)
       setRequests(reqs as RequestRow[])
+      setTotalItems(itemCount as number)
 
       let idx = 0
       if (canApprove) { setApprovalItems(rest[idx] as LineItemWithRequest[]); idx++ }
@@ -90,6 +92,11 @@ export function DashboardPage() {
         <>
           {/* KPI grid */}
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <KpiCard
+              label="Total Items"
+              value={totalItems}
+              sub="Across all requests"
+            />
             {canCreate && (
               <KpiCard
                 label="My Pending Requests"
