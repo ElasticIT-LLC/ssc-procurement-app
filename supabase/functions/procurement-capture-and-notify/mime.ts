@@ -9,7 +9,7 @@ export function buildMimeMessage(opts: {
   html: string
   images: MimeImage[]
 }): string {
-  const boundary = `rel_${opts.images.length}_${opts.subject.length}_${opts.to.length}`
+  const boundary = `rel_${opts.images.length}_${opts.subject.length}_${opts.to.length}_${crypto.randomUUID().slice(0, 8)}`
   const CRLF = '\r\n'
   const parts: string[] = []
   parts.push(`From: ${opts.fromHeader}`)
@@ -31,7 +31,9 @@ export function buildMimeMessage(opts: {
     parts.push(`Content-Disposition: inline; filename="${img.cid}.png"`)
     parts.push('')
     // base64 wrapped at 76 chars per line
-    parts.push(img.base64.replace(/(.{76})/g, `$1${CRLF}`))
+    const b64lines: string[] = []
+    for (let i = 0; i < img.base64.length; i += 76) b64lines.push(img.base64.slice(i, i + 76))
+    parts.push(b64lines.join(CRLF))
   }
   parts.push(`--${boundary}--`)
   parts.push('')

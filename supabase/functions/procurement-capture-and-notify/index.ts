@@ -38,7 +38,9 @@ Deno.serve(async (req) => {
   if (liErr) return json({ error: liErr.message }, 500)
 
   // 2. Capture screenshots (non-fatal per item).
-  const apiKey = (await db.rpc('get_app_secret', { p_name: 'SCREENSHOT_API_KEY' })).data as string | null
+  const secretRes = await db.rpc('get_app_secret', { p_name: 'SCREENSHOT_API_KEY' })
+  if (secretRes.error) console.warn('get_app_secret(SCREENSHOT_API_KEY) failed:', secretRes.error.message)
+  const apiKey = secretRes.data as string | null
   const results: { line_item_id: string; captured: boolean; error?: string }[] = []
   for (const li of lineItems ?? []) {
     if (!li.item_url || (li.product_image_path && !body.only_line_item_id)) { results.push({ line_item_id: li.id, captured: !!li.product_image_path }); continue }
@@ -79,7 +81,9 @@ Deno.serve(async (req) => {
         let imgHtml = '<em>(no product image)</em>'
         if (captured && li.product_image_path) {
           const dl = await db.storage.from('product-images').download(li.product_image_path)
-          if (dl.data) { const cid = `img_${li.id.replace(/-/g, '')}`; images.push({ cid, contentType: 'image/png', base64: toBase64(new Uint8Array(await dl.data.arrayBuffer())) }); imgHtml = `<img src="cid:${cid}" alt="product" style="max-width:280px;border:1px solid #ddd;border-radius:6px"/>` }
+          if (dl.data) { const cid = `img_${li.id.replace(/-/g, '')}`; images.push({ cid, contentType: 'image/png', base64: toBase64(new Uint8Array(await dl.data.arrayBuffer())) }); imgHtml = `<img src="cid:${cid}" alt="product" style="max-width:280px;border:1px solid #ddd;border-radius:6px"/>` } else {
+            console.warn(`product-images download returned no data for line item ${li.id}`)
+          }
         }
         const urlHtml = li.item_url ? `<a href="${li.item_url}">${li.item_url}</a>` : '—'
         rowsHtml.push(`<tr><td style="padding:8px;vertical-align:top">${imgHtml}</td><td style="padding:8px;vertical-align:top"><strong>${li.item_description ?? 'Item'}</strong><br/>Qty: ${li.quantity}<br/>${urlHtml}</td></tr>`)
