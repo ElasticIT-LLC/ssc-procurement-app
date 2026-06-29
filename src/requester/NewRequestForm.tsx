@@ -109,7 +109,7 @@ export function NewRequestForm({ onCancel, onSuccess }: NewRequestFormProps) {
         if (!res) return
         const captured = res.items.filter((i) => i.captured).length
         showToast({ message: `Captured ${captured}/${res.items.length} product images, notified ${res.recipients} approver(s)`, type: captured === res.items.length ? 'success' : 'info' })
-      })
+      }).catch(() => {})
     } catch (err: unknown) {
       showToast({ message: err instanceof Error ? err.message : 'Failed to submit request', type: 'error' })
     } finally {

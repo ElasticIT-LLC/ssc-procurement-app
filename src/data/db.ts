@@ -133,8 +133,12 @@ export function useProcurementApi() {
     }
   }
   async function getProductImageUrl(path: string): Promise<string | null> {
-    const { data } = await supabase.storage.from('product-images').createSignedUrl(path, 3600)
-    return data?.signedUrl ?? null
+    try {
+      const { data } = await supabase.storage.from('product-images').createSignedUrl(path, 3600)
+      return data?.signedUrl ?? null
+    } catch {
+      return null
+    }
   }
 
   return { listRequests, getRequest, listLineItems, listLocations, listDepartments, listAllLocations, listAllDepartments, submitRequest, decideLineItem, orderLineItem, receiveLineItem, initiateReturn, processReturn, listLineItemsByStatus, listAllLineItemsDetailed, countLineItems, setLineItemComment, deleteLineItem, createLocation, createDepartment, updateLocation, updateDepartment, fireNotification, captureAndNotify, getProductImageUrl }

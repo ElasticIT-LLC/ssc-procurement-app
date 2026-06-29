@@ -99,7 +99,7 @@ export function ApprovalsPage() {
           {imageUrls[item.id] ? (
             <img src={imageUrls[item.id]} alt="Product" className="max-w-[240px] rounded-md border border-border" />
           ) : item.item_url ? (
-            <button type="button" disabled={busyId === item.id} onClick={async () => { setBusyId(item.id); await api.captureAndNotify(item.request.id, item.id); await load(); setBusyId(null) }} className="self-start inline-flex items-center rounded-md border border-border px-2.5 py-1 text-xs font-medium text-muted-foreground hover:bg-muted disabled:opacity-50">
+            <button type="button" disabled={busyId === item.id} onClick={async () => { setBusyId(item.id); try { await api.captureAndNotify(item.request.id, item.id); await load() } finally { setBusyId(null) } }} className="self-start inline-flex items-center rounded-md border border-border px-2.5 py-1 text-xs font-medium text-muted-foreground hover:bg-muted disabled:opacity-50">
               Product image unavailable — Retry capture
             </button>
           ) : null}
