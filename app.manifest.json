@@ -3,7 +3,7 @@
   "slug": "procurement",
   "name": "Procurement",
   "icon": "Package",
-  "version": "0.2.2",
+  "version": "0.3.0",
   "permissions": [
     { "key": "apps/procurement/*", "label": "Full Access", "description": "Full access to Procurement", "group": "Administration" },
     { "key": "apps/procurement/requests/create", "label": "Create requests", "description": "Create and submit purchase requests; mark items received; initiate returns", "group": "Requests" },
@@ -29,7 +29,8 @@
       { "version": 1, "description": "Core tables + seed", "up": "migrations/001_initial.sql" },
       { "version": 2, "description": "Workflow RPCs + row-ownership RLS", "up": "migrations/002_rpcs_and_rls.sql" },
       { "version": 3, "description": "Records (admin_comment + item RPCs) + requester capture", "up": "migrations/003_records_and_polish.sql" },
-      { "version": 4, "description": "Enable RLS on purchase_requests + line_items (policies were inert)", "up": "migrations/004_enable_rls.sql" }
+      { "version": 4, "description": "Enable RLS on purchase_requests + line_items (policies were inert)", "up": "migrations/004_enable_rls.sql" },
+      { "version": 5, "description": "Phase 2a: product-images bucket + get_app_secret + get_permission_holders", "up": "migrations/005_images_secrets_recipients.sql" }
     ],
     "tables": [
       { "name": "locations",         "rls": { "read": "authenticated", "write": "admin" } },
