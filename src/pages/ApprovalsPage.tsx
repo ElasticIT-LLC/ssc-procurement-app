@@ -33,6 +33,8 @@ export function ApprovalsPage() {
     setBusyId(id)
     try {
       await api.decideLineItem(id, action)
+      if (action === 'approved') await api.fireNotification('item_approved')
+      else if (action === 'declined') await api.fireNotification('item_declined')
       const messages: Record<typeof action, string> = {
         approved: 'Item approved',
         declined: 'Item declined',

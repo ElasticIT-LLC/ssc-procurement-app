@@ -37,6 +37,7 @@ export function ReturnForm({ item, onDone }: ReturnFormProps) {
         wants_replacement: wantsReplacement,
         return_notes: returnNotes || null,
       })
+      await api.fireNotification('return_initiated')
       showToast({ message: 'Return initiated', type: 'success' })
       onDone()
     } catch (err: unknown) {

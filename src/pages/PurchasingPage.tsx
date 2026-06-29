@@ -73,6 +73,7 @@ export function PurchasingPage() {
         custom_shipping_location: isOther ? (form.custom_shipping_location || null) : null,
         purchase_notes: form.purchase_notes || null,
       })
+      await api.fireNotification('item_ordered')
       showToast({ message: 'Order recorded', type: 'success' })
       setOpenFormId(null)
       await load()

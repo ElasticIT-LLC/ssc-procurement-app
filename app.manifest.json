@@ -40,7 +40,13 @@
       { "name": "_config",           "rls": { "read": "admin", "write": "admin" } }
     ]
   },
-  "notifications": [],
+  "notifications": [
+    { "key": "request_submitted", "label": "New request to approve", "description": "A new purchase request was submitted and needs approval.", "sort_order": 1 },
+    { "key": "item_approved", "label": "Item approved", "description": "A requested item was approved.", "sort_order": 2 },
+    { "key": "item_declined", "label": "Item declined", "description": "A requested item was declined.", "sort_order": 3 },
+    { "key": "item_ordered", "label": "Item ordered", "description": "An approved item was ordered.", "sort_order": 4 },
+    { "key": "return_initiated", "label": "Return initiated", "description": "A return was initiated for a received item.", "sort_order": 5 }
+  ],
   "edge_functions": [
     { "name": "procurement-capture-and-notify", "entrypoint": "supabase/functions/procurement-capture-and-notify/index.ts", "verify_jwt": false }
   ],

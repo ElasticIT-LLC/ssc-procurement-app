@@ -69,6 +69,18 @@ export function useProcurementApi() {
   }
   async function processReturn(id: string, orderReplacement: boolean): Promise<void> { ok(await db().rpc(RPCS.processReturn, { p_line_item_id: id, p_order_replacement: orderReplacement })) }
 
+  // Fire an in-app + email notification via the shell's send-notification function.
+  // Best-effort: never throws into the caller (a notification failure must not break the action).
+  async function fireNotification(key: string, details?: string): Promise<void> {
+    try {
+      await supabase.functions.invoke('send-notification', {
+        body: { event_type: `procurement:${key}`, app_slug: 'procurement', app_name: 'Procurement', details: details ?? null },
+      })
+    } catch (e) {
+      console.error('send-notification failed:', e)
+    }
+  }
+
   async function listLineItemsByStatus(statuses: string[]): Promise<LineItemWithRequest[]> {
     const rows = ok(await db().from(TABLES.lineItems)
       .select('*, purchase_requests!request_id(id, requester_name, requester_email, notes, submitted_at)')
@@ -108,5 +120,5 @@ export function useProcurementApi() {
   async function updateLocation(id: string, patch: { name?: string; is_active?: boolean }): Promise<void> { ok(await db().from(TABLES.locations).update(patch).eq('id', id)) }
   async function updateDepartment(id: string, patch: { name?: string; is_active?: boolean }): Promise<void> { ok(await db().from(TABLES.departments).update(patch).eq('id', id)) }
 
-  return { listRequests, getRequest, listLineItems, listLocations, listDepartments, listAllLocations, listAllDepartments, submitRequest, decideLineItem, orderLineItem, receiveLineItem, initiateReturn, processReturn, listLineItemsByStatus, listAllLineItemsDetailed, countLineItems, setLineItemComment, deleteLineItem, createLocation, createDepartment, updateLocation, updateDepartment }
+  return { listRequests, getRequest, listLineItems, listLocations, listDepartments, listAllLocations, listAllDepartments, submitRequest, decideLineItem, orderLineItem, receiveLineItem, initiateReturn, processReturn, listLineItemsByStatus, listAllLineItemsDetailed, countLineItems, setLineItemComment, deleteLineItem, createLocation, createDepartment, updateLocation, updateDepartment, fireNotification }
 }
