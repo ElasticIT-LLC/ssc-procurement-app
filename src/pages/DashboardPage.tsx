@@ -13,10 +13,10 @@ interface KpiCardProps {
 
 function KpiCard({ label, value, sub }: KpiCardProps) {
   return (
-    <div className="rounded-lg border border-border bg-card p-4 grid gap-1">
+    <div className="rounded-lg border border-border bg-card px-4 py-3 w-44">
       <p className="text-xs font-medium text-muted-foreground">{label}</p>
-      <p className="text-3xl font-semibold text-foreground">{value}</p>
-      <p className="text-xs text-muted-foreground">{sub}</p>
+      <p className="text-2xl font-semibold text-foreground mt-1 leading-none">{value}</p>
+      <p className="text-[11px] text-muted-foreground mt-1">{sub}</p>
     </div>
   )
 }
@@ -91,7 +91,7 @@ export function DashboardPage() {
       {!loading && !error && (
         <>
           {/* KPI grid */}
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="flex flex-wrap gap-3">
             <KpiCard
               label="Total Items"
               value={totalItems}
