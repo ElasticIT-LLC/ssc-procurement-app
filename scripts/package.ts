@@ -306,6 +306,29 @@ async function createPackage(meta: AppMeta): Promise<void> {
       }
     }
 
+    // Add edge functions declared in app.manifest.json `edge_functions[]`.
+    // Bundle the ENTIRE function directory (sibling modules like smtp.ts must travel too).
+    const mPath = join(root, 'app.manifest.json')
+    if (existsSync(mPath)) {
+      const m = JSON.parse(readFileSync(mPath, 'utf-8')) as { edge_functions?: Array<{ name: string; entrypoint: string }> }
+      for (const fn of m.edge_functions ?? []) {
+        const fnEntry = join(root, fn.entrypoint)
+        if (!existsSync(fnEntry)) {
+          console.warn(`WARNING: edge_function "${fn.name}" entrypoint not found at ${fn.entrypoint} — publish-app will skip it.`)
+          continue
+        }
+        const fnDir = dirname(fnEntry)
+        const rel = fn.entrypoint.substring(0, fn.entrypoint.lastIndexOf('/'))
+        for (const f of readdirSync(fnDir)) {
+          const full = join(fnDir, f)
+          if (statSync(full).isFile()) {
+            archive.file(full, { name: `${rel}/${f}` })
+            files.push(`${rel}/${f}`)
+          }
+        }
+      }
+    }
+
     archive.finalize()
   })
 }

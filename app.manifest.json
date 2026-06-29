@@ -40,5 +40,11 @@
       { "name": "_config",           "rls": { "read": "admin", "write": "admin" } }
     ]
   },
-  "notifications": []
+  "notifications": [],
+  "edge_functions": [
+    { "name": "procurement-capture-and-notify", "entrypoint": "supabase/functions/procurement-capture-and-notify/index.ts", "verify_jwt": false }
+  ],
+  "vault_secrets": [
+    { "name": "SCREENSHOT_API_KEY", "source": "admin-input", "description": "x-api-key for the msr-screenshot Azure container app (used server-side by procurement-capture-and-notify to capture product screenshots)." }
+  ]
 }
