@@ -3,10 +3,11 @@ import type { LineItemStatus, RequestStatus } from '../lib/constants'
 
 const SCHEMA = 'app_procurement'
 const TABLES = { requests: 'purchase_requests', lineItems: 'line_items', locations: 'locations', departments: 'departments' } as const
+const PUBLIC = { userProfiles: 'user_profiles' } as const
 const RPCS = { submit: 'submit_request', decide: 'decide_line_item', order: 'order_line_item', receive: 'receive_line_item', initiateReturn: 'initiate_return', processReturn: 'process_return', setComment: 'set_line_item_comment', deleteItem: 'delete_line_item' } as const
 
 export interface RequestRow { id: string; requester_id: string | null; requester_name: string | null; requester_email: string | null; requester_type: string; status: RequestStatus; notes: string | null; submitted_at: string; updated_at: string }
-export interface LineItemRow { id: string; request_id: string; item_description: string | null; item_url: string | null; memo: string | null; quantity: number; status: LineItemStatus; location_id: string | null; custom_location: string | null; department_id: string | null; custom_department: string | null; date_needed: string | null; eta: string | null; admin_comment: string | null; product_image_path: string | null; return_reason: string | null; return_quantity: number | null; wants_replacement: boolean | null; return_notes: string | null; created_at: string }
+export interface LineItemRow { id: string; request_id: string; item_description: string | null; item_url: string | null; memo: string | null; quantity: number; status: LineItemStatus; location_id: string | null; custom_location: string | null; department_id: string | null; custom_department: string | null; date_needed: string | null; eta: string | null; admin_comment: string | null; commented_by: string | null; commented_at: string | null; product_image_path: string | null; return_reason: string | null; return_quantity: number | null; wants_replacement: boolean | null; return_notes: string | null; created_at: string }
 export interface LineItemWithRequest extends LineItemRow {
   request: {
     id: string
@@ -115,6 +116,17 @@ export function useProcurementApi() {
   async function setLineItemComment(id: string, comment: string): Promise<void> { ok(await db().rpc(RPCS.setComment, { p_line_item_id: id, p_comment: comment })) }
   async function deleteLineItem(id: string): Promise<void> { ok(await db().rpc(RPCS.deleteItem, { p_line_item_id: id })) }
 
+  // Resolve a set of user ids → display names (public.user_profiles). Used to label commenters.
+  async function resolveUserNames(ids: string[]): Promise<Record<string, string>> {
+    const unique = [...new Set(ids.filter(Boolean))]
+    if (!unique.length) return {}
+    const res = await supabase.from(PUBLIC.userProfiles).select('id, display_name, email')
+    if (res.error) throw new Error(res.error.message)
+    const map: Record<string, string> = {}
+    for (const p of ((res.data ?? []) as { id: string; display_name: string | null; email: string | null }[])) map[p.id] = p.display_name || p.email || ''
+    return map
+  }
+
   async function createLocation(name: string): Promise<void> { ok(await db().from(TABLES.locations).insert({ name })) }
   async function createDepartment(name: string): Promise<void> { ok(await db().from(TABLES.departments).insert({ name })) }
   async function updateLocation(id: string, patch: { name?: string; is_active?: boolean }): Promise<void> { ok(await db().from(TABLES.locations).update(patch).eq('id', id)) }
@@ -149,5 +161,5 @@ export function useProcurementApi() {
     }
   }
 
-  return { listRequests, getRequest, listLineItems, listLocations, listDepartments, listAllLocations, listAllDepartments, submitRequest, decideLineItem, orderLineItem, receiveLineItem, initiateReturn, processReturn, listLineItemsByStatus, listAllLineItemsDetailed, countLineItems, setLineItemComment, deleteLineItem, createLocation, createDepartment, updateLocation, updateDepartment, fireNotification, captureAndNotify, getProductImageUrl, notifyApproved }
+  return { listRequests, getRequest, listLineItems, listLocations, listDepartments, listAllLocations, listAllDepartments, submitRequest, decideLineItem, orderLineItem, receiveLineItem, initiateReturn, processReturn, listLineItemsByStatus, listAllLineItemsDetailed, countLineItems, setLineItemComment, deleteLineItem, createLocation, createDepartment, updateLocation, updateDepartment, fireNotification, captureAndNotify, getProductImageUrl, notifyApproved, resolveUserNames }
 }
