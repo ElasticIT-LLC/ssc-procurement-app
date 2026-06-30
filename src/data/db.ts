@@ -120,7 +120,7 @@ export function useProcurementApi() {
   async function resolveUserNames(ids: string[]): Promise<Record<string, string>> {
     const unique = [...new Set(ids.filter(Boolean))]
     if (!unique.length) return {}
-    const res = await supabase.from(PUBLIC.userProfiles).select('id, display_name, email')
+    const res = await supabase.from(PUBLIC.userProfiles).select('id, display_name, email').in('id', unique)
     if (res.error) throw new Error(res.error.message)
     const map: Record<string, string> = {}
     for (const p of ((res.data ?? []) as { id: string; display_name: string | null; email: string | null }[])) map[p.id] = p.display_name || p.email || ''
