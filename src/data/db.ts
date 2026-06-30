@@ -120,6 +120,14 @@ export function useProcurementApi() {
   async function updateLocation(id: string, patch: { name?: string; is_active?: boolean }): Promise<void> { ok(await db().from(TABLES.locations).update(patch).eq('id', id)) }
   async function updateDepartment(id: string, patch: { name?: string; is_active?: boolean }): Promise<void> { ok(await db().from(TABLES.departments).update(patch).eq('id', id)) }
 
+  async function notifyApproved(requestId: string): Promise<void> {
+    try {
+      await supabase.functions.invoke('procurement-capture-and-notify', { body: { event: 'approved', request_id: requestId } })
+    } catch (e) {
+      console.error('notifyApproved failed:', e)
+    }
+  }
+
   async function captureAndNotify(requestId: string, onlyLineItemId?: string) {
     try {
       const { data, error } = await supabase.functions.invoke('procurement-capture-and-notify', {
@@ -141,5 +149,5 @@ export function useProcurementApi() {
     }
   }
 
-  return { listRequests, getRequest, listLineItems, listLocations, listDepartments, listAllLocations, listAllDepartments, submitRequest, decideLineItem, orderLineItem, receiveLineItem, initiateReturn, processReturn, listLineItemsByStatus, listAllLineItemsDetailed, countLineItems, setLineItemComment, deleteLineItem, createLocation, createDepartment, updateLocation, updateDepartment, fireNotification, captureAndNotify, getProductImageUrl }
+  return { listRequests, getRequest, listLineItems, listLocations, listDepartments, listAllLocations, listAllDepartments, submitRequest, decideLineItem, orderLineItem, receiveLineItem, initiateReturn, processReturn, listLineItemsByStatus, listAllLineItemsDetailed, countLineItems, setLineItemComment, deleteLineItem, createLocation, createDepartment, updateLocation, updateDepartment, fireNotification, captureAndNotify, getProductImageUrl, notifyApproved }
 }

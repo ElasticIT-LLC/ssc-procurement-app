@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
 import { sendSmtp } from './smtp.ts'
+import { buildApprovedEmail, buildSummaryEmail } from './emails.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
@@ -22,7 +23,7 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: cors })
   if (req.method !== 'POST') return json({ error: 'POST only' }, 405)
 
-  let body: { request_id?: string; only_line_item_id?: string }
+  let body: { request_id?: string; only_line_item_id?: string; event?: string }
   try { body = await req.json() } catch { return json({ error: 'invalid JSON' }, 400) }
   const requestId = body.request_id
   if (!requestId) return json({ error: 'request_id required' }, 400)
@@ -30,8 +31,56 @@ Deno.serve(async (req) => {
   const db = createClient(SUPABASE_URL, SERVICE_KEY)
 
   // 1. Load request + line items.
-  const { data: request, error: reqErr } = await db.schema('app_procurement').from('purchase_requests').select('id, requester_name, requester_email, notes, submitted_at').eq('id', requestId).maybeSingle()
+  const { data: request, error: reqErr } = await db.schema('app_procurement').from('purchase_requests').select('id, requester_name, requester_email, notes, submitted_at, approval_notified_at').eq('id', requestId).maybeSingle()
   if (reqErr || !request) return json({ error: 'request not found' }, 404)
+
+  const event = body.event ?? 'submitted'
+
+  // ── Approval summary flow ───────────────────────────────────────────────
+  if (event === 'approved') {
+    if ((request as Record<string, unknown>).approval_notified_at) return json({ event: 'approved', skipped: true, reason: 'already notified' })
+    const { data: items } = await db.schema('app_procurement').from('line_items').select('id, item_description, item_url, quantity, status, admin_comment, approved_by, custom_location, custom_department, locations!location_id(name), departments!department_id(name)').eq('request_id', requestId)
+    const allItems = (items ?? []) as Array<Record<string, any>>
+    const deciderIds = [...new Set(allItems.map((i) => i.approved_by).filter(Boolean))]
+    const deciderMap = new Map<string, string>()
+    if (deciderIds.length) {
+      const { data: profs } = await db.from('user_profiles').select('id, display_name, email').in('id', deciderIds)
+      for (const p of (profs ?? []) as Array<{ id: string; display_name: string | null; email: string | null }>) deciderMap.set(p.id, p.display_name || p.email || '')
+    }
+    const approverName = deciderMap.size ? [...deciderMap.values()][0] : 'the approver'
+    const { data: settings } = await db.from('client_settings').select('key, value').in('key', ['client_name', 'portal_url', 'hve_sender_address'])
+    const sMap = new Map((settings ?? []).map((s: { key: string; value: string }) => [s.key, s.value]))
+    const sender = sMap.get('hve_sender_address')
+    const portalUrl = sMap.get('portal_url') ?? ''
+    const clientName = sMap.get('client_name') ?? ''
+    const { data: appRow } = await db.from('apps').select('id').eq('slug', 'procurement').maybeSingle()
+    const appBase = portalUrl && appRow?.id ? `${portalUrl}/apps/${appRow.id}` : ''
+    const recordsUrl = appBase ? `${appBase}/records` : ''
+    const purchasingUrl = appBase ? `${appBase}/purchasing` : ''
+    const requestsUrl = appBase ? `${appBase}/requests` : ''
+    const STATUS: Record<string, string> = { pending: 'Pending', approved: 'Approved', declined: 'Declined', on_hold: 'On hold', ordered: 'Ordered', received: 'Received', returned: 'Returned', replacement_ordered: 'Replacement ordered' }
+    const nm = (li: Record<string, any>) => li.locations?.name ?? li.custom_location ?? '—'
+    const dp = (li: Record<string, any>) => li.departments?.name ?? li.custom_department ?? '—'
+    const requester = request.requester_name ?? request.requester_email ?? 'a requester'
+    let purchaserEmailed = false
+    let requesterEmailed = false
+    if (sender && HVE_PASSWORD) {
+      const approved = allItems.filter((i) => i.status === 'approved')
+      const { data: purchasers } = await db.schema('app_procurement').rpc('get_permission_holders', { p_permission: 'apps/procurement/purchasing/manage' })
+      const purchaserEmails = ((purchasers ?? []) as Array<{ email: string }>).map((p) => p.email)
+      if (approved.length && purchaserEmails.length) {
+        const html = buildApprovedEmail({ requester, approverName, recordsUrl, purchasingUrl, clientName, items: approved.map((i) => ({ name: i.item_description ?? 'Item', qty: String(i.quantity), dept: dp(i), location: nm(i), approvedBy: deciderMap.get(i.approved_by) ?? '', url: i.item_url ?? null })) })
+        try { await sendSmtp({ host: HVE_HOST, port: HVE_PORT, fromAddress: sender, useTls: true, auth: { type: 'login', username: sender, password: HVE_PASSWORD } }, { recipients: purchaserEmails, subject: 'Approved Procurement Request', htmlBody: html, fromDisplayName: clientName ? `${clientName} Procurement` : 'Procurement' }); purchaserEmailed = true } catch (e) { console.error('purchaser email failed:', e instanceof Error ? e.message : e) }
+      }
+      if (request.requester_email) {
+        const html = buildSummaryEmail({ clientName, approverName, items: allItems.map((i) => ({ name: i.item_description ?? 'Item', status: STATUS[i.status] ?? i.status, comments: i.admin_comment ?? '', decidedBy: deciderMap.get(i.approved_by) ?? '', returnUrl: requestsUrl, canReturn: ['approved', 'ordered', 'received'].includes(i.status) })) })
+        try { await sendSmtp({ host: HVE_HOST, port: HVE_PORT, fromAddress: sender, useTls: true, auth: { type: 'login', username: sender, password: HVE_PASSWORD } }, { recipients: [request.requester_email], subject: 'Procurement Request Summary', htmlBody: html, fromDisplayName: clientName ? `${clientName} Procurement` : 'Procurement' }); requesterEmailed = true } catch (e) { console.error('requester email failed:', e instanceof Error ? e.message : e) }
+      }
+    }
+    await db.schema('app_procurement').from('purchase_requests').update({ approval_notified_at: new Date().toISOString() }).eq('id', requestId)
+    return json({ event: 'approved', purchaser_emailed: purchaserEmailed, requester_emailed: requesterEmailed, items: allItems.length })
+  }
+
   let liQuery = db.schema('app_procurement').from('line_items').select('id, item_description, item_url, quantity, product_image_path, custom_location, custom_department, locations!location_id(name), departments!department_id(name)').eq('request_id', requestId)
   if (body.only_line_item_id) liQuery = liQuery.eq('id', body.only_line_item_id)
   const { data: lineItems, error: liErr } = await liQuery

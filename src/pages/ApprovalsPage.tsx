@@ -34,18 +34,21 @@ export function ApprovalsPage() {
   useEffect(() => { load() }, [load])
 
   async function handleAction(id: string, action: 'approved' | 'declined' | 'on_hold') {
+    const reqId = items.find((it) => it.id === id)?.request.id
     setBusyId(id)
     try {
       await api.decideLineItem(id, action)
-      if (action === 'approved') await api.fireNotification('item_approved')
-      else if (action === 'declined') await api.fireNotification('item_declined')
       const messages: Record<typeof action, string> = {
         approved: 'Item approved',
         declined: 'Item declined',
         on_hold: 'Item placed on hold',
       }
       showToast({ message: messages[action], type: 'success' })
-      await load()
+      if (action === 'approved') await api.fireNotification('item_approved')
+      else if (action === 'declined') await api.fireNotification('item_declined')
+      const remaining = await api.listLineItemsByStatus(['pending', 'on_hold'])
+      setItems(remaining)
+      if (reqId && !remaining.some((it) => it.request.id === reqId)) api.notifyApproved(reqId)
     } catch (err: unknown) {
       showToast({ message: err instanceof Error ? err.message : 'Action failed', type: 'error' })
     } finally {
