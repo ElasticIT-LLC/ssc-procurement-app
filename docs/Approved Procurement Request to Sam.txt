@@ -1,0 +1,101 @@
+<table cellpadding="0" cellspacing="0" width="100%" style="font-family: Arial, sans-serif; background-color: #f4f6f8; padding: 24px;">
+  <tr>
+    <td align="center">
+      <table cellpadding="0" cellspacing="0" width="620" style="background: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 6px rgba(0,0,0,0.08);">
+
+        <!-- Header -->
+        <tr>
+          <td style="padding: 20px; background: #0b66c3; color: #ffffff; text-align: left;">
+            <h2 style="margin:0; font-size:18px; font-weight:600;">Approved Procurement Request</h2>
+            <div style="font-size:12px; opacity:0.95;">Items approved for purchase</div>
+          </td>
+        </tr>
+
+        <!-- Body -->
+        <tr>
+          <td style="padding: 20px; color: #333333; font-size: 14px; line-height:1.5;">
+            <p style="margin: 0 0 12px 0;">Good day Sam,</p>
+
+            <p style="margin: 0 0 12px 0;">Requested by: <strong>Jacky Velasquez</strong></p>
+
+            <p style="margin: 0 0 16px 0;">
+              The following items have been <strong>approved</strong> for purchase:
+            </p>
+
+            <!-- Approved Items Table -->
+            <table cellpadding="6" cellspacing="0" width="100%" style="border-collapse: collapse; border: 1px solid #e6e9ed; font-size: 13px;">
+              <thead>
+                <tr style="background-color: #f1f4f8;">
+                  <th align="left" style="border: 1px solid #e6e9ed; padding: 8px; font-weight: 600;">Item</th>
+                  <th align="left" style="border: 1px solid #e6e9ed; padding: 8px; font-weight: 600;">Quantity</th>
+                  <th align="left" style="border: 1px solid #e6e9ed; padding: 8px; font-weight: 600;">Department</th>
+                  <th align="left" style="border: 1px solid #e6e9ed; padding: 8px; font-weight: 600;">Location</th>
+                  <th align="left" style="border: 1px solid #e6e9ed; padding: 8px; font-weight: 600;">Approved By</th>
+                  <th align="left" style="border: 1px solid #e6e9ed; padding: 8px; font-weight: 600;">URL</th>
+                </tr>
+              </thead>
+              <tbody>
+                
+    <tr>
+      <td style="padding: 8px; border: 1px solid #e6e9ed;">Charger for brother label machine</td>
+      <td style="padding: 8px; border: 1px solid #e6e9ed;">1</td>
+      <td style="padding: 8px; border: 1px solid #e6e9ed;">Staff Operations (Office Supplies, holiday party, HR events, meetings)</td>
+      <td style="padding: 8px; border: 1px solid #e6e9ed;">Dumfries 3.5 - 17470 FRALEY BLVD, DUMFRIES, VA 22026</td>
+      <td style="padding: 8px; border: 1px solid #e6e9ed;">Nicole Erkfitz</td>
+      <td style="padding: 8px; border: 1px solid #e6e9ed;"><a href="https://a.co/d/0f4wTBZd" target="_blank" style="color:#0b66c3; text-decoration:none;">View Item</a></td>
+    </tr>
+  
+    <tr>
+      <td style="padding: 8px; border: 1px solid #e6e9ed;">Printer labels</td>
+      <td style="padding: 8px; border: 1px solid #e6e9ed;">1 pack </td>
+      <td style="padding: 8px; border: 1px solid #e6e9ed;">Staff Operations (Office Supplies, holiday party, HR events, meetings)</td>
+      <td style="padding: 8px; border: 1px solid #e6e9ed;">Dumfries 3.5 - 17470 FRALEY BLVD, DUMFRIES, VA 22026</td>
+      <td style="padding: 8px; border: 1px solid #e6e9ed;">Nicole Erkfitz</td>
+      <td style="padding: 8px; border: 1px solid #e6e9ed;"><a href="https://a.co/d/06oW3DiS" target="_blank" style="color:#0b66c3; text-decoration:none;">View Item</a></td>
+    </tr>
+  
+              </tbody>
+            </table>
+
+            <!-- Excel Sheet Link -->
+            <p style="margin: 20px 0 12px 0;">
+              You can view the complete worksheet in Excel by clicking the link below:
+            </p>
+
+            <p style="margin: 0 0 16px 0;">
+              <a href="https://mainspringrecovery-my.sharepoint.com/:x:/r/personal/admin_elasticit_mainspringrecovery_onmicrosoft_com/_layouts/15/doc2.aspx?sourcedoc=%7B56DC4557-D7C3-4E37-8097-FE9EC7C4F043%7D&file=Procurement%20Request%20Form.xlsx&action=edit&mobileredirect=true&wdMsFormsCorrelationId=14be6422-63c7-49f0-912b-b634cc726c9a&wdtf=%20Microsoft.Office.Excel.FMsFormsMetadataInWorkbookMetadata%3Atrue" target="_blank" style="color:#0b66c3; text-decoration:none; font-weight:600;">
+                📘 View Excel Sheet
+              </a>
+            </p>
+
+            <!-- ETA Form Link -->
+            <p style="margin: 0 0 12px 0;">
+              Once you've confirmed the expected delivery details, please provide the <strong>ETA</strong> and <strong>Shipping Location</strong> using the form below:
+            </p>
+
+            <p style="margin: 0 0 16px 0;">
+              <a href="https://n8n.elasticit.com/form/aee2438b-3b89-4fa3-ad22-5dd9cc9fa2ae?rownum=66%2C67&requestorEmail=jvelasquez%40Mainspringrecovery.com" target="_blank" style="color:#0b66c3; text-decoration:none; font-weight:600;">
+                📦 Submit ETA and Location
+              </a>
+            </p>
+
+            <p style="margin-top: 18px; font-size: 12px; color: #666;">
+              For any updates or clarifications, please reach out to Nicole.
+            </p>
+          </td>
+        </tr>
+
+        <!-- Footer -->
+        <tr>
+          <td style="padding: 12px 20px; background:#f7f9fb; font-size:12px; color:#666;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <div>Procurement · Mainspring Recovery</div>
+              <div style="opacity:0.9;">Automated Summary</div>
+            </div>
+          </td>
+        </tr>
+
+      </table>
+    </td>
+  </tr>
+</table>

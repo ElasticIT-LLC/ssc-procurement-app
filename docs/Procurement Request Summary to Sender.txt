@@ -1,0 +1,80 @@
+<table cellpadding="0" cellspacing="0" width="100%" style="font-family: Arial, sans-serif; background-color: #f4f6f8; padding: 24px;">
+  <tr>
+    <td align="center">
+      <table cellpadding="0" cellspacing="0" width="620" style="background: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 6px rgba(0,0,0,0.08);">
+
+        <!-- Header -->
+        <tr>
+          <td style="padding: 20px; background: #0b66c3; color: #ffffff; text-align: left;">
+            <h2 style="margin:0; font-size:18px; font-weight:600;">Request Summary</h2>
+            <div style="font-size:12px; opacity:0.95;">Overview of submitted items</div>
+          </td>
+        </tr>
+
+        <!-- Body -->
+        <tr>
+          <td style="padding: 20px; color: #333333; font-size: 14px; line-height:1.5;">
+            <p style="margin: 0 0 12px 0;">
+              Kindly review your request summary. For any denied requests, please submit a new request addressing the approver's comments.
+            </p>
+
+            <p style="margin: 0 0 16px 0;">
+              Below is the summary of items included in this purchase request and their current approval status:
+            </p>
+
+            <!-- Request Summary Table -->
+            <table cellpadding="6" cellspacing="0" width="100%" style="border-collapse: collapse; border: 1px solid #e6e9ed; font-size: 13px;">
+              <thead>
+                <tr style="background-color: #f1f4f8;">
+                  <th align="left" style="border: 1px solid #e6e9ed; padding: 8px; font-weight: 600;">Item</th>
+                  <th align="left" style="border: 1px solid #e6e9ed; padding: 8px; font-weight: 600;">Status</th>
+                  <th align="left" style="border: 1px solid #e6e9ed; padding: 8px; font-weight: 600;">Comments</th>
+                  <th align="left" style="border: 1px solid #e6e9ed; padding: 8px; font-weight: 600;">Approved/Denied By</th>
+                  <th align="center" style="border: 1px solid #e6e9ed; padding: 8px; font-weight: 600;">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                
+      <tr>
+        <td style="padding: 8px; border: 1px solid #e6e9ed;">Charger for brother label machine</td>
+        <td style="padding: 8px; border: 1px solid #e6e9ed;">Approved</td>
+        <td style="padding: 8px; border: 1px solid #e6e9ed; word-break: break-word;"></td>
+        <td style="padding: 8px; border: 1px solid #e6e9ed;">Nicole Erkfitz</td>
+        <td style="padding: 8px; border: 1px solid #e6e9ed; text-align: center;">
+          <a href="https://n8n.elasticit.com/form/208aa82b-c318-4bf6-96d5-892dd830a1c7?rownum=66&itemsreturn=true" target="_blank" style="display: inline-block; padding: 6px 12px; background-color: #0b66c3; color: #ffffff; text-decoration: none; border-radius: 4px; font-size: 12px; font-weight: 600;">Return</a>
+        </td>
+      </tr>
+    
+      <tr>
+        <td style="padding: 8px; border: 1px solid #e6e9ed;">Printer labels</td>
+        <td style="padding: 8px; border: 1px solid #e6e9ed;">Approved</td>
+        <td style="padding: 8px; border: 1px solid #e6e9ed; word-break: break-word;"></td>
+        <td style="padding: 8px; border: 1px solid #e6e9ed;">Nicole Erkfitz</td>
+        <td style="padding: 8px; border: 1px solid #e6e9ed; text-align: center;">
+          <a href="https://n8n.elasticit.com/form/208aa82b-c318-4bf6-96d5-892dd830a1c7?rownum=67&itemsreturn=true" target="_blank" style="display: inline-block; padding: 6px 12px; background-color: #0b66c3; color: #ffffff; text-decoration: none; border-radius: 4px; font-size: 12px; font-weight: 600;">Return</a>
+        </td>
+      </tr>
+    
+              </tbody>
+            </table>
+
+            <p style="margin-top: 18px; font-size: 12px; color: #666;">
+              For any updates or clarifications, please reach out to Nicole.
+            </p>
+          </td>
+        </tr>
+
+        <!-- Footer -->
+        <tr>
+          <td style="padding: 12px 20px; background:#f7f9fb; font-size:12px; color:#666;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <div>Procurement · Mainspring Recovery</div>
+              <div style="opacity:0.9;">Automated Summary</div>
+            </div>
+          </td>
+        </tr>
+
+      </table>
+    </td>
+  </tr>
+</table>
