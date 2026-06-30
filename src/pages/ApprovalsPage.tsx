@@ -14,6 +14,8 @@ export function ApprovalsPage() {
   const [error, setError] = useState<string | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [imageUrls, setImageUrls] = useState<Record<string, string>>({})
+  const [names, setNames] = useState<Record<string, string>>({})
+  const [drafts, setDrafts] = useState<Record<string, string>>({})
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -21,6 +23,7 @@ export function ApprovalsPage() {
     try {
       const data = await api.listLineItemsByStatus(['pending', 'on_hold'])
       setItems(data)
+      setNames(await api.resolveUserNames(data.map((i) => i.commented_by).filter((x): x is string => !!x)))
       const urls: Record<string, string> = {}
       await Promise.all(data.filter((i) => i.product_image_path).map(async (i) => { const u = await api.getProductImageUrl(i.product_image_path as string); if (u) urls[i.id] = u }))
       setImageUrls(urls)
@@ -55,6 +58,8 @@ export function ApprovalsPage() {
       setBusyId(null)
     }
   }
+
+  const canComment = hasPermission(PERMS.approve) || hasPermission(PERMS.purchase) || hasPermission(PERMS.admin)
 
   if (!hasPermission(PERMS.approve)) {
     return (
@@ -147,6 +152,32 @@ export function ApprovalsPage() {
               Submitted: {formatDate(item.request.submitted_at)}
             </p>
           </div>
+
+          {/* Comment editor */}
+          {canComment && (
+            <div className="grid gap-1">
+              <label className="text-xs font-medium text-foreground">Comment</label>
+              <textarea
+                rows={2}
+                maxLength={100}
+                defaultValue={item.admin_comment ?? ''}
+                onChange={(e) => setDrafts((d) => ({ ...d, [item.id]: e.target.value }))}
+                placeholder="Short note (max 100 chars)…"
+                className="w-full rounded-md border border-input bg-input px-2 py-1 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring resize-none"
+              />
+              <div className="flex items-center justify-between gap-2">
+                {item.commented_at ? (
+                  <span className="text-[11px] text-muted-foreground">— {names[item.commented_by ?? ''] ?? 'Unknown'} · {formatDate(item.commented_at)}</span>
+                ) : <span />}
+                <button
+                  type="button"
+                  disabled={busyId === item.id}
+                  onClick={async () => { setBusyId(item.id); try { await api.setLineItemComment(item.id, drafts[item.id] ?? item.admin_comment ?? ''); await load() } catch (err) { showToast({ message: err instanceof Error ? err.message : 'Failed to save comment', type: 'error' }) } finally { setBusyId(null) } }}
+                  className="inline-flex items-center rounded-md border border-border px-2.5 py-1 text-xs font-medium text-foreground hover:bg-muted disabled:opacity-50"
+                >Save comment</button>
+              </div>
+            </div>
+          )}
 
           {/* Action buttons */}
           <div className="flex flex-wrap gap-2">
