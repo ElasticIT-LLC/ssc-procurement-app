@@ -53,10 +53,11 @@ export function RecordsPage() {
   const { showToast } = useToast()
   const { hasPermission } = usePermissions()
 
-  const canEdit = hasPermission(PERMS.admin)
+  const canComment = hasPermission(PERMS.approve) || hasPermission(PERMS.purchase) || hasPermission(PERMS.admin)
   const canDelete = hasPermission(FULL_ACCESS)
 
   const [items, setItems] = useState<LineItemDetailed[]>([])
+  const [names, setNames] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [drafts, setDrafts] = useState<Record<string, string>>({})
@@ -69,6 +70,8 @@ export function RecordsPage() {
       const data = await api.listAllLineItemsDetailed()
       setItems(data)
       setDrafts(Object.fromEntries(data.map(i => [i.id, i.admin_comment ?? ''])))
+      const map = await api.resolveUserNames(data.map((r) => r.commented_by).filter((x): x is string => !!x))
+      setNames(map)
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to load records')
     } finally {
@@ -195,23 +198,29 @@ export function RecordsPage() {
                     <span className="break-words">{item.request.notes ?? '—'}</span>
                   </td>
                   <td className={`${cell} min-w-[12rem]`}>
-                    {canEdit ? (
-                      <div className="flex items-start gap-1.5">
-                        <input
-                          type="text"
-                          value={drafts[item.id] ?? ''}
-                          onChange={e => setDrafts(prev => ({ ...prev, [item.id]: e.target.value }))}
-                          placeholder="Add comment…"
-                          className="h-8 w-full rounded-md border border-border bg-input px-2 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                        />
-                        <button
-                          type="button"
-                          disabled={busyId === item.id || (drafts[item.id] ?? '') === (item.admin_comment ?? '')}
-                          onClick={() => handleSaveComment(item.id)}
-                          className="inline-flex shrink-0 items-center rounded-md bg-primary px-2 py-1.5 text-xs font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
-                        >
-                          Save
-                        </button>
+                    {canComment ? (
+                      <div className="flex flex-col gap-1">
+                        <div className="flex items-start gap-1.5">
+                          <input
+                            type="text"
+                            value={drafts[item.id] ?? ''}
+                            onChange={e => setDrafts(prev => ({ ...prev, [item.id]: e.target.value }))}
+                            placeholder="Add comment…"
+                            maxLength={100}
+                            className="h-8 w-full rounded-md border border-border bg-input px-2 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                          />
+                          <button
+                            type="button"
+                            disabled={busyId === item.id || (drafts[item.id] ?? '') === (item.admin_comment ?? '')}
+                            onClick={() => handleSaveComment(item.id)}
+                            className="inline-flex shrink-0 items-center rounded-md bg-primary px-2 py-1.5 text-xs font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
+                          >
+                            Save
+                          </button>
+                        </div>
+                        {item.commented_at && (
+                          <p className="text-[11px] text-muted-foreground mt-0.5">— {names[item.commented_by ?? ''] ?? 'Unknown'} · {formatDate(item.commented_at, { month: 'short', day: 'numeric', year: 'numeric' })}</p>
+                        )}
                       </div>
                     ) : (
                       <span className="text-muted-foreground break-words">{item.admin_comment ?? '—'}</span>
