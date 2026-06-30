@@ -32,7 +32,7 @@ Deno.serve(async (req) => {
   // 1. Load request + line items.
   const { data: request, error: reqErr } = await db.schema('app_procurement').from('purchase_requests').select('id, requester_name, requester_email, notes, submitted_at').eq('id', requestId).maybeSingle()
   if (reqErr || !request) return json({ error: 'request not found' }, 404)
-  let liQuery = db.schema('app_procurement').from('line_items').select('id, item_description, item_url, quantity, product_image_path').eq('request_id', requestId)
+  let liQuery = db.schema('app_procurement').from('line_items').select('id, item_description, item_url, quantity, product_image_path, custom_location, custom_department, locations!location_id(name), departments!department_id(name)').eq('request_id', requestId)
   if (body.only_line_item_id) liQuery = liQuery.eq('id', body.only_line_item_id)
   const { data: lineItems, error: liErr } = await liQuery
   if (liErr) return json({ error: liErr.message }, 500)
@@ -73,23 +73,34 @@ Deno.serve(async (req) => {
     const portalUrl = sMap.get('portal_url') ?? ''
     const clientName = sMap.get('client_name') ?? ''
     if (sender) {
-      // Build HTML with inline cid images for captured items.
+      // Build a branded HTML email with inline (CID) product screenshots.
+      const GREEN = '#2b6450'
       const images: { cid: string; contentType: string; base64: string }[] = []
       const rowsHtml: string[] = []
       for (const li of lineItems ?? []) {
         const captured = results.find((r) => r.line_item_id === li.id)?.captured
-        let imgHtml = '<em>(no product image)</em>'
+        let imgHtml = '<span style="color:#9aa5ad;font-size:12px">No image</span>'
         if (captured && li.product_image_path) {
           const dl = await db.storage.from('product-images').download(li.product_image_path)
-          if (dl.data) { const cid = `img_${li.id.replace(/-/g, '')}`; images.push({ cid, contentType: 'image/png', base64: toBase64(new Uint8Array(await dl.data.arrayBuffer())) }); imgHtml = `<img src="cid:${cid}" alt="product" style="max-width:280px;border:1px solid #ddd;border-radius:6px"/>` } else {
+          if (dl.data) { const cid = `img_${li.id.replace(/-/g, '')}`; images.push({ cid, contentType: 'image/png', base64: toBase64(new Uint8Array(await dl.data.arrayBuffer())) }); imgHtml = `<img src="cid:${cid}" alt="product" style="width:96px;height:auto;border:1px solid #e4e7ea;border-radius:6px;display:block"/>` } else {
             console.warn(`product-images download returned no data for line item ${li.id}`)
           }
         }
-        const urlHtml = li.item_url ? `<a href="${li.item_url}">${li.item_url}</a>` : '—'
-        rowsHtml.push(`<tr><td style="padding:8px;vertical-align:top">${imgHtml}</td><td style="padding:8px;vertical-align:top"><strong>${li.item_description ?? 'Item'}</strong><br/>Qty: ${li.quantity}<br/>${urlHtml}</td></tr>`)
+        const row = li as Record<string, unknown> & { locations?: { name?: string } | null; departments?: { name?: string } | null }
+        const loc = row.locations?.name ?? li.custom_location ?? '—'
+        const dept = row.departments?.name ?? li.custom_department ?? '—'
+        const itemName = li.item_description ?? 'Item'
+        const nameCell = li.item_url ? `<a href="${li.item_url}" style="color:${GREEN};font-weight:600;text-decoration:none">${itemName}</a>` : `<strong>${itemName}</strong>`
+        const td = 'padding:10px 12px;border-bottom:1px solid #e4e7ea;font-size:14px;color:#36414d;vertical-align:top'
+        rowsHtml.push(`<tr><td style="${td}">${imgHtml}</td><td style="${td}">${nameCell}</td><td style="${td};text-align:center">${li.quantity}</td><td style="${td}">${dept}</td><td style="${td}">${loc}</td></tr>`)
       }
-      const link = `${portalUrl}/apps/procurement`
-      const html = `<div style="font-family:system-ui,Arial,sans-serif"><h2>New procurement request needs approval</h2><p>Requested by ${request.requester_name ?? request.requester_email ?? 'a requester'}.${request.notes ? ` Notes: ${request.notes}` : ''}</p><table style="border-collapse:collapse">${rowsHtml.join('')}</table><p><a href="${link}">Open Approvals in the portal</a></p></div>`
+      const thL = 'padding:10px 12px;text-align:left;font-size:12px;font-weight:700;color:#1f4739;background:#dbf0e9;border-bottom:2px solid #b8e0d2'
+      const thC = thL.replace('text-align:left', 'text-align:center')
+      const requester = request.requester_name ?? request.requester_email ?? 'a requester'
+      const count = (lineItems ?? []).length
+      const approvalsUrl = portalUrl ? `${portalUrl}/apps/procurement` : ''
+      const btn = approvalsUrl ? `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:24px auto"><tr><td style="border-radius:8px;background:${GREEN}"><a href="${approvalsUrl}" style="display:inline-block;padding:12px 28px;color:#ffffff;font-weight:600;font-size:14px;text-decoration:none">Review &amp; Approve in Portal</a></td></tr></table>` : ''
+      const html = `<!DOCTYPE html><html><body style="margin:0;padding:0;background:#f4f5f7"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f5f7;padding:24px 0"><tr><td align="center"><table role="presentation" width="640" cellpadding="0" cellspacing="0" style="max-width:640px;width:100%;background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e4e7ea;font-family:system-ui,-apple-system,Segoe UI,Arial,sans-serif"><tr><td style="background:${GREEN};padding:24px 28px"><div style="color:#ffffff;font-size:20px;font-weight:700">New Procurement Request</div><div style="color:#b8e0d2;font-size:14px;margin-top:4px">Awaiting your approval</div></td></tr><tr><td style="padding:28px"><p style="margin:0 0 16px;font-size:14px;color:#36414d">Good day,</p><p style="margin:0 0 20px;font-size:14px;color:#36414d">The following ${count === 1 ? 'item was' : 'items were'} requested by <strong>${requester}</strong> and ${count === 1 ? 'needs' : 'need'} your approval:</p><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;border:1px solid #e4e7ea"><tr><th style="${thL}">Product</th><th style="${thL}">Item</th><th style="${thC}">Qty</th><th style="${thL}">Department</th><th style="${thL}">Location</th></tr>${rowsHtml.join('')}</table>${btn}<p style="margin:24px 0 0;font-size:12px;color:#7a8796;border-top:1px solid #e4e7ea;padding-top:16px">Procurement · ${clientName || 'Mainspring Recovery'}</p></td></tr></table></td></tr></table></body></html>`
       try {
         await sendSmtp(
           { host: HVE_HOST, port: HVE_PORT, fromAddress: sender, useTls: true, auth: { type: 'login', username: sender, password: HVE_PASSWORD } },
