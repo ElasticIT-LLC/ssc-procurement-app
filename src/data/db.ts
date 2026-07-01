@@ -1,9 +1,10 @@
 import { useSupabase } from '@elasticit-llc/app-bridge'
 import type { LineItemStatus, RequestStatus } from '../lib/constants'
+import { DEFAULT_RULES, type FormatRule } from '../formatting/rules'
 
 const SCHEMA = 'app_procurement'
-const TABLES = { requests: 'purchase_requests', lineItems: 'line_items', locations: 'locations', departments: 'departments' } as const
-const RPCS = { submit: 'submit_request', decide: 'decide_line_item', order: 'order_line_item', receive: 'receive_line_item', initiateReturn: 'initiate_return', processReturn: 'process_return', setComment: 'set_line_item_comment', deleteItem: 'delete_line_item', getUserNames: 'get_user_names' } as const
+const TABLES = { requests: 'purchase_requests', lineItems: 'line_items', locations: 'locations', departments: 'departments', config: '_config' } as const
+const RPCS = { submit: 'submit_request', decide: 'decide_line_item', order: 'order_line_item', receive: 'receive_line_item', initiateReturn: 'initiate_return', processReturn: 'process_return', setComment: 'set_line_item_comment', deleteItem: 'delete_line_item', getUserNames: 'get_user_names', getFormattingRules: 'get_formatting_rules' } as const
 
 export interface RequestRow { id: string; requester_id: string | null; requester_name: string | null; requester_email: string | null; requester_type: string; status: RequestStatus; notes: string | null; submitted_at: string; updated_at: string }
 export interface LineItemRow { id: string; request_id: string; item_description: string | null; item_url: string | null; memo: string | null; quantity: number; status: LineItemStatus; location_id: string | null; custom_location: string | null; department_id: string | null; custom_department: string | null; date_needed: string | null; eta: string | null; admin_comment: string | null; commented_by: string | null; commented_at: string | null; product_image_path: string | null; return_reason: string | null; return_quantity: number | null; wants_replacement: boolean | null; return_notes: string | null; created_at: string }
@@ -162,5 +163,14 @@ export function useProcurementApi() {
     }
   }
 
-  return { listRequests, getRequest, listLineItems, listLocations, listDepartments, listAllLocations, listAllDepartments, submitRequest, decideLineItem, orderLineItem, receiveLineItem, initiateReturn, processReturn, listLineItemsByStatus, listAllLineItemsDetailed, countLineItems, setLineItemComment, deleteLineItem, createLocation, createDepartment, updateLocation, updateDepartment, fireNotification, captureAndNotify, getProductImageUrl, notifyApproved, resolveUserNames }
+  async function getFormattingRules(): Promise<FormatRule[]> {
+    const res = await db().rpc(RPCS.getFormattingRules)
+    if (res.error || !res.data) return DEFAULT_RULES
+    try { const parsed = JSON.parse(res.data as string); return Array.isArray(parsed) ? (parsed as FormatRule[]) : DEFAULT_RULES } catch { return DEFAULT_RULES }
+  }
+  async function setFormattingRules(rules: FormatRule[]): Promise<void> {
+    ok(await db().from(TABLES.config).upsert({ key: 'formatting_rules', value: JSON.stringify(rules) }, { onConflict: 'key' }))
+  }
+
+  return { listRequests, getRequest, listLineItems, listLocations, listDepartments, listAllLocations, listAllDepartments, submitRequest, decideLineItem, orderLineItem, receiveLineItem, initiateReturn, processReturn, listLineItemsByStatus, listAllLineItemsDetailed, countLineItems, setLineItemComment, deleteLineItem, createLocation, createDepartment, updateLocation, updateDepartment, fireNotification, captureAndNotify, getProductImageUrl, notifyApproved, resolveUserNames, getFormattingRules, setFormattingRules }
 }
