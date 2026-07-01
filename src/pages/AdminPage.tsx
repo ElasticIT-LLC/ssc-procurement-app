@@ -1,7 +1,9 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useToast, usePermissions } from '@elasticit-llc/app-bridge'
 import { useProcurementApi, Location, Department } from '../data/db'
-import { PERMS } from '../lib/constants'
+import { PERMS, LINE_ITEM_STATUS } from '../lib/constants'
+import { FIELD_OPTIONS, OPERATOR_OPTIONS, DEFAULT_RULES, type FormatRule, type FormatField, type FormatOperator } from '../formatting/rules'
+import { TONE_OPTIONS } from '../formatting/tones'
 
 // ─── Inline-edit row for a single location or department ────────────────────
 
@@ -184,6 +186,283 @@ function AdminSection({ title, items, onAdd, onRename, onToggle }: AdminSectionP
   )
 }
 
+// ─── Conditional Formatting rule editor ──────────────────────────────────────
+
+function fieldType(field: FormatField): 'status' | 'date' | 'number' | 'text' {
+  return FIELD_OPTIONS.find(f => f.field === field)?.type ?? 'text'
+}
+
+const HIDE_VALUE_OPERATORS: FormatOperator[] = ['is_overdue', 'is_empty', 'is_not_empty']
+
+interface FormattingRuleRowProps {
+  rule: FormatRule
+  index: number
+  count: number
+  onChange: (index: number, rule: FormatRule) => void
+  onMove: (index: number, direction: -1 | 1) => void
+  onDelete: (index: number) => void
+}
+
+function FormattingRuleRow({ rule, index, count, onChange, onMove, onDelete }: FormattingRuleRowProps) {
+  const type = fieldType(rule.field)
+  const operators = OPERATOR_OPTIONS[type]
+  const showValue = !HIDE_VALUE_OPERATORS.includes(rule.operator)
+
+  function handleFieldChange(field: FormatField) {
+    const nextType = fieldType(field)
+    const nextOperators = OPERATOR_OPTIONS[nextType]
+    const operator = nextOperators.some(o => o.op === rule.operator) ? rule.operator : (nextOperators[0]?.op ?? 'equals')
+    onChange(index, { ...rule, field, operator, value: '' })
+  }
+
+  function handleOperatorChange(operator: FormatOperator) {
+    onChange(index, { ...rule, operator, value: HIDE_VALUE_OPERATORS.includes(operator) ? null : rule.value })
+  }
+
+  return (
+    <div className={`grid gap-2 rounded-md border border-border bg-card px-3 py-2.5 ${rule.enabled ? '' : 'opacity-60'}`}>
+      <div className="flex flex-wrap items-center gap-2">
+        <input
+          type="checkbox"
+          checked={rule.enabled}
+          onChange={e => onChange(index, { ...rule, enabled: e.target.checked })}
+          className="h-4 w-4 shrink-0 accent-primary"
+          aria-label="Enabled"
+        />
+
+        <input
+          type="text"
+          value={rule.label ?? ''}
+          onChange={e => onChange(index, { ...rule, label: e.target.value })}
+          placeholder="Label (optional)"
+          className="w-36 rounded-md border border-input bg-input px-2 py-1 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+        />
+
+        <select
+          value={rule.field}
+          onChange={e => handleFieldChange(e.target.value as FormatField)}
+          className="rounded-md border border-input bg-input px-2 py-1 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+        >
+          {FIELD_OPTIONS.map(f => (
+            <option key={f.field} value={f.field}>{f.label}</option>
+          ))}
+        </select>
+
+        <select
+          value={rule.operator}
+          onChange={e => handleOperatorChange(e.target.value as FormatOperator)}
+          className="rounded-md border border-input bg-input px-2 py-1 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+        >
+          {operators.map(o => (
+            <option key={o.op} value={o.op}>{o.label}</option>
+          ))}
+        </select>
+
+        {showValue && type === 'status' && (
+          <select
+            value={rule.value ?? ''}
+            onChange={e => onChange(index, { ...rule, value: e.target.value })}
+            className="rounded-md border border-input bg-input px-2 py-1 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+          >
+            <option value="">Select…</option>
+            {LINE_ITEM_STATUS.map(s => (
+              <option key={s} value={s}>{s}</option>
+            ))}
+          </select>
+        )}
+
+        {showValue && type === 'date' && (
+          <input
+            type="date"
+            value={rule.value ?? ''}
+            onChange={e => onChange(index, { ...rule, value: e.target.value })}
+            className="rounded-md border border-input bg-input px-2 py-1 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+          />
+        )}
+
+        {showValue && type === 'number' && (
+          <input
+            type="number"
+            value={rule.value ?? ''}
+            onChange={e => onChange(index, { ...rule, value: e.target.value })}
+            className="w-24 rounded-md border border-input bg-input px-2 py-1 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+          />
+        )}
+
+        {showValue && type === 'text' && (
+          <input
+            type="text"
+            value={rule.value ?? ''}
+            onChange={e => onChange(index, { ...rule, value: e.target.value })}
+            placeholder="Value"
+            className="rounded-md border border-input bg-input px-2 py-1 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+          />
+        )}
+
+        <select
+          value={rule.tone}
+          onChange={e => onChange(index, { ...rule, tone: e.target.value as FormatRule['tone'] })}
+          className="rounded-md border border-input bg-input px-2 py-1 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+        >
+          {TONE_OPTIONS.map(t => (
+            <option key={t.tone} value={t.tone}>{t.label}</option>
+          ))}
+        </select>
+
+        <div className="ml-auto flex items-center gap-1 shrink-0">
+          <button
+            type="button"
+            disabled={index === 0}
+            onClick={() => onMove(index, -1)}
+            className="inline-flex items-center rounded-md border border-border px-2 py-1 text-xs font-medium text-foreground hover:bg-muted disabled:opacity-40"
+            aria-label="Move up"
+          >
+            ↑
+          </button>
+          <button
+            type="button"
+            disabled={index === count - 1}
+            onClick={() => onMove(index, 1)}
+            className="inline-flex items-center rounded-md border border-border px-2 py-1 text-xs font-medium text-foreground hover:bg-muted disabled:opacity-40"
+            aria-label="Move down"
+          >
+            ↓
+          </button>
+          <button
+            type="button"
+            onClick={() => onDelete(index)}
+            className="inline-flex items-center rounded-md bg-destructive/15 px-2.5 py-1 text-xs font-medium text-destructive hover:bg-destructive/25"
+          >
+            Delete
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function FormattingRulesCard() {
+  const api = useProcurementApi()
+  const { showToast } = useToast()
+
+  const [rules, setRules] = useState<FormatRule[]>([])
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    setLoading(true)
+    api.getFormattingRules()
+      .then(r => { if (!cancelled) setRules(r) })
+      .catch(() => { if (!cancelled) setRules(DEFAULT_RULES) })
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
+  }, [])
+
+  function handleRuleChange(index: number, next: FormatRule) {
+    setRules(prev => prev.map((r, i) => (i === index ? next : r)))
+  }
+
+  function handleMove(index: number, direction: -1 | 1) {
+    setRules(prev => {
+      const target = index + direction
+      if (target < 0 || target >= prev.length) return prev
+      const current = prev[index]
+      const swapped = prev[target]
+      if (!current || !swapped) return prev
+      const next = [...prev]
+      next[index] = swapped
+      next[target] = current
+      return next
+    })
+  }
+
+  function handleDelete(index: number) {
+    setRules(prev => prev.filter((_, i) => i !== index))
+  }
+
+  function handleAdd() {
+    setRules(prev => [...prev, { id: crypto.randomUUID(), field: 'status', operator: 'equals', value: '', tone: 'neutral', enabled: true }])
+  }
+
+  function handleReset() {
+    setRules(DEFAULT_RULES.map(r => ({ ...r })))
+  }
+
+  async function handleSave() {
+    setSaving(true)
+    try {
+      await api.setFormattingRules(rules)
+      showToast({ message: 'Formatting rules saved', type: 'success' })
+    } catch (err: unknown) {
+      showToast({ message: err instanceof Error ? err.message : 'Failed to save formatting rules', type: 'error' })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="grid gap-3">
+      <div className="flex items-center justify-between gap-2">
+        <h2 className="text-base font-semibold text-foreground">Conditional Formatting</h2>
+        <span className="text-xs text-muted-foreground">{rules.length} rule{rules.length === 1 ? '' : 's'}</span>
+      </div>
+      <p className="text-sm text-muted-foreground">
+        Rules are evaluated top to bottom — the first enabled match sets the row's tint. Applies across Records, Requests, Approvals, Purchasing, and Returns.
+      </p>
+
+      {loading ? (
+        <div className="py-4 text-center text-muted-foreground text-sm">Loading…</div>
+      ) : (
+        <>
+          {rules.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No formatting rules yet.</p>
+          ) : (
+            <div className="grid gap-2">
+              {rules.map((rule, index) => (
+                <FormattingRuleRow
+                  key={rule.id}
+                  rule={rule}
+                  index={index}
+                  count={rules.length}
+                  onChange={handleRuleChange}
+                  onMove={handleMove}
+                  onDelete={handleDelete}
+                />
+              ))}
+            </div>
+          )}
+
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={handleAdd}
+              className="inline-flex items-center rounded-md border border-border px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted"
+            >
+              Add rule
+            </button>
+            <button
+              type="button"
+              onClick={handleReset}
+              className="inline-flex items-center rounded-md border border-border px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted"
+            >
+              Reset to defaults
+            </button>
+            <button
+              type="button"
+              disabled={saving}
+              onClick={handleSave}
+              className="ml-auto inline-flex items-center rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
+            >
+              {saving ? 'Saving…' : 'Save'}
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
 // ─── AdminPage ───────────────────────────────────────────────────────────────
 
 export function AdminPage() {
@@ -328,6 +607,10 @@ export function AdminPage() {
               onRename={handleRenameDepartment}
               onToggle={handleToggleDepartment}
             />
+          </div>
+
+          <div className="rounded-lg border border-border bg-card p-4">
+            <FormattingRulesCard />
           </div>
         </>
       )}
