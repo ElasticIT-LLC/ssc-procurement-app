@@ -3,6 +3,7 @@ import { usePermissions } from '@elasticit-llc/app-bridge'
 import { useProcurementApi, RequestRow } from '../data/db'
 import { PERMS, formatDate } from '../lib/constants'
 import { StatusBadge } from './StatusBadge'
+import { useFormattingRules } from '../formatting/useFormattingRules'
 
 interface RequestsListProps {
   onNew: () => void
@@ -12,6 +13,7 @@ interface RequestsListProps {
 export function RequestsList({ onNew, onSelect }: RequestsListProps) {
   const api = useProcurementApi()
   const { hasPermission } = usePermissions()
+  const { toneClassFor } = useFormattingRules()
 
   const [requests, setRequests] = useState<RequestRow[]>([])
   const [loading, setLoading] = useState(true)
@@ -65,7 +67,7 @@ export function RequestsList({ onNew, onSelect }: RequestsListProps) {
               key={req.id}
               type="button"
               onClick={() => onSelect(req.id)}
-              className="w-full text-left rounded-lg border border-border bg-card p-4 hover:bg-muted transition-colors grid gap-1"
+              className={`w-full text-left rounded-lg border border-border bg-card p-4 hover:bg-muted transition-colors grid gap-1 ${toneClassFor(req as unknown as Record<string, unknown>)}`}
             >
               <div className="flex items-center justify-between gap-2">
                 <span className="text-sm font-medium text-foreground">

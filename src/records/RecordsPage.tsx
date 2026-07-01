@@ -3,6 +3,7 @@ import { useToast, usePermissions } from '@elasticit-llc/app-bridge'
 import { useProcurementApi, LineItemDetailed } from '../data/db'
 import { StatusBadge } from '../requester/StatusBadge'
 import { PERMS, formatDate } from '../lib/constants'
+import { useFormattingRules } from '../formatting/useFormattingRules'
 
 const FULL_ACCESS = 'apps/procurement/*'
 
@@ -52,6 +53,7 @@ export function RecordsPage() {
   const api = useProcurementApi()
   const { showToast } = useToast()
   const { hasPermission } = usePermissions()
+  const { toneClassFor } = useFormattingRules()
 
   const canComment = hasPermission(PERMS.approve) || hasPermission(PERMS.purchase) || hasPermission(PERMS.admin)
   const canDelete = hasPermission(FULL_ACCESS)
@@ -171,7 +173,7 @@ export function RecordsPage() {
             </thead>
             <tbody>
               {items.map(item => (
-                <tr key={item.id} className="border-t border-border hover:bg-muted/30">
+                <tr key={item.id} className={`border-t border-border hover:bg-muted/30 ${toneClassFor(item as unknown as Record<string, unknown>)}`}>
                   <td className={`${cell} whitespace-nowrap`}>{formatDate(item.request.submitted_at)}</td>
                   <td className={cell}>
                     <div className="text-foreground">{item.request.requester_name ?? '—'}</div>

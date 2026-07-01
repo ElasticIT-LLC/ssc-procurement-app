@@ -3,6 +3,7 @@ import { useToast, usePermissions } from '@elasticit-llc/app-bridge'
 import { useProcurementApi, LineItemWithRequest } from '../data/db'
 import { StatusBadge } from '../requester/StatusBadge'
 import { PERMS, formatDate } from '../lib/constants'
+import { useFormattingRules } from '../formatting/useFormattingRules'
 
 function humanizeReason(reason: string): string {
   if (!reason) return ''
@@ -14,6 +15,7 @@ export function ReturnsPage() {
   const api = useProcurementApi()
   const { showToast } = useToast()
   const { hasPermission } = usePermissions()
+  const { toneClassFor } = useFormattingRules()
 
   const [items, setItems] = useState<LineItemWithRequest[]>([])
   const [loading, setLoading] = useState(true)
@@ -78,7 +80,7 @@ export function ReturnsPage() {
       )}
 
       {!loading && !error && items.map(item => (
-        <div key={item.id} className="rounded-lg border border-border bg-card p-4 grid gap-3">
+        <div key={item.id} className={`rounded-lg border border-border bg-card p-4 grid gap-3 ${toneClassFor(item as unknown as Record<string, unknown>)}`}>
           {/* Header */}
           <div className="flex items-start justify-between gap-2">
             <div>

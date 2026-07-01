@@ -3,6 +3,7 @@ import { useToast, usePermissions } from '@elasticit-llc/app-bridge'
 import { useProcurementApi, LineItemWithRequest, Location } from '../data/db'
 import { StatusBadge } from '../requester/StatusBadge'
 import { PERMS, formatDate } from '../lib/constants'
+import { useFormattingRules } from '../formatting/useFormattingRules'
 
 interface OrderForm {
   date_purchased: string
@@ -20,6 +21,7 @@ export function PurchasingPage() {
   const api = useProcurementApi()
   const { showToast } = useToast()
   const { hasPermission } = usePermissions()
+  const { toneClassFor } = useFormattingRules()
 
   const [items, setItems] = useState<LineItemWithRequest[]>([])
   const [locations, setLocations] = useState<Location[]>([])
@@ -120,7 +122,7 @@ export function PurchasingPage() {
         const busy = submittingId === item.id
 
         return (
-          <div key={item.id} className="rounded-lg border border-border bg-card p-4 grid gap-3">
+          <div key={item.id} className={`rounded-lg border border-border bg-card p-4 grid gap-3 ${toneClassFor(item as unknown as Record<string, unknown>)}`}>
             {/* Header */}
             <div className="flex items-start justify-between gap-2">
               <div>
