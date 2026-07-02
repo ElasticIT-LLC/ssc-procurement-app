@@ -3,7 +3,8 @@
 // vault server-side (the key never reaches the browser), fetches /workers +
 // /work-locations from rest.ripplingapis.com, keeps status=ACTIVE, joins location
 // names, and caches the compact list in app_procurement._config for 6h.
-// verify_jwt=true (any authenticated portal user). Body: { refresh?: boolean }.
+// verify_jwt=false at the platform gate (shell uses Entra ES256 tokens); the
+// function authenticates the caller itself. Any authenticated portal user. Body: { refresh?: boolean }.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
