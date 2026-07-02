@@ -53,7 +53,7 @@
   ],
   "edge_functions": [
     { "name": "procurement-capture-and-notify", "entrypoint": "supabase/functions/procurement-capture-and-notify/index.ts", "verify_jwt": false },
-    { "name": "procurement-rippling-proxy", "entrypoint": "supabase/functions/procurement-rippling-proxy/index.ts", "verify_jwt": true, "secrets": ["CREDENTIAL_ENCRYPTION_KEY"] }
+    { "name": "procurement-rippling-proxy", "entrypoint": "supabase/functions/procurement-rippling-proxy/index.ts", "verify_jwt": false, "inherit_secrets": ["CREDENTIAL_ENCRYPTION_KEY"] }
   ],
   "vault_secrets": [
     { "name": "SCREENSHOT_API_KEY", "source": "admin-input", "description": "x-api-key for the msr-screenshot Azure container app (used server-side by procurement-capture-and-notify to capture product screenshots)." }

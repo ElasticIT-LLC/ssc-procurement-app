@@ -101,6 +101,14 @@ Deno.serve(async (req) => {
   const refresh = body?.refresh === true
   const db = createClient(SUPABASE_URL, SERVICE_KEY)
 
+  // Auth: the platform verify_jwt gate is off (the shell uses Entra ES256 tokens
+  // that Supabase's HS256 gate can't verify), so authenticate the caller here.
+  // Any authenticated portal user may fetch the worker list.
+  const authHeader = req.headers.get('Authorization')
+  if (!authHeader?.startsWith('Bearer ')) return json({ error: 'Missing Authorization header', workers: [] }, 401)
+  const { data: { user } } = await db.auth.getUser(authHeader.slice('Bearer '.length))
+  if (!user) return json({ error: 'Invalid token', workers: [] }, 401)
+
   const { data: appRow } = await db.from('apps').select('id').eq('slug', 'procurement').maybeSingle()
   if (!appRow) return json({ error: 'procurement app not found', workers: [] }, 500)
   const appId = (appRow as { id: string }).id
