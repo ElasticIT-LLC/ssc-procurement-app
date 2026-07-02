@@ -15,7 +15,7 @@ const WORKER_EXPAND = 'user'
 const CACHE_TTL_MS = 6 * 60 * 60 * 1000
 const SCHEMA = 'app_procurement'
 
-const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, content-type, apikey', 'Access-Control-Allow-Methods': 'POST, OPTIONS' }
+const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type', 'Access-Control-Allow-Methods': 'POST, OPTIONS' }
 const json = (b: unknown, s = 200) => new Response(JSON.stringify(b), { status: s, headers: { ...cors, 'Content-Type': 'application/json' } })
 
 // ── Credential Vault AES-256-GCM decrypt (matches the credential-vault edge fn) ──
