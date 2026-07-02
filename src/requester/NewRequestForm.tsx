@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useToast } from '@elasticit-llc/app-bridge'
 import { useProcurementApi, Location, Department } from '../data/db'
 import { LineItemFormRow, LineItemDraft, LineItemDraftErrors } from './LineItemFormRow'
+import { useShipToWorkers } from './useShipToWorkers'
 
 interface NewRequestFormProps {
   onCancel: () => void
@@ -46,6 +47,7 @@ function hasErrors(errs: LineItemDraftErrors): boolean {
 export function NewRequestForm({ onCancel, onSuccess }: NewRequestFormProps) {
   const api = useProcurementApi()
   const { showToast } = useToast()
+  const { workers, loading: workersLoading, refresh: refreshWorkers } = useShipToWorkers()
 
   const [notes, setNotes] = useState('')
   const [items, setItems] = useState<LineItemDraft[]>([emptyItem()])
@@ -140,6 +142,9 @@ export function NewRequestForm({ onCancel, onSuccess }: NewRequestFormProps) {
             locations={locations}
             departments={departments}
             errors={itemErrors[index] ?? {}}
+            workers={workers}
+            workersLoading={workersLoading}
+            onRefreshWorkers={refreshWorkers}
           />
         ))}
       </div>

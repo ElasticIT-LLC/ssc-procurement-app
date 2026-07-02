@@ -1,4 +1,6 @@
 import { Location, Department } from '../data/db'
+import { ShipToWorker } from '../data/db'
+import { ShipToCombobox } from './ShipToCombobox'
 
 export interface LineItemDraft {
   ship_to_name: string
@@ -36,6 +38,9 @@ interface LineItemFormRowProps {
   locations: Location[]
   departments: Department[]
   errors: LineItemDraftErrors
+  workers: ShipToWorker[]
+  workersLoading: boolean
+  onRefreshWorkers: () => void
 }
 
 function Field({ label, error, children }: { label: string; error?: string; children: React.ReactNode }) {
@@ -50,6 +55,7 @@ function Field({ label, error, children }: { label: string; error?: string; chil
 
 export function LineItemFormRow({
   index, value, onChange, onRemove, disableRemove, locations, departments, errors,
+  workers, workersLoading, onRefreshWorkers,
 }: LineItemFormRowProps) {
   const set = (patch: Partial<LineItemDraft>) => onChange({ ...value, ...patch })
 
@@ -106,11 +112,12 @@ export function LineItemFormRow({
 
       {/* Ship to Name */}
       <Field label="Ship to Name">
-        <input
-          type="text"
+        <ShipToCombobox
           value={value.ship_to_name}
-          onChange={(e) => set({ ship_to_name: e.target.value })}
-          className="h-9 w-full rounded-md border border-border bg-input px-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+          onChange={(v) => set({ ship_to_name: v })}
+          workers={workers}
+          loading={workersLoading}
+          onRefresh={onRefreshWorkers}
         />
       </Field>
 
