@@ -3,7 +3,7 @@
   "slug": "procurement",
   "name": "Procurement",
   "icon": "Package",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "permissions": [
     { "key": "apps/procurement/*", "label": "Full Access", "description": "Full access to Procurement", "group": "Administration" },
     { "key": "apps/procurement/requests/create", "label": "Create requests", "description": "Create and submit purchase requests; mark items received; initiate returns", "group": "Requests" },
@@ -52,7 +52,8 @@
     { "key": "return_initiated", "label": "Return initiated", "description": "A return was initiated for a received item.", "sort_order": 5 }
   ],
   "edge_functions": [
-    { "name": "procurement-capture-and-notify", "entrypoint": "supabase/functions/procurement-capture-and-notify/index.ts", "verify_jwt": false }
+    { "name": "procurement-capture-and-notify", "entrypoint": "supabase/functions/procurement-capture-and-notify/index.ts", "verify_jwt": false },
+    { "name": "procurement-rippling-proxy", "entrypoint": "supabase/functions/procurement-rippling-proxy/index.ts", "verify_jwt": true, "secrets": ["CREDENTIAL_ENCRYPTION_KEY"] }
   ],
   "vault_secrets": [
     { "name": "SCREENSHOT_API_KEY", "source": "admin-input", "description": "x-api-key for the msr-screenshot Azure container app (used server-side by procurement-capture-and-notify to capture product screenshots)." }

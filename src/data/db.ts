@@ -26,6 +26,7 @@ export interface LineItemDetailed extends LineItemRow {
 }
 export interface Location { id: string; name: string; is_active: boolean }
 export interface Department { id: string; name: string; is_active: boolean }
+export interface ShipToWorker { id: string; name: string; location: string | null; label: string }
 
 export function useProcurementApi() {
   const supabase = useSupabase()
@@ -172,5 +173,20 @@ export function useProcurementApi() {
     ok(await db().from(TABLES.config).upsert({ key: 'formatting_rules', value: JSON.stringify(rules) }, { onConflict: 'key' }))
   }
 
-  return { listRequests, getRequest, listLineItems, listLocations, listDepartments, listAllLocations, listAllDepartments, submitRequest, decideLineItem, orderLineItem, receiveLineItem, initiateReturn, processReturn, listLineItemsByStatus, listAllLineItemsDetailed, countLineItems, setLineItemComment, deleteLineItem, createLocation, createDepartment, updateLocation, updateDepartment, fireNotification, captureAndNotify, getProductImageUrl, notifyApproved, resolveUserNames, getFormattingRules, setFormattingRules }
+  // Fetch the active-Rippling-worker list for the Ship-to-Name dropdown via the
+  // procurement-rippling-proxy edge fn (which holds the Rippling credential
+  // server-side). Never throws — on failure returns [] so the UI degrades to a
+  // plain text input. { refresh: true } bypasses the edge fn's 6h cache.
+  async function listShipToWorkers(opts?: { refresh?: boolean }): Promise<ShipToWorker[]> {
+    try {
+      const { data, error } = await supabase.functions.invoke('procurement-rippling-proxy', { body: { refresh: opts?.refresh ?? false } })
+      if (error) throw error
+      return ((data as { workers?: ShipToWorker[] } | null)?.workers ?? []) as ShipToWorker[]
+    } catch (e) {
+      console.error('listShipToWorkers failed:', e)
+      return []
+    }
+  }
+
+  return { listRequests, getRequest, listLineItems, listLocations, listDepartments, listAllLocations, listAllDepartments, submitRequest, decideLineItem, orderLineItem, receiveLineItem, initiateReturn, processReturn, listLineItemsByStatus, listAllLineItemsDetailed, countLineItems, setLineItemComment, deleteLineItem, createLocation, createDepartment, updateLocation, updateDepartment, fireNotification, captureAndNotify, getProductImageUrl, notifyApproved, resolveUserNames, getFormattingRules, setFormattingRules, listShipToWorkers }
 }
