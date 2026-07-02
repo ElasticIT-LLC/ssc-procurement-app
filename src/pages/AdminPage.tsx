@@ -5,6 +5,38 @@ import { PERMS, LINE_ITEM_STATUS } from '../lib/constants'
 import { FIELD_OPTIONS, OPERATOR_OPTIONS, DEFAULT_RULES, type FormatRule, type FormatField, type FormatOperator } from '../formatting/rules'
 import { TONE_OPTIONS } from '../formatting/tones'
 
+// ─── Collapsible card wrapper ───────────────────────────────────────────────
+// A bordered card whose header (title + optional right-side text) toggles the
+// body open/closed. Defaults to open so nothing is hidden on first load.
+
+interface CollapsibleCardProps {
+  title: string
+  right?: string
+  defaultOpen?: boolean
+  children: React.ReactNode
+}
+
+function CollapsibleCard({ title, right, defaultOpen = true, children }: CollapsibleCardProps) {
+  const [open, setOpen] = useState(defaultOpen)
+  return (
+    <div className="rounded-lg border border-border bg-card">
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        aria-expanded={open}
+        className="flex w-full items-center justify-between gap-2 px-4 py-3 text-left"
+      >
+        <span className="flex items-center gap-2 min-w-0">
+          <span className={`shrink-0 text-muted-foreground transition-transform ${open ? 'rotate-90' : ''}`} aria-hidden="true">▸</span>
+          <span className="text-base font-semibold text-foreground truncate">{title}</span>
+        </span>
+        {right && <span className="shrink-0 text-xs text-muted-foreground">{right}</span>}
+      </button>
+      {open && <div className="px-4 pb-4">{children}</div>}
+    </div>
+  )
+}
+
 // ─── Inline-edit row for a single location or department ────────────────────
 
 interface EditableRowProps {
@@ -139,12 +171,8 @@ function AdminSection({ title, items, onAdd, onRename, onToggle }: AdminSectionP
   }
 
   return (
-    <div className="grid gap-3">
-      <div className="flex items-center justify-between gap-2">
-        <h2 className="text-base font-semibold text-foreground">{title}</h2>
-        <span className="text-xs text-muted-foreground">{items.length} total</span>
-      </div>
-
+    <CollapsibleCard title={title} right={`${items.length} total`}>
+      <div className="grid gap-3">
       {/* Add form */}
       <div className="flex gap-2">
         <input
@@ -182,7 +210,8 @@ function AdminSection({ title, items, onAdd, onRename, onToggle }: AdminSectionP
           ))}
         </div>
       )}
-    </div>
+      </div>
+    </CollapsibleCard>
   )
 }
 
@@ -402,11 +431,8 @@ function FormattingRulesCard() {
   }
 
   return (
-    <div className="grid gap-3">
-      <div className="flex items-center justify-between gap-2">
-        <h2 className="text-base font-semibold text-foreground">Conditional Formatting</h2>
-        <span className="text-xs text-muted-foreground">{rules.length} rule{rules.length === 1 ? '' : 's'}</span>
-      </div>
+    <CollapsibleCard title="Conditional Formatting" right={`${rules.length} rule${rules.length === 1 ? '' : 's'}`}>
+      <div className="grid gap-3">
       <p className="text-sm text-muted-foreground">
         Rules are evaluated top to bottom — the first enabled match sets the row's tint. Applies across Records, Requests, Approvals, Purchasing, and Returns.
       </p>
@@ -459,7 +485,8 @@ function FormattingRulesCard() {
           </div>
         </>
       )}
-    </div>
+      </div>
+    </CollapsibleCard>
   )
 }
 
@@ -588,31 +615,25 @@ export function AdminPage() {
       )}
 
       {!loading && !error && (
-        <>
-          <div className="rounded-lg border border-border bg-card p-4">
-            <AdminSection
-              title="Locations"
-              items={locations}
-              onAdd={handleAddLocation}
-              onRename={handleRenameLocation}
-              onToggle={handleToggleLocation}
-            />
-          </div>
+        <div className="grid gap-4">
+          <AdminSection
+            title="Locations"
+            items={locations}
+            onAdd={handleAddLocation}
+            onRename={handleRenameLocation}
+            onToggle={handleToggleLocation}
+          />
 
-          <div className="rounded-lg border border-border bg-card p-4">
-            <AdminSection
-              title="Departments"
-              items={departments}
-              onAdd={handleAddDepartment}
-              onRename={handleRenameDepartment}
-              onToggle={handleToggleDepartment}
-            />
-          </div>
+          <AdminSection
+            title="Departments"
+            items={departments}
+            onAdd={handleAddDepartment}
+            onRename={handleRenameDepartment}
+            onToggle={handleToggleDepartment}
+          />
 
-          <div className="rounded-lg border border-border bg-card p-4">
-            <FormattingRulesCard />
-          </div>
-        </>
+          <FormattingRulesCard />
+        </div>
       )}
     </div>
   )
