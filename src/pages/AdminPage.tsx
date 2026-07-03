@@ -7,7 +7,7 @@ import { TONE_OPTIONS } from '../formatting/tones'
 
 // ─── Collapsible card wrapper ───────────────────────────────────────────────
 // A bordered card whose header (title + optional right-side text) toggles the
-// body open/closed. Defaults to open so nothing is hidden on first load.
+// body open/closed. Defaults to collapsed; click a header to expand.
 
 interface CollapsibleCardProps {
   title: string
@@ -16,7 +16,7 @@ interface CollapsibleCardProps {
   children: React.ReactNode
 }
 
-function CollapsibleCard({ title, right, defaultOpen = true, children }: CollapsibleCardProps) {
+function CollapsibleCard({ title, right, defaultOpen = false, children }: CollapsibleCardProps) {
   const [open, setOpen] = useState(defaultOpen)
   return (
     <div className="rounded-lg border border-border bg-card">
