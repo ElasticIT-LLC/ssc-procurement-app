@@ -25,3 +25,6 @@ local-dev/test-shell/src/generated-brand.ts
 # the Supabase stack is still up.
 local-dev/.setup-complete
 *.tsbuildinfo
+
+# local Supabase project-linking temp state
+supabase/.temp/
