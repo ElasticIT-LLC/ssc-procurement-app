@@ -34,7 +34,8 @@
       { "version": 6, "description": "Phase 2b: approval-summary notification guard", "up": "migrations/006_approval_notify_guard.sql" },
       { "version": 7, "description": "Phase 3a: comment attribution (commented_by/at) + wider gate + 100-char cap", "up": "migrations/007_comment_attribution.sql" },
       { "version": 8, "description": "Phase 3a fix: get_user_names resolver (client can't read others' user_profiles)", "up": "migrations/008_user_name_resolver.sql" },
-      { "version": 9, "description": "Phase 3b: get_formatting_rules read RPC (conditional formatting)", "up": "migrations/009_formatting_rules.sql" }
+      { "version": 9, "description": "Phase 3b: get_formatting_rules read RPC (conditional formatting)", "up": "migrations/009_formatting_rules.sql" },
+      { "version": 10, "description": "Phase 4 QA: request_number sequence + per-item line_no trigger + backfill", "up": "migrations/010_request_numbering.sql" }
     ],
     "tables": [
       { "name": "locations",         "rls": { "read": "authenticated", "write": "admin" } },
