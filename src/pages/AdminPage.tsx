@@ -436,6 +436,9 @@ function FormattingRulesCard() {
       <p className="text-sm text-muted-foreground">
         Rules are evaluated top to bottom — the first enabled match sets the row's tint. Applies across Records, Requests, Approvals, Purchasing, and Returns.
       </p>
+      <p className="text-sm text-muted-foreground">
+        Formatting rules only color rows — they do not create new statuses. The status list is fixed.
+      </p>
 
       {loading ? (
         <div className="py-4 text-center text-muted-foreground text-sm">Loading…</div>
