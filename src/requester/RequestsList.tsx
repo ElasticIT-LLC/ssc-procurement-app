@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react'
 import { usePermissions } from '@elasticit-llc/app-bridge'
 import { useProcurementApi, RequestRow } from '../data/db'
-import { PERMS, formatDate } from '../lib/constants'
+import { PERMS, formatDate, REQUEST_STATUS } from '../lib/constants'
+import { formatRequestNo } from '../lib/itemRef'
+import { countByStatus, filterByStatus } from '../lib/requestFilter'
 import { StatusBadge } from './StatusBadge'
 import { useFormattingRules } from '../formatting/useFormattingRules'
 
@@ -18,6 +20,10 @@ export function RequestsList({ onNew, onSelect }: RequestsListProps) {
   const [requests, setRequests] = useState<RequestRow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [tab, setTab] = useState<string>('all')
+  const counts = countByStatus(requests)
+  const visible = filterByStatus(requests, tab)
+  const TABS = ['all', ...REQUEST_STATUS] as const
 
   useEffect(() => {
     setLoading(true)
@@ -56,13 +62,30 @@ export function RequestsList({ onNew, onSelect }: RequestsListProps) {
         )}
       </div>
 
-      {requests.length === 0 ? (
+      <div className="flex flex-wrap gap-1 border-b border-border">
+        {TABS.map((t) => (
+          <button
+            key={t}
+            type="button"
+            onClick={() => setTab(t)}
+            className={`px-3 py-1.5 text-xs font-medium capitalize border-b-2 -mb-px transition-colors ${
+              tab === t
+                ? 'border-primary text-foreground'
+                : 'border-transparent text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            {t.replace(/_/g, ' ')} {counts[t] ? `(${counts[t]})` : '(0)'}
+          </button>
+        ))}
+      </div>
+
+      {visible.length === 0 ? (
         <div className="rounded-lg border border-border bg-card p-8 text-center text-muted-foreground text-sm">
-          You have no requests yet.{canCreate ? ' Click "New Request" to get started.' : ''}
+          No requests in this view.
         </div>
       ) : (
         <div className="grid gap-2">
-          {requests.map((req) => (
+          {visible.map((req) => (
             <button
               key={req.id}
               type="button"
@@ -71,7 +94,14 @@ export function RequestsList({ onNew, onSelect }: RequestsListProps) {
             >
               <div className="flex items-center justify-between gap-2">
                 <span className="text-sm font-medium text-foreground">
-                  {req.notes ? (req.notes.length > 80 ? req.notes.slice(0, 80) + '…' : req.notes) : 'No notes'}
+                  {formatRequestNo(req.request_number)}
+                  {' · '}
+                  {(() => {
+                    const items = req.line_items ?? []
+                    const first = items[0]?.item_description?.trim()
+                    if (!first) return req.notes?.trim() || 'Untitled request'
+                    return items.length > 1 ? `${first} (+${items.length - 1} more)` : first
+                  })()}
                 </span>
                 <StatusBadge status={req.status} />
               </div>
