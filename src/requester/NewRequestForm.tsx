@@ -29,7 +29,7 @@ function emptyItem(): LineItemDraft {
 
 function validateItem(item: LineItemDraft): LineItemDraftErrors {
   const errs: LineItemDraftErrors = {}
-  if (!item.item_description.trim()) errs.item_description = 'Item description is required'
+  if (!item.item_description.trim()) errs.item_description = 'Item name is required'
   if (item.quantity < 1) errs.quantity = 'Quantity must be at least 1'
   if (!item.memo.trim()) errs.memo = 'Memo is required'
   if (!item.date_needed) errs.date_needed = 'Date needed is required'
