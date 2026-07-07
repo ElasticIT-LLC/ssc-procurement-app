@@ -51,7 +51,8 @@
     { "key": "item_approved", "label": "Item approved", "description": "A requested item was approved.", "sort_order": 2 },
     { "key": "item_declined", "label": "Item declined", "description": "A requested item was declined.", "sort_order": 3 },
     { "key": "item_ordered", "label": "Item ordered", "description": "An approved item was ordered.", "sort_order": 4 },
-    { "key": "return_initiated", "label": "Return initiated", "description": "A return was initiated for a received item.", "sort_order": 5 }
+    { "key": "return_initiated", "label": "Return initiated", "description": "A return was initiated for a received item.", "sort_order": 5 },
+    { "key": "item_cancelled", "label": "Item cancelled", "description": "An approved item was cancelled; a new request is needed.", "sort_order": 6 }
   ],
   "edge_functions": [
     { "name": "procurement-capture-and-notify", "entrypoint": "supabase/functions/procurement-capture-and-notify/index.ts", "verify_jwt": false },

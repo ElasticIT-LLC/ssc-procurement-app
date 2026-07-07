@@ -87,6 +87,21 @@ export function PurchasingPage() {
     }
   }
 
+  async function handleCancel(item: LineItemWithRequest) {
+    if (!window.confirm('Cancel this approved item? The requester will need to submit a new request.')) return
+    setSubmittingId(item.id)
+    try {
+      await api.cancelLineItem(item.id)
+      await api.fireNotification('item_cancelled')
+      showToast({ message: 'Item cancelled', type: 'success' })
+      await load()
+    } catch (err: unknown) {
+      showToast({ message: err instanceof Error ? err.message : 'Failed to cancel item', type: 'error' })
+    } finally {
+      setSubmittingId(null)
+    }
+  }
+
   if (!hasPermission(PERMS.purchase)) {
     return (
       <div className="rounded-md bg-destructive/10 border border-destructive/30 p-4 text-sm text-destructive">
@@ -173,15 +188,25 @@ export function PurchasingPage() {
               </p>
             </div>
 
-            {/* Place Order toggle */}
+            {/* Place Order / Cancel actions */}
             {!isOpen && (
-              <button
-                type="button"
-                onClick={() => toggleForm(item.id)}
-                className="self-start inline-flex items-center rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:opacity-90"
-              >
-                Place Order
-              </button>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => toggleForm(item.id)}
+                  className="self-start inline-flex items-center rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:opacity-90"
+                >
+                  Place Order
+                </button>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => handleCancel(item)}
+                  className="self-start inline-flex items-center rounded-md border border-destructive/40 px-3 py-1.5 text-xs font-medium text-destructive hover:bg-destructive/10 disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+              </div>
             )}
 
             {/* Inline order form */}
