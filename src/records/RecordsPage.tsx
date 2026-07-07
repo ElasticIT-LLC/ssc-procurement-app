@@ -1,7 +1,8 @@
-import { useState, useEffect, useCallback } from 'react'
+import { Fragment, useState, useEffect, useCallback } from 'react'
 import { useToast, usePermissions } from '@elasticit-llc/app-bridge'
-import { useProcurementApi, LineItemDetailed } from '../data/db'
+import { useProcurementApi, LineItemDetailed, LineItemWithRequest } from '../data/db'
 import { StatusBadge } from '../requester/StatusBadge'
+import { ReturnForm } from '../requester/ReturnForm'
 import { PERMS, formatDate } from '../lib/constants'
 import { useFormattingRules } from '../formatting/useFormattingRules'
 
@@ -57,6 +58,7 @@ export function RecordsPage() {
 
   const canComment = hasPermission(PERMS.approve) || hasPermission(PERMS.purchase) || hasPermission(PERMS.admin)
   const canDelete = hasPermission(FULL_ACCESS)
+  const canReturn = hasPermission(PERMS.returns) || hasPermission(PERMS.admin)
 
   const [items, setItems] = useState<LineItemDetailed[]>([])
   const [names, setNames] = useState<Record<string, string>>({})
@@ -64,6 +66,7 @@ export function RecordsPage() {
   const [error, setError] = useState<string | null>(null)
   const [drafts, setDrafts] = useState<Record<string, string>>({})
   const [busyId, setBusyId] = useState<string | null>(null)
+  const [returnOpenId, setReturnOpenId] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -120,6 +123,9 @@ export function RecordsPage() {
 
   const cell = 'px-3 py-2 align-top text-xs text-foreground'
   const head = 'px-3 py-2 text-left text-xs font-semibold text-muted-foreground whitespace-nowrap'
+  const showActionsColumn = canDelete || canReturn
+  // 11 fixed columns (Submitted…Admin Comment) + the conditional Actions column.
+  const columnCount = 11 + (showActionsColumn ? 1 : 0)
 
   return (
     <div className="grid gap-6">
@@ -168,12 +174,13 @@ export function RecordsPage() {
                 <th className={head}>ETA</th>
                 <th className={head}>Request Notes</th>
                 <th className={head}>Admin Comment</th>
-                {canDelete && <th className={head}>Actions</th>}
+                {showActionsColumn && <th className={head}>Actions</th>}
               </tr>
             </thead>
             <tbody>
               {items.map(item => (
-                <tr key={item.id} className={`border-t border-border hover:bg-muted/30 ${toneClassFor(item as unknown as Record<string, unknown>)}`}>
+                <Fragment key={item.id}>
+                  <tr className={`border-t border-border hover:bg-muted/30 ${toneClassFor(item as unknown as Record<string, unknown>)}`}>
                   <td className={`${cell} whitespace-nowrap`}>{formatDate(item.request.submitted_at)}</td>
                   <td className={cell}>
                     <div className="text-foreground">{item.request.requester_name ?? '—'}</div>
@@ -228,19 +235,43 @@ export function RecordsPage() {
                       <span className="text-muted-foreground break-words">{item.admin_comment ?? '—'}</span>
                     )}
                   </td>
-                  {canDelete && (
+                  {showActionsColumn && (
                     <td className={`${cell} whitespace-nowrap`}>
-                      <button
-                        type="button"
-                        disabled={busyId === item.id}
-                        onClick={() => handleDelete(item)}
-                        className="inline-flex items-center rounded-md bg-destructive/15 px-2 py-1.5 text-xs font-medium text-destructive hover:bg-destructive/25 disabled:opacity-50"
-                      >
-                        Delete
-                      </button>
+                      <div className="flex flex-wrap gap-1.5">
+                        {canReturn && item.status === 'received' && (
+                          <button
+                            type="button"
+                            onClick={() => setReturnOpenId(returnOpenId === item.id ? null : item.id)}
+                            className="inline-flex items-center rounded-md border border-border px-2 py-1.5 text-xs font-medium text-foreground hover:bg-muted"
+                          >
+                            Return
+                          </button>
+                        )}
+                        {canDelete && (
+                          <button
+                            type="button"
+                            disabled={busyId === item.id}
+                            onClick={() => handleDelete(item)}
+                            className="inline-flex items-center rounded-md bg-destructive/15 px-2 py-1.5 text-xs font-medium text-destructive hover:bg-destructive/25 disabled:opacity-50"
+                          >
+                            Delete
+                          </button>
+                        )}
+                      </div>
                     </td>
                   )}
-                </tr>
+                  </tr>
+                  {returnOpenId === item.id && (
+                    <tr>
+                      <td colSpan={columnCount} className="bg-muted/30 p-4">
+                        <ReturnForm
+                          item={item as unknown as LineItemWithRequest}
+                          onDone={async () => { setReturnOpenId(null); await load() }}
+                        />
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
               ))}
             </tbody>
           </table>
