@@ -28,7 +28,7 @@ export function ReturnsPage() {
     setError(null)
     try {
       const data = await api.listLineItemsByStatus(['returned'])
-      setItems(data)
+      setItems(data.filter(i => i.return_processed_at == null))
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to load items')
     } finally {
@@ -103,11 +103,6 @@ export function ReturnsPage() {
             )}
             {item.return_quantity != null && (
               <p className="text-xs text-muted-foreground">Return qty: {item.return_quantity}</p>
-            )}
-            {item.wants_replacement && (
-              <span className="inline-flex self-start items-center rounded-full px-2.5 py-0.5 text-xs font-medium bg-info/15 text-info">
-                Wants replacement
-              </span>
             )}
             {item.return_notes && (
               <p className="text-xs text-muted-foreground">Notes: {item.return_notes}</p>

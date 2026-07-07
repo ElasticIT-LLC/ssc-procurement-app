@@ -37,7 +37,8 @@
       { "version": 9, "description": "Phase 3b: get_formatting_rules read RPC (conditional formatting)", "up": "migrations/009_formatting_rules.sql" },
       { "version": 10, "description": "Phase 4 QA: request_number sequence + per-item line_no trigger + backfill", "up": "migrations/010_request_numbering.sql" },
       { "version": 11, "description": "Phase 4 QA: cancel approved item -> cancelled; rollup + CHECK updates", "up": "migrations/011_cancel_item.sql" },
-      { "version": 12, "description": "Phase 4 QA: replacement returns route to approved (Purchasing); backfill replacement_ordered", "up": "migrations/012_replacement_routing.sql" }
+      { "version": 12, "description": "Phase 4 QA: replacement returns route to approved (Purchasing); backfill replacement_ordered", "up": "migrations/012_replacement_routing.sql" },
+      { "version": 13, "description": "Phase 4 QA: mark processed returns (return_processed_at) so they leave the Returns queue", "up": "migrations/013_return_processed.sql" }
     ],
     "tables": [
       { "name": "locations",         "rls": { "read": "authenticated", "write": "admin" } },
