@@ -35,7 +35,9 @@ export function useProcurementApi() {
   const ok = <T,>(res: { data: T; error: { message: string } | null }): T => { if (res.error) throw new Error(res.error.message); return res.data }
 
   async function listRequests(): Promise<RequestRow[]> {
-    return (ok(await db().from(TABLES.requests).select('*, line_items(item_description)').order('updated_at', { ascending: false })) ?? []) as RequestRow[]
+    return (ok(await db().from(TABLES.requests).select('*, line_items(item_description)')
+      .order('line_no', { ascending: true, referencedTable: 'line_items' })
+      .order('updated_at', { ascending: false })) ?? []) as RequestRow[]
   }
   async function getRequest(id: string): Promise<RequestRow | null> {
     return (ok(await db().from(TABLES.requests).select('*').eq('id', id).maybeSingle()) ?? null) as RequestRow | null
