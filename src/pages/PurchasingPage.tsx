@@ -144,6 +144,11 @@ export function PurchasingPage() {
               <div>
                 <p className="text-sm font-medium text-foreground">
                   {formatItemRef(item.request?.request_number, item.line_no)} — {item.item_description || 'Unnamed item'}
+                  {item.return_date && item.wants_replacement && (
+                    <span className="ml-2 inline-flex items-center rounded-full bg-info/15 px-2 py-0.5 text-xs font-medium text-info">
+                      Replacement
+                    </span>
+                  )}
                 </p>
                 <p className="text-xs text-muted-foreground">Qty: {item.quantity}</p>
               </div>
