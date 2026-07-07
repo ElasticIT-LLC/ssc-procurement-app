@@ -4,13 +4,14 @@ import { DEFAULT_RULES, type FormatRule } from '../formatting/rules'
 
 const SCHEMA = 'app_procurement'
 const TABLES = { requests: 'purchase_requests', lineItems: 'line_items', locations: 'locations', departments: 'departments', config: '_config' } as const
-const RPCS = { submit: 'submit_request', decide: 'decide_line_item', order: 'order_line_item', receive: 'receive_line_item', initiateReturn: 'initiate_return', processReturn: 'process_return', setComment: 'set_line_item_comment', deleteItem: 'delete_line_item', getUserNames: 'get_user_names', getFormattingRules: 'get_formatting_rules' } as const
+const RPCS = { submit: 'submit_request', decide: 'decide_line_item', order: 'order_line_item', receive: 'receive_line_item', initiateReturn: 'initiate_return', processReturn: 'process_return', setComment: 'set_line_item_comment', deleteItem: 'delete_line_item', cancel: 'cancel_line_item', getUserNames: 'get_user_names', getFormattingRules: 'get_formatting_rules' } as const
 
-export interface RequestRow { id: string; requester_id: string | null; requester_name: string | null; requester_email: string | null; requester_type: string; status: RequestStatus; notes: string | null; submitted_at: string; updated_at: string }
-export interface LineItemRow { id: string; request_id: string; item_description: string | null; item_url: string | null; memo: string | null; quantity: number; status: LineItemStatus; location_id: string | null; custom_location: string | null; department_id: string | null; custom_department: string | null; date_needed: string | null; eta: string | null; admin_comment: string | null; commented_by: string | null; commented_at: string | null; product_image_path: string | null; return_reason: string | null; return_quantity: number | null; wants_replacement: boolean | null; return_notes: string | null; created_at: string }
+export interface RequestRow { id: string; requester_id: string | null; requester_name: string | null; requester_email: string | null; requester_type: string; status: RequestStatus; notes: string | null; submitted_at: string; updated_at: string; request_number: number | null; line_items?: { item_description: string | null }[] }
+export interface LineItemRow { id: string; request_id: string; item_description: string | null; item_url: string | null; memo: string | null; quantity: number; status: LineItemStatus; location_id: string | null; custom_location: string | null; department_id: string | null; custom_department: string | null; date_needed: string | null; eta: string | null; admin_comment: string | null; commented_by: string | null; commented_at: string | null; product_image_path: string | null; return_reason: string | null; return_quantity: number | null; wants_replacement: boolean | null; return_notes: string | null; created_at: string; line_no: number | null }
 export interface LineItemWithRequest extends LineItemRow {
   request: {
     id: string
+    request_number: number | null
     requester_name: string | null
     requester_email: string | null
     notes: string | null
@@ -34,7 +35,7 @@ export function useProcurementApi() {
   const ok = <T,>(res: { data: T; error: { message: string } | null }): T => { if (res.error) throw new Error(res.error.message); return res.data }
 
   async function listRequests(): Promise<RequestRow[]> {
-    return (ok(await db().from(TABLES.requests).select('*').order('updated_at', { ascending: false })) ?? []) as RequestRow[]
+    return (ok(await db().from(TABLES.requests).select('*, line_items(item_description)').order('updated_at', { ascending: false })) ?? []) as RequestRow[]
   }
   async function getRequest(id: string): Promise<RequestRow | null> {
     return (ok(await db().from(TABLES.requests).select('*').eq('id', id).maybeSingle()) ?? null) as RequestRow | null
@@ -70,6 +71,9 @@ export function useProcurementApi() {
     ok(await db().rpc(RPCS.initiateReturn, { p_line_item_id: id, p_return_quantity: f.return_quantity, p_return_reason: f.return_reason, p_has_packaging: f.has_packaging, p_wants_replacement: f.wants_replacement, p_return_notes: f.return_notes ?? null }))
   }
   async function processReturn(id: string, orderReplacement: boolean): Promise<void> { ok(await db().rpc(RPCS.processReturn, { p_line_item_id: id, p_order_replacement: orderReplacement })) }
+  async function cancelLineItem(id: string): Promise<void> {
+    ok(await db().rpc(RPCS.cancel, { p_line_item_id: id }))
+  }
 
   // Fire an in-app + email notification via the shell's send-notification function.
   // Best-effort: never throws into the caller (a notification failure must not break the action).
@@ -85,10 +89,10 @@ export function useProcurementApi() {
 
   async function listLineItemsByStatus(statuses: string[]): Promise<LineItemWithRequest[]> {
     const rows = ok(await db().from(TABLES.lineItems)
-      .select('*, purchase_requests!request_id(id, requester_name, requester_email, notes, submitted_at)')
+      .select('*, purchase_requests!request_id(id, request_number, requester_name, requester_email, notes, submitted_at)')
       .in('status', statuses)
       .order('updated_at', { ascending: false })) ?? []
-    return (rows as unknown as (LineItemRow & { purchase_requests: { id: string; requester_name: string | null; requester_email: string | null; notes: string | null; submitted_at: string } })[]).map(row => {
+    return (rows as unknown as (LineItemRow & { purchase_requests: { id: string; request_number: number | null; requester_name: string | null; requester_email: string | null; notes: string | null; submitted_at: string } })[]).map(row => {
       const { purchase_requests, ...item } = row
       return { ...item, request: purchase_requests } as LineItemWithRequest
     })
@@ -188,5 +192,5 @@ export function useProcurementApi() {
     }
   }
 
-  return { listRequests, getRequest, listLineItems, listLocations, listDepartments, listAllLocations, listAllDepartments, submitRequest, decideLineItem, orderLineItem, receiveLineItem, initiateReturn, processReturn, listLineItemsByStatus, listAllLineItemsDetailed, countLineItems, setLineItemComment, deleteLineItem, createLocation, createDepartment, updateLocation, updateDepartment, fireNotification, captureAndNotify, getProductImageUrl, notifyApproved, resolveUserNames, getFormattingRules, setFormattingRules, listShipToWorkers }
+  return { listRequests, getRequest, listLineItems, listLocations, listDepartments, listAllLocations, listAllDepartments, submitRequest, decideLineItem, orderLineItem, receiveLineItem, initiateReturn, processReturn, cancelLineItem, listLineItemsByStatus, listAllLineItemsDetailed, countLineItems, setLineItemComment, deleteLineItem, createLocation, createDepartment, updateLocation, updateDepartment, fireNotification, captureAndNotify, getProductImageUrl, notifyApproved, resolveUserNames, getFormattingRules, setFormattingRules, listShipToWorkers }
 }
