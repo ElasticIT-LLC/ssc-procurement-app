@@ -9,8 +9,8 @@ export interface MonthCount { month: string; count: number }
 export function countByStatusList<T extends { status: string }>(rows: T[], order: readonly string[]): StatusCount[] {
   const counts: Record<string, number> = {}
   for (const r of rows) counts[r.status] = (counts[r.status] ?? 0) + 1
-  const ordered = order.filter(s => counts[s] !== undefined).map(s => ({ status: s, count: counts[s] }))
-  const extras = Object.keys(counts).filter(s => !order.includes(s)).map(s => ({ status: s, count: counts[s] }))
+  const ordered = order.filter(s => counts[s] !== undefined).map(s => ({ status: s, count: counts[s] ?? 0 }))
+  const extras = Object.keys(counts).filter(s => !order.includes(s)).map(s => ({ status: s, count: counts[s] ?? 0 }))
   return [...ordered, ...extras]
 }
 
@@ -24,5 +24,5 @@ export function requestsByMonth<T extends { submitted_at: string }>(rows: T[]): 
     const month = r.submitted_at.slice(0, 7)
     counts[month] = (counts[month] ?? 0) + 1
   }
-  return Object.keys(counts).sort().map(month => ({ month, count: counts[month] }))
+  return Object.keys(counts).sort().map(month => ({ month, count: counts[month] ?? 0 }))
 }
