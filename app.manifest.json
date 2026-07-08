@@ -46,7 +46,8 @@
       { "name": "departments",       "rls": { "read": "authenticated", "write": "admin" } },
       { "name": "purchase_requests", "rls": { "read": "authenticated", "write": "authenticated" } },
       { "name": "line_items",        "rls": { "read": "authenticated", "write": "authenticated" } },
-      { "name": "_config",           "rls": { "read": "admin", "write": "admin" } }
+      { "name": "_config",           "rls": { "read": "admin", "write": "admin" } },
+      { "name": "purchase_orders",   "rls": { "read": "authenticated", "write": "admin" } }
     ]
   },
   "notifications": [
