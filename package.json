@@ -4,6 +4,9 @@
   "description": "ElasticIT portal app — deployed via Admin UI `.eitapp` upload",
   "type": "module",
   "private": true,
+  "dependencies": {
+    "recharts": "^3.8.1"
+  },
   "scripts": {
     "dev": "vite build --watch",
     "prebuild": "tsx scripts/validate.ts",

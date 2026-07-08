@@ -120,6 +120,12 @@ export function useProcurementApi() {
     if (res.error) throw new Error(res.error.message)
     return res.count ?? 0
   }
+  // Thin status-only read for the dashboard "Items by Status" chart. RLS-scoped
+  // (all items for an admin, own items for a requester). Capped at 1000 rows by
+  // PostgREST — acceptable for the dashboard; TODO: move to a grouped-count RPC if volume grows.
+  async function listLineItemStatuses(): Promise<{ status: string }[]> {
+    return (ok(await db().from(TABLES.lineItems).select('status')) ?? []) as { status: string }[]
+  }
   async function setLineItemComment(id: string, comment: string): Promise<void> { ok(await db().rpc(RPCS.setComment, { p_line_item_id: id, p_comment: comment })) }
   async function deleteLineItem(id: string): Promise<void> { ok(await db().rpc(RPCS.deleteItem, { p_line_item_id: id })) }
 
@@ -194,5 +200,5 @@ export function useProcurementApi() {
     }
   }
 
-  return { listRequests, getRequest, listLineItems, listLocations, listDepartments, listAllLocations, listAllDepartments, submitRequest, decideLineItem, orderLineItem, receiveLineItem, initiateReturn, processReturn, cancelLineItem, listLineItemsByStatus, listAllLineItemsDetailed, countLineItems, setLineItemComment, deleteLineItem, createLocation, createDepartment, updateLocation, updateDepartment, fireNotification, captureAndNotify, getProductImageUrl, notifyApproved, resolveUserNames, getFormattingRules, setFormattingRules, listShipToWorkers }
+  return { listRequests, getRequest, listLineItems, listLocations, listDepartments, listAllLocations, listAllDepartments, submitRequest, decideLineItem, orderLineItem, receiveLineItem, initiateReturn, processReturn, cancelLineItem, listLineItemsByStatus, listLineItemStatuses, listAllLineItemsDetailed, countLineItems, setLineItemComment, deleteLineItem, createLocation, createDepartment, updateLocation, updateDepartment, fireNotification, captureAndNotify, getProductImageUrl, notifyApproved, resolveUserNames, getFormattingRules, setFormattingRules, listShipToWorkers }
 }

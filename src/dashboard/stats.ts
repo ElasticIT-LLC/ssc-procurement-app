@@ -1,5 +1,7 @@
-export interface StatusCount { status: string; count: number }
-export interface MonthCount { month: string; count: number }
+// Index signatures let these flow straight into ui-kit's `Chart` (which takes
+// `Record<string, unknown>[]`) without a cast at the call site.
+export interface StatusCount { status: string; count: number; [key: string]: unknown }
+export interface MonthCount { month: string; count: number; [key: string]: unknown }
 
 /**
  * Count rows per status, returned as a chart-friendly array. Statuses are ordered by the
