@@ -138,15 +138,15 @@ export function DashboardPage() {
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             <div className="rounded-lg border border-border bg-card p-4">
               <h3 className="text-sm font-semibold text-foreground mb-2">Requests by Status</h3>
-              <Chart type="pie" data={reqStatusData} xKey="status" yKey="count" height={240} />
+              <Chart type="pie" data={reqStatusData as unknown as Record<string, unknown>[]} xKey="status" yKey="count" height={240} />
             </div>
             <div className="rounded-lg border border-border bg-card p-4">
               <h3 className="text-sm font-semibold text-foreground mb-2">Items by Status</h3>
-              <Chart type="bar" data={itemStatusData} xKey="status" yKey="count" height={240} />
+              <Chart type="bar" data={itemStatusData as unknown as Record<string, unknown>[]} xKey="status" yKey="count" height={240} />
             </div>
             <div className="rounded-lg border border-border bg-card p-4">
               <h3 className="text-sm font-semibold text-foreground mb-2">Requests Over Time</h3>
-              <Chart type="area" data={reqMonthData} xKey="month" yKey="count" height={240} />
+              <Chart type="area" data={reqMonthData as unknown as Record<string, unknown>[]} xKey="month" yKey="count" height={240} />
             </div>
           </div>
 
