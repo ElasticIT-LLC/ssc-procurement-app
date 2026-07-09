@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useToast } from '@elasticit-llc/app-bridge'
 import { useProcurementApi, PurchaseOrderRow, LineItemWithRequest } from '../data/db'
 import { StatusBadge } from '../requester/StatusBadge'
+import { ReplacementBadge } from '../requester/ReplacementBadge'
 import { formatDate } from '../lib/constants'
 import { formatItemRef } from '../lib/itemRef'
 import { poReceiveProgress } from './orders'
@@ -72,6 +73,7 @@ export function OpenOrders() {
                     <p className="text-xs text-muted-foreground">Qty: {item.quantity}</p>
                   </div>
                   <div className="flex items-center gap-2">
+                    <ReplacementBadge item={item} />
                     <StatusBadge status={item.status} />
                     {item.status === 'ordered' && (
                       <button type="button" disabled={busyId === item.id} onClick={() => receive(item.id)} className="inline-flex items-center rounded-md bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50">Mark Received</button>
@@ -94,6 +96,7 @@ export function OpenOrders() {
                 <p className="text-xs text-muted-foreground">Qty: {item.quantity}{item.eta ? ` · ETA ${formatDate(item.eta)}` : ''}</p>
               </div>
               <div className="flex items-center gap-2">
+                <ReplacementBadge item={item} />
                 <StatusBadge status={item.status} />
                 {item.status === 'ordered' && (
                   <button type="button" disabled={busyId === item.id} onClick={() => receive(item.id)} className="inline-flex items-center rounded-md bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50">Mark Received</button>

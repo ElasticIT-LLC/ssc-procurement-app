@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useToast } from '@elasticit-llc/app-bridge'
 import { useProcurementApi, LineItemWithRequest, Location } from '../data/db'
 import { StatusBadge } from '../requester/StatusBadge'
+import { ReplacementBadge } from '../requester/ReplacementBadge'
 import { formatDate } from '../lib/constants'
 import { useFormattingRules } from '../formatting/useFormattingRules'
 import { formatItemRef } from '../lib/itemRef'
@@ -156,11 +157,7 @@ export function ReadyForPurchasing() {
               <div>
                 <p className="text-sm font-medium text-foreground">
                   {formatItemRef(item.request?.request_number, item.line_no)} — {item.item_description || 'Unnamed item'}
-                  {item.return_date && item.wants_replacement && (
-                    <span className="ml-2 inline-flex items-center rounded-full bg-info/15 px-2 py-0.5 text-xs font-medium text-info">
-                      Replacement
-                    </span>
-                  )}
+                  <ReplacementBadge item={item} className="ml-2" />
                 </p>
                 <p className="text-xs text-muted-foreground">Qty: {item.quantity}</p>
               </div>

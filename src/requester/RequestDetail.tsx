@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useToast } from '@elasticit-llc/app-bridge'
 import { useProcurementApi, RequestRow, LineItemRow } from '../data/db'
 import { StatusBadge } from './StatusBadge'
+import { ReplacementBadge } from './ReplacementBadge'
 import { ReturnForm } from './ReturnForm'
 import { formatDate } from '../lib/constants'
 import { formatItemRef } from '../lib/itemRef'
@@ -106,6 +107,7 @@ export function RequestDetail({ requestId, onBack }: RequestDetailProps) {
               <div>
                 <p className="text-sm font-medium text-foreground">
                   {formatItemRef(request?.request_number, item.line_no)} — {item.item_description || 'Unnamed item'}
+                  <ReplacementBadge item={item} className="ml-2" />
                 </p>
                 <p className="text-xs text-muted-foreground">Qty: {item.quantity}</p>
               </div>

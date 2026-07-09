@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useProcurementApi, PurchaseOrderRow } from '../data/db'
 import { StatusBadge } from '../requester/StatusBadge'
+import { ReplacementBadge } from '../requester/ReplacementBadge'
 import { formatDate } from '../lib/constants'
 import { formatItemRef } from '../lib/itemRef'
 
@@ -35,7 +36,10 @@ export function ClosedOrders() {
             {po.line_items.map(item => (
               <div key={item.id} className="rounded-md border border-border bg-muted/30 px-3 py-2 flex items-center justify-between gap-2">
                 <p className="text-sm text-foreground truncate">{formatItemRef(item.request?.request_number, item.line_no)} — {item.item_description || 'Unnamed item'}</p>
-                <StatusBadge status={item.status} />
+                <div className="flex items-center gap-2">
+                  <ReplacementBadge item={item} />
+                  <StatusBadge status={item.status} />
+                </div>
               </div>
             ))}
           </div>

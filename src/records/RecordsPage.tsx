@@ -2,6 +2,7 @@ import { Fragment, useState, useEffect, useCallback } from 'react'
 import { useToast, usePermissions } from '@elasticit-llc/app-bridge'
 import { useProcurementApi, LineItemDetailed, LineItemWithRequest } from '../data/db'
 import { StatusBadge } from '../requester/StatusBadge'
+import { ReplacementBadge } from '../requester/ReplacementBadge'
 import { ReturnForm } from '../requester/ReturnForm'
 import { PERMS, formatDate } from '../lib/constants'
 import { useFormattingRules } from '../formatting/useFormattingRules'
@@ -200,7 +201,7 @@ export function RecordsPage() {
                   <td className={cell}>{item.quantity}</td>
                   <td className={cell}>{locationName(item)}</td>
                   <td className={cell}>{departmentName(item)}</td>
-                  <td className={cell}><StatusBadge status={item.status} /></td>
+                  <td className={cell}><span className="inline-flex flex-wrap items-center gap-1"><StatusBadge status={item.status} /><ReplacementBadge item={item} /></span></td>
                   <td className={`${cell} whitespace-nowrap`}>{formatDate(item.date_needed) || '—'}</td>
                   <td className={`${cell} whitespace-nowrap`}>{formatDate(item.eta) || '—'}</td>
                   <td className={`${cell} max-w-[14rem] text-muted-foreground`}>
