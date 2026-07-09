@@ -2,8 +2,10 @@ import { useState, useEffect, useCallback } from 'react'
 import { useToast } from '@elasticit-llc/app-bridge'
 import { useProcurementApi, RequestRow, LineItemRow } from '../data/db'
 import { StatusBadge } from './StatusBadge'
+import { ReplacementBadge } from './ReplacementBadge'
 import { ReturnForm } from './ReturnForm'
 import { formatDate } from '../lib/constants'
+import { formatItemRef } from '../lib/itemRef'
 
 interface RequestDetailProps {
   requestId: string
@@ -99,12 +101,13 @@ export function RequestDetail({ requestId, onBack }: RequestDetailProps) {
         {lineItems.length === 0 && (
           <p className="text-sm text-muted-foreground">No items found.</p>
         )}
-        {lineItems.map((item, idx) => (
+        {lineItems.map((item) => (
           <div key={item.id} className="rounded-lg border border-border bg-card p-4 grid gap-2">
             <div className="flex items-start justify-between gap-2">
               <div>
                 <p className="text-sm font-medium text-foreground">
-                  Item #{idx + 1}{item.item_description ? ` — ${item.item_description}` : ''}
+                  {formatItemRef(request?.request_number, item.line_no)} — {item.item_description || 'Unnamed item'}
+                  <ReplacementBadge item={item} className="ml-2" />
                 </p>
                 <p className="text-xs text-muted-foreground">Qty: {item.quantity}</p>
               </div>

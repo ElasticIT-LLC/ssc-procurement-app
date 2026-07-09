@@ -1,9 +1,11 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useShellContext } from '@elasticit-llc/app-bridge'
 import { usePermissions } from '@elasticit-llc/app-bridge'
-import { useProcurementApi, RequestRow, LineItemWithRequest } from '../data/db'
+import { Chart } from '@elasticit-llc/ui-kit'
+import { useProcurementApi, RequestRow, LineItemWithRequest, Location } from '../data/db'
 import { StatusBadge } from '../requester/StatusBadge'
-import { PERMS, formatDate } from '../lib/constants'
+import { PERMS, formatDate, REQUEST_STATUS, LINE_ITEM_STATUS } from '../lib/constants'
+import { countByStatusList, requestsByMonth, itemsByLocation } from '../dashboard/stats'
 
 interface KpiCardProps {
   label: string
@@ -13,7 +15,7 @@ interface KpiCardProps {
 
 function KpiCard({ label, value, sub }: KpiCardProps) {
   return (
-    <div className="rounded-lg border border-border bg-card px-4 py-3 w-44">
+    <div className="rounded-lg border border-border bg-card px-4 py-3 flex-1 min-w-0">
       <p className="text-xs font-medium text-muted-foreground">{label}</p>
       <p className="text-2xl font-semibold text-foreground mt-1 leading-none">{value}</p>
       <p className="text-[11px] text-muted-foreground mt-1">{sub}</p>
@@ -31,6 +33,8 @@ export function DashboardPage() {
   const [approvalItems, setApprovalItems] = useState<LineItemWithRequest[]>([])
   const [purchaseItems, setPurchaseItems] = useState<LineItemWithRequest[]>([])
   const [returnItems, setReturnItems] = useState<LineItemWithRequest[]>([])
+  const [itemFacets, setItemFacets] = useState<{ status: string; location_id: string | null; custom_location: string | null }[]>([])
+  const [locations, setLocations] = useState<Location[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -43,14 +47,16 @@ export function DashboardPage() {
     setLoading(true)
     setError(null)
     try {
-      const fetches: Promise<unknown>[] = [api.listRequests(), api.countLineItems()]
+      const fetches: Promise<unknown>[] = [api.listRequests(), api.countLineItems(), api.listLineItemFacets(), api.listAllLocations()]
       if (canApprove) fetches.push(api.listLineItemsByStatus(['pending', 'on_hold']))
       if (canPurchase) fetches.push(api.listLineItemsByStatus(['approved']))
       if (canReturns) fetches.push(api.listLineItemsByStatus(['returned']))
 
-      const [reqs, itemCount, ...rest] = await Promise.all(fetches)
+      const [reqs, itemCount, facets, locs, ...rest] = await Promise.all(fetches)
       setRequests(reqs as RequestRow[])
       setTotalItems(itemCount as number)
+      setItemFacets(facets as { status: string; location_id: string | null; custom_location: string | null }[])
+      setLocations(locs as Location[])
 
       let idx = 0
       if (canApprove) { setApprovalItems(rest[idx] as LineItemWithRequest[]); idx++ }
@@ -67,6 +73,11 @@ export function DashboardPage() {
 
   const myPendingRequests = requests.filter(r => r.status === 'pending').length
   const recentItems = requests.slice(0, 5)
+  const reqStatusData = countByStatusList(requests, REQUEST_STATUS)
+  const itemStatusData = countByStatusList(itemFacets, LINE_ITEM_STATUS)
+  const reqMonthData = requestsByMonth(requests)
+  const locationNames = Object.fromEntries(locations.map(l => [l.id, l.name]))
+  const itemLocationData = itemsByLocation(itemFacets, locationNames)
 
   return (
     <div className="grid gap-6">
@@ -90,8 +101,8 @@ export function DashboardPage() {
 
       {!loading && !error && (
         <>
-          {/* KPI grid */}
-          <div className="flex flex-wrap gap-3">
+          {/* KPI row — all cards on one line, each an equal share of the width */}
+          <div className="flex gap-3">
             <KpiCard
               label="Total Items"
               value={totalItems}
@@ -125,6 +136,26 @@ export function DashboardPage() {
                 sub="Returns to process"
               />
             )}
+          </div>
+
+          {/* Charts */}
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <div className="rounded-lg border border-border bg-card p-4">
+              <h3 className="text-sm font-semibold text-foreground mb-2">Requests by Status</h3>
+              <Chart type="pie" data={reqStatusData as unknown as Record<string, unknown>[]} xKey="status" yKey="count" height={240} />
+            </div>
+            <div className="rounded-lg border border-border bg-card p-4">
+              <h3 className="text-sm font-semibold text-foreground mb-2">Items by Status</h3>
+              <Chart type="bar" data={itemStatusData as unknown as Record<string, unknown>[]} xKey="status" yKey="count" height={240} />
+            </div>
+            <div className="rounded-lg border border-border bg-card p-4">
+              <h3 className="text-sm font-semibold text-foreground mb-2">Requests Over Time</h3>
+              <Chart type="area" data={reqMonthData as unknown as Record<string, unknown>[]} xKey="month" yKey="count" height={240} />
+            </div>
+            <div className="rounded-lg border border-border bg-card p-4">
+              <h3 className="text-sm font-semibold text-foreground mb-2">Items by Location</h3>
+              <Chart type="bar" data={itemLocationData as unknown as Record<string, unknown>[]} xKey="location" yKey="count" height={240} />
+            </div>
           </div>
 
           {/* Recent activity */}

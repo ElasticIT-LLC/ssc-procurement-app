@@ -4,6 +4,7 @@ import { useProcurementApi, LineItemWithRequest } from '../data/db'
 import { StatusBadge } from '../requester/StatusBadge'
 import { PERMS, formatDate } from '../lib/constants'
 import { useFormattingRules } from '../formatting/useFormattingRules'
+import { formatItemRef } from '../lib/itemRef'
 
 export function ApprovalsPage() {
   const api = useProcurementApi()
@@ -98,7 +99,7 @@ export function ApprovalsPage() {
           <div className="flex items-start justify-between gap-2">
             <div>
               <p className="text-sm font-medium text-foreground">
-                {item.item_description ?? 'Unnamed item'}
+                {formatItemRef(item.request?.request_number, item.line_no)} — {item.item_description || 'Unnamed item'}
               </p>
               <p className="text-xs text-muted-foreground">Qty: {item.quantity}</p>
             </div>

@@ -4,6 +4,7 @@ import { useProcurementApi, LineItemWithRequest } from '../data/db'
 import { StatusBadge } from '../requester/StatusBadge'
 import { PERMS, formatDate } from '../lib/constants'
 import { useFormattingRules } from '../formatting/useFormattingRules'
+import { formatItemRef } from '../lib/itemRef'
 
 function humanizeReason(reason: string): string {
   if (!reason) return ''
@@ -27,7 +28,7 @@ export function ReturnsPage() {
     setError(null)
     try {
       const data = await api.listLineItemsByStatus(['returned'])
-      setItems(data)
+      setItems(data.filter(i => i.return_processed_at == null))
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to load items')
     } finally {
@@ -85,7 +86,7 @@ export function ReturnsPage() {
           <div className="flex items-start justify-between gap-2">
             <div>
               <p className="text-sm font-medium text-foreground">
-                {item.item_description ?? 'Unnamed item'}
+                {formatItemRef(item.request?.request_number, item.line_no)} — {item.item_description || 'Unnamed item'}
               </p>
               <p className="text-xs text-muted-foreground">Qty: {item.quantity}</p>
             </div>
@@ -102,11 +103,6 @@ export function ReturnsPage() {
             )}
             {item.return_quantity != null && (
               <p className="text-xs text-muted-foreground">Return qty: {item.return_quantity}</p>
-            )}
-            {item.wants_replacement && (
-              <span className="inline-flex self-start items-center rounded-full px-2.5 py-0.5 text-xs font-medium bg-info/15 text-info">
-                Wants replacement
-              </span>
             )}
             {item.return_notes && (
               <p className="text-xs text-muted-foreground">Notes: {item.return_notes}</p>

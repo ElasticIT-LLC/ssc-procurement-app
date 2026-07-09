@@ -1,0 +1,4 @@
+-- 013: Phase 4 QA — mark processed returns so they leave the Returns queue.
+-- return_processed_at is set by process_return; the Returns screen shows only unprocessed ('returned' AND return_processed_at IS NULL). status stays 'returned' (terminal), so the request rollup is untouched.
+ALTER TABLE app_procurement.line_items ADD COLUMN IF NOT EXISTS return_processed_at timestamptz;
+CREATE OR REPLACE FUNCTION app_procurement.process_return(p_line_item_id uuid, p_order_replacement boolean) RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = app_procurement, public AS $fn$ BEGIN IF NOT public.check_user_permission(auth.uid(), 'apps/procurement/returns/manage') THEN RAISE EXCEPTION 'Not permitted to process returns'; END IF; UPDATE app_procurement.line_items SET status = CASE WHEN p_order_replacement THEN 'replacement_ordered' ELSE status END, return_processed_at=now(), updated_at=now() WHERE id=p_line_item_id AND status='returned'; END; $fn$;
