@@ -153,8 +153,12 @@ export function useProcurementApi() {
   // Thin status-only read for the dashboard "Items by Status" chart. RLS-scoped
   // (all items for an admin, own items for a requester). Capped at 1000 rows by
   // PostgREST — acceptable for the dashboard; TODO: move to a grouped-count RPC if volume grows.
-  async function listLineItemStatuses(): Promise<{ status: string }[]> {
-    return (ok(await db().from(TABLES.lineItems).select('status')) ?? []) as { status: string }[]
+  // Thin projection of every (RLS-scoped) line item for the dashboard charts:
+  // status feeds "Items by Status", location_id/custom_location feed "Items by
+  // Location". One read serves both. Capped at 1000 rows by PostgREST — fine for
+  // the dashboard; TODO: move to grouped-count RPCs if volume grows.
+  async function listLineItemFacets(): Promise<{ status: string; location_id: string | null; custom_location: string | null }[]> {
+    return (ok(await db().from(TABLES.lineItems).select('status, location_id, custom_location')) ?? []) as { status: string; location_id: string | null; custom_location: string | null }[]
   }
   async function setLineItemComment(id: string, comment: string): Promise<void> { ok(await db().rpc(RPCS.setComment, { p_line_item_id: id, p_comment: comment })) }
   async function deleteLineItem(id: string): Promise<void> { ok(await db().rpc(RPCS.deleteItem, { p_line_item_id: id })) }
@@ -230,5 +234,5 @@ export function useProcurementApi() {
     }
   }
 
-  return { listRequests, getRequest, listLineItems, listLocations, listDepartments, listAllLocations, listAllDepartments, submitRequest, decideLineItem, orderLineItem, receiveLineItem, initiateReturn, processReturn, cancelLineItem, listLineItemsByStatus, listLineItemStatuses, listAllLineItemsDetailed, countLineItems, setLineItemComment, deleteLineItem, createLocation, createDepartment, updateLocation, updateDepartment, fireNotification, captureAndNotify, getProductImageUrl, notifyApproved, resolveUserNames, getFormattingRules, setFormattingRules, listShipToWorkers, createPurchaseOrder, listPurchaseOrders, closePurchaseOrder }
+  return { listRequests, getRequest, listLineItems, listLocations, listDepartments, listAllLocations, listAllDepartments, submitRequest, decideLineItem, orderLineItem, receiveLineItem, initiateReturn, processReturn, cancelLineItem, listLineItemsByStatus, listLineItemFacets, listAllLineItemsDetailed, countLineItems, setLineItemComment, deleteLineItem, createLocation, createDepartment, updateLocation, updateDepartment, fireNotification, captureAndNotify, getProductImageUrl, notifyApproved, resolveUserNames, getFormattingRules, setFormattingRules, listShipToWorkers, createPurchaseOrder, listPurchaseOrders, closePurchaseOrder }
 }

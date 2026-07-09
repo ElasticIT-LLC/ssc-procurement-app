@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { countByStatusList, requestsByMonth } from './stats'
+import { countByStatusList, requestsByMonth, itemsByLocation } from './stats'
 
 const items = [
   { status: 'approved' },
@@ -37,4 +37,29 @@ describe('requestsByMonth', () => {
     ])
   })
   it('handles empty input', () => expect(requestsByMonth([])).toEqual([]))
+})
+
+describe('itemsByLocation', () => {
+  const names = { 'loc-a': 'Warehouse A', 'loc-b': 'HQ Office' }
+  it('counts items per named location; custom/blank/unknown go to Other; sorted desc, Other last', () => {
+    const rows = [
+      { location_id: 'loc-a', custom_location: null },
+      { location_id: 'loc-a', custom_location: null },
+      { location_id: 'loc-b', custom_location: null },
+      { location_id: null, custom_location: 'Front desk' }, // free-typed → Other
+      { location_id: null, custom_location: null },          // blank → Other
+      { location_id: 'loc-x', custom_location: null },        // unknown id → Other
+    ]
+    expect(itemsByLocation(rows, names)).toEqual([
+      { location: 'Warehouse A', count: 2 },
+      { location: 'HQ Office', count: 1 },
+      { location: 'Other', count: 3 },
+    ])
+  })
+  it('omits Other when every item maps to a named location', () => {
+    expect(itemsByLocation([{ location_id: 'loc-b', custom_location: null }], names)).toEqual([
+      { location: 'HQ Office', count: 1 },
+    ])
+  })
+  it('handles empty input', () => expect(itemsByLocation([], names)).toEqual([]))
 })
