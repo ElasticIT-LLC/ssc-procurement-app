@@ -44,6 +44,10 @@ export function ReadyForPurchasing() {
       ])
       setItems(data)
       setLocations(locs)
+      // Drop any selected ids that are no longer approved (item was individually
+      // ordered/cancelled, moved onto a PO, or changed elsewhere) so the toolbar
+      // count and a subsequent Create-PO never reference stale items.
+      setSelected(prev => new Set([...prev].filter(id => data.some(i => i.id === id))))
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to load items')
     } finally {

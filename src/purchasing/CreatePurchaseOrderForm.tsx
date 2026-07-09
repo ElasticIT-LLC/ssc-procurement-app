@@ -32,8 +32,9 @@ export function CreatePurchaseOrderForm({ itemIds, locations, onCancel, onCreate
         custom_shipping_location: isOther ? (customShipping || null) : null,
         notes: notes || null,
       })
-      // Reuse the existing per-item ordered notification, one per item.
-      await Promise.all(itemIds.map(() => api.fireNotification('item_ordered')))
+      // Reuse the existing ordered notification, fired once for the whole PO
+      // (the items were ordered together — one notification, not one per item).
+      await api.fireNotification('item_ordered')
       await onCreated(po)
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to create purchase order')
