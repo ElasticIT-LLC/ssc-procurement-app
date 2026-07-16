@@ -16,7 +16,7 @@ export function PurchasingPage() {
   const { hasPermission } = usePermissions()
   const [tab, setTab] = useState<Tab>('ready')
 
-  if (!hasPermission(PERMS.purchase) && !hasPermission(PERMS.admin)) {
+if (!hasPermission(PERMS.purchase) && !hasPermission(PERMS.admin)) {
     return (
       <div className="rounded-md bg-destructive/10 border border-destructive/30 p-4 text-sm text-destructive">
         You do not have permission to view this page.
