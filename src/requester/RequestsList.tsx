@@ -42,7 +42,8 @@ export function RequestsList({ onNew, onSelect }: RequestsListProps) {
       .then((rows) => setRequests(rows))
       .catch((err: unknown) => setError(err instanceof Error ? err.message : 'Failed to load requests'))
       .finally(() => setLoading(false))
-  }, [api, hasPermission, supabase])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const canCreate = hasPermission(PERMS.create)
 
