@@ -39,6 +39,8 @@ export interface SmtpPayload {
   fromDisplayName?: string
   /** Inline images embedded via multipart/related; referenced from htmlBody as cid:<cid>. */
   inlineImages?: { cid: string; contentType: string; base64: string }[]
+  /** Whether this is a high-priority message (adds X-Priority, Importance headers). */
+  highPriority?: boolean
 }
 
 /** Fetch an OAuth 2.0 access token via the client_credentials grant.
@@ -132,9 +134,10 @@ export async function sendSmtp(config: SmtpConfig, payload: SmtpPayload): Promis
         subject: payload.subject,
         html: payload.htmlBody,
         images: payload.inlineImages,
+        highPriority: payload.highPriority,
       })
     } else {
-      message = buildMessage(config.fromAddress, payload.subject, payload.htmlBody, payload.fromDisplayName)
+      message = buildMessage(config.fromAddress, payload.subject, payload.htmlBody, payload.fromDisplayName, payload.highPriority)
     }
 
     await session.sendRaw(message + `\r\n.\r\n`)
@@ -205,7 +208,7 @@ function b64utf8(s: string): string {
   return btoa(bin)
 }
 
-export function buildMessage(from: string, subject: string, htmlBody: string, fromDisplayName?: string): string {
+export function buildMessage(from: string, subject: string, htmlBody: string, fromDisplayName?: string, highPriority = false): string {
   const date = new Date().toUTCString()
   const messageId = `<${crypto.randomUUID()}@elasticit.com>`
   const safeSubject = /^[\x20-\x7E]*$/.test(subject)
@@ -226,6 +229,7 @@ export function buildMessage(from: string, subject: string, htmlBody: string, fr
     `Subject: ${safeSubject}`,
     `Date: ${date}`,
     `Message-ID: ${messageId}`,
+    ...(highPriority ? [`X-Priority: 1`, `X-MSMail-Priority: High`, `Importance: High`] : []),
     `MIME-Version: 1.0`,
     `Content-Type: text/html; charset=utf-8`,
     `Content-Transfer-Encoding: 8bit`,

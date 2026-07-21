@@ -50,11 +50,10 @@ export function ApprovalsPage() {
         on_hold: 'Item placed on hold',
       }
       showToast({ message: messages[action], type: 'success' })
-      if (action === 'approved') await api.fireNotification('item_approved')
-      else if (action === 'declined') await api.fireNotification('item_declined')
+      api.fireNotification(action === 'approved' ? 'item_approved' : 'item_declined')
       const remaining = await api.listLineItemsByStatus(['pending', 'on_hold'])
       setItems(remaining)
-      if (reqId && !remaining.some((it) => it.request.id === reqId)) api.notifyApproved(reqId)
+      if (reqId && !remaining.some((it) => it.request.id === reqId)) await api.notifyApproved(reqId)
     } catch (err: unknown) {
       showToast({ message: err instanceof Error ? err.message : 'Action failed', type: 'error' })
     } finally {

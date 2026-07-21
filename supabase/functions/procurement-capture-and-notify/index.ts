@@ -1,6 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
 import { sendSmtp } from './smtp.ts'
-import { buildApprovedEmail, buildSummaryEmail } from './emails.ts'
+import { buildApprovedEmail, buildSummaryEmail, buildRequesterConfirmation, buildItemOrderedEmail, buildReturnNotificationEmail, buildItemCancelledEmail } from './emails.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
@@ -9,6 +9,8 @@ const HVE_HOST = 'smtp-hve.office365.com'
 const HVE_PORT = 587
 const SCREENSHOT_URL = 'https://msr-screenshot.livelysky-4eedc56b.eastus.azurecontainerapps.io/screenshot'
 const APPROVE_PERMISSION = 'apps/procurement/approvals/act'
+
+const STATUS_MAP: Record<string, string> = { pending: 'Pending', approved: 'Approved', declined: 'Declined', on_hold: 'On hold', ordered: 'Ordered', received: 'Received', returned: 'Returned', replacement_ordered: 'Replacement ordered', cancelled: 'Cancelled' }
 
 const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, content-type, apikey', 'Access-Control-Allow-Methods': 'POST, OPTIONS' }
 const json = (b: unknown, s = 200) => new Response(JSON.stringify(b), { status: s, headers: { ...cors, 'Content-Type': 'application/json' } })
@@ -23,7 +25,7 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: cors })
   if (req.method !== 'POST') return json({ error: 'POST only' }, 405)
 
-  let body: { request_id?: string; only_line_item_id?: string; event?: string }
+  let body: { request_id?: string; only_line_item_id?: string; event?: string; line_item_ids?: string[] }
   try { body = await req.json() } catch { return json({ error: 'invalid JSON' }, 400) }
   const requestId = body.request_id
   if (!requestId) return json({ error: 'request_id required' }, 400)
@@ -31,10 +33,24 @@ Deno.serve(async (req) => {
   const db = createClient(SUPABASE_URL, SERVICE_KEY)
 
   // 1. Load request + line items.
-  const { data: request, error: reqErr } = await db.schema('app_procurement').from('purchase_requests').select('id, requester_name, requester_email, notes, submitted_at, approval_notified_at').eq('id', requestId).maybeSingle()
+  const { data: request, error: reqErr } = await db.schema('app_procurement').from('purchase_requests').select('id, requester_name, requester_email, requester_id, notes, submitted_at, approval_notified_at').eq('id', requestId).maybeSingle()
   if (reqErr || !request) return json({ error: 'request not found' }, 404)
 
   const event = body.event ?? 'submitted'
+
+  // Shared settings loaded once for all event branches
+  const { data: settings } = await db.from('client_settings').select('key, value').in('key', ['client_name', 'portal_url', 'hve_sender_address'])
+  const sMap = new Map((settings ?? []).map((s: { key: string; value: string }) => [s.key, s.value]))
+  const sender = sMap.get('hve_sender_address')
+  const portalUrl = sMap.get('portal_url') ?? ''
+  const clientName = sMap.get('client_name') ?? ''
+  const { data: appRow } = await db.from('apps').select('id').eq('slug', 'procurement').maybeSingle()
+  const appBase = portalUrl && appRow?.id ? `${portalUrl}/apps/${appRow.id}` : ''
+  const approvalsUrl = appBase ? `${appBase}/approvals` : ''
+  const recordsUrl = appBase ? `${appBase}/records` : ''
+  const purchasingUrl = appBase ? `${appBase}/purchasing` : ''
+  const requestsUrl = appBase ? `${appBase}/requests` : ''
+  const returnsUrl = appBase ? `${appBase}/returns` : ''
 
   // ── Approval summary flow ───────────────────────────────────────────────
   if (event === 'approved') {
@@ -48,37 +64,102 @@ Deno.serve(async (req) => {
       for (const p of (profs ?? []) as Array<{ id: string; display_name: string | null; email: string | null }>) deciderMap.set(p.id, p.display_name || p.email || '')
     }
     const approverName = deciderMap.size ? [...deciderMap.values()][0] : 'the approver'
-    const { data: settings } = await db.from('client_settings').select('key, value').in('key', ['client_name', 'portal_url', 'hve_sender_address'])
-    const sMap = new Map((settings ?? []).map((s: { key: string; value: string }) => [s.key, s.value]))
-    const sender = sMap.get('hve_sender_address')
-    const portalUrl = sMap.get('portal_url') ?? ''
-    const clientName = sMap.get('client_name') ?? ''
-    const { data: appRow } = await db.from('apps').select('id').eq('slug', 'procurement').maybeSingle()
-    const appBase = portalUrl && appRow?.id ? `${portalUrl}/apps/${appRow.id}` : ''
-    const recordsUrl = appBase ? `${appBase}/records` : ''
-    const purchasingUrl = appBase ? `${appBase}/purchasing` : ''
-    const requestsUrl = appBase ? `${appBase}/requests` : ''
-    const STATUS: Record<string, string> = { pending: 'Pending', approved: 'Approved', declined: 'Declined', on_hold: 'On hold', ordered: 'Ordered', received: 'Received', returned: 'Returned', replacement_ordered: 'Replacement ordered' }
     const nm = (li: Record<string, any>) => li.locations?.name ?? li.custom_location ?? '—'
     const dp = (li: Record<string, any>) => li.departments?.name ?? li.custom_department ?? '—'
     const requester = request.requester_name ?? request.requester_email ?? 'a requester'
     let purchaserEmailed = false
     let requesterEmailed = false
     if (sender && HVE_PASSWORD) {
-      const approved = allItems.filter((i) => i.status === 'approved')
       const { data: purchasers } = await db.schema('app_procurement').rpc('get_permission_holders', { p_permission: 'apps/procurement/purchasing/manage' })
       const purchaserEmails = ((purchasers ?? []) as Array<{ email: string }>).map((p) => p.email)
-      if (approved.length && purchaserEmails.length) {
-        const html = buildApprovedEmail({ requester, approverName, recordsUrl, purchasingUrl, clientName, items: approved.map((i) => ({ name: i.item_description ?? 'Item', qty: String(i.quantity), dept: dp(i), location: nm(i), approvedBy: deciderMap.get(i.approved_by) ?? '', url: i.item_url ?? null })) })
-        try { await sendSmtp({ host: HVE_HOST, port: HVE_PORT, fromAddress: sender, useTls: true, auth: { type: 'login', username: sender, password: HVE_PASSWORD } }, { recipients: purchaserEmails, subject: 'Approved Procurement Request', htmlBody: html, fromDisplayName: clientName ? `${clientName} Procurement` : 'Procurement' }); purchaserEmailed = true } catch (e) { console.error('purchaser email failed:', e instanceof Error ? e.message : e) }
+      if (allItems.length && purchaserEmails.length) {
+        const html = buildApprovedEmail({ requester, approverName, recordsUrl, purchasingUrl, clientName, items: allItems.map((i) => ({ name: i.item_description ?? 'Item', qty: String(i.quantity), status: STATUS_MAP[i.status] ?? i.status, dept: dp(i), location: nm(i), approvedBy: deciderMap.get(i.approved_by) ?? '', url: i.item_url ?? null })) })
+        try { await sendSmtp({ host: HVE_HOST, port: HVE_PORT, fromAddress: sender, useTls: true, auth: { type: 'login', username: sender, password: HVE_PASSWORD } }, { recipients: purchaserEmails, subject: 'Approved Procurement Request', htmlBody: html, fromDisplayName: clientName ? `${clientName} Procurement` : 'Procurement', highPriority: true }); purchaserEmailed = true } catch (e) { console.error('purchaser email failed:', e instanceof Error ? e.message : e) }
       }
       if (request.requester_email) {
-        const html = buildSummaryEmail({ clientName, approverName, items: allItems.map((i) => ({ name: i.item_description ?? 'Item', status: STATUS[i.status] ?? i.status, comments: i.admin_comment ?? '', decidedBy: deciderMap.get(i.approved_by) ?? '', returnUrl: requestsUrl, canReturn: ['approved', 'ordered', 'received'].includes(i.status) })) })
-        try { await sendSmtp({ host: HVE_HOST, port: HVE_PORT, fromAddress: sender, useTls: true, auth: { type: 'login', username: sender, password: HVE_PASSWORD } }, { recipients: [request.requester_email], subject: 'Procurement Request Summary', htmlBody: html, fromDisplayName: clientName ? `${clientName} Procurement` : 'Procurement' }); requesterEmailed = true } catch (e) { console.error('requester email failed:', e instanceof Error ? e.message : e) }
+        const html = buildSummaryEmail({ clientName, approverName, items: allItems.map((i) => ({ name: i.item_description ?? 'Item', status: STATUS_MAP[i.status] ?? i.status, comments: i.admin_comment ?? '', decidedBy: deciderMap.get(i.approved_by) ?? '', returnUrl: requestsUrl, canReturn: ['approved', 'ordered', 'received'].includes(i.status) })) })
+        try { await sendSmtp({ host: HVE_HOST, port: HVE_PORT, fromAddress: sender, useTls: true, auth: { type: 'login', username: sender, password: HVE_PASSWORD } }, { recipients: [request.requester_email], subject: 'Procurement Request Summary', htmlBody: html, fromDisplayName: clientName ? `${clientName} Procurement` : 'Procurement', highPriority: true }); requesterEmailed = true } catch (e) { console.error('requester email failed:', e instanceof Error ? e.message : e) }
       }
     }
     await db.schema('app_procurement').from('purchase_requests').update({ approval_notified_at: new Date().toISOString() }).eq('id', requestId)
     return json({ event: 'approved', purchaser_emailed: purchaserEmailed, requester_emailed: requesterEmailed, items: allItems.length })
+  }
+
+  // ── Requester confirmation ──────────────────────────────────────────────
+  if (event === 'requester_confirmation') {
+    const { data: items } = await db.schema('app_procurement').from('line_items').select('id, item_description, quantity, custom_location, custom_department, locations!location_id(name), departments!department_id(name)').eq('request_id', requestId)
+    const allItems = (items ?? []) as Array<Record<string, any>>
+    const nm = (li: Record<string, any>) => li.locations?.name ?? li.custom_location ?? '—'
+    const dp = (li: Record<string, any>) => li.departments?.name ?? li.custom_department ?? '—'
+    if (request.requester_email && sender && HVE_PASSWORD) {
+      const html = buildRequesterConfirmation({ requestNumber: (request as Record<string, unknown>).request_number ?? null, items: allItems.map((i) => ({ name: i.item_description ?? 'Item', qty: String(i.quantity), dept: dp(i), location: nm(i) })), clientName, requestsUrl })
+      try { await sendSmtp({ host: HVE_HOST, port: HVE_PORT, fromAddress: sender, useTls: true, auth: { type: 'login', username: sender, password: HVE_PASSWORD } }, { recipients: [request.requester_email], subject: 'Procurement Request Submitted', htmlBody: html, fromDisplayName: clientName ? `${clientName} Procurement` : 'Procurement', highPriority: true }) } catch (e) { console.error('requester confirmation email failed:', e instanceof Error ? e.message : e) }
+    }
+    return json({ event: 'requester_confirmation', done: true })
+  }
+
+  // ── Item ordered ────────────────────────────────────────────────────────
+  if (event === 'item_ordered') {
+    const lineItemIds = (body.line_item_ids ?? []) as string[]
+    if (!lineItemIds.length) return json({ event: 'item_ordered', skipped: true, reason: 'no line_item_ids' })
+    const { data: items } = await db.schema('app_procurement').from('line_items').select('id, item_description, quantity, eta, shipping_location_id, custom_shipping_location, locations!shipping_location_id(name)').eq('request_id', requestId).in('id', lineItemIds)
+    const allItems = (items ?? []) as Array<Record<string, any>>
+    if (request.requester_email && sender && HVE_PASSWORD) {
+      for (const item of allItems) {
+        const locName = item.locations?.name ?? item.custom_shipping_location ?? '—'
+        const html = buildItemOrderedEmail({
+          item: { name: item.item_description ?? 'Item', qty: String(item.quantity), eta: item.eta ?? '', shippingLocation: locName },
+          purchaserName: body.details ?? 'the purchasing team',
+          clientName,
+          requestsUrl,
+        })
+        try { await sendSmtp({ host: HVE_HOST, port: HVE_PORT, fromAddress: sender, useTls: true, auth: { type: 'login', username: sender, password: HVE_PASSWORD } }, { recipients: [request.requester_email], subject: 'Item Ordered', htmlBody: html, fromDisplayName: clientName ? `${clientName} Procurement` : 'Procurement', highPriority: true }) } catch (e) { console.error('item ordered email failed:', e instanceof Error ? e.message : e) }
+      }
+    }
+    return json({ event: 'item_ordered', done: true })
+  }
+
+  // ── Return notification ─────────────────────────────────────────────────
+  if (event === 'return_notification') {
+    const lineItemIds = (body.line_item_ids ?? []) as string[]
+    if (!lineItemIds.length) return json({ event: 'return_notification', skipped: true, reason: 'no line_item_ids' })
+    const { data: items } = await db.schema('app_procurement').from('line_items').select('id, item_description, quantity, return_reason, wants_replacement').eq('request_id', requestId).in('id', lineItemIds)
+    const allItems = (items ?? []) as Array<Record<string, any>>
+    // Get purchasers for email and bell notifications
+    const { data: purchasers } = await db.schema('app_procurement').rpc('get_permission_holders', { p_permission: 'apps/procurement/purchasing/manage' })
+    const purchaserEmails = ((purchasers ?? []) as Array<{ email: string }>).map((p) => p.email)
+    if (sender && HVE_PASSWORD && allItems.length && purchaserEmails.length) {
+      const html = buildReturnNotificationEmail({ requester: request.requester_name ?? request.requester_email ?? 'a requester', items: allItems.map((i) => ({ name: i.item_description ?? 'Item', qty: String(i.quantity), reason: i.return_reason ?? '', wantsReplacement: !!i.wants_replacement })), returnsUrl, clientName })
+      try { await sendSmtp({ host: HVE_HOST, port: HVE_PORT, fromAddress: sender, useTls: true, auth: { type: 'login', username: sender, password: HVE_PASSWORD } }, { recipients: purchaserEmails, subject: 'Items Returned', htmlBody: html, fromDisplayName: clientName ? `${clientName} Procurement` : 'Procurement', highPriority: true }) } catch (e) { console.error('return notification email failed:', e instanceof Error ? e.message : e) }
+    }
+    return json({ event: 'return_notification', done: true })
+  }
+
+  // ── Item cancelled ───────────────────────────────────────────────────────
+  if (event === 'item_cancelled') {
+    const lineItemIds = (body.line_item_ids ?? []) as string[]
+    if (!lineItemIds.length) return json({ event: 'item_cancelled', skipped: true, reason: 'no line_item_ids' })
+    const { data: items } = await db.schema('app_procurement').from('line_items').select('id, item_description').eq('request_id', requestId).in('id', lineItemIds)
+    const allItems = (items ?? []) as Array<Record<string, any>>
+    const deciderIds = [...new Set(allItems.map((i) => i.approved_by).filter(Boolean))]
+    const deciderMap = new Map<string, string>()
+    if (deciderIds.length) {
+      const { data: profs } = await db.from('user_profiles').select('id, display_name, email').in('id', deciderIds)
+      for (const p of (profs ?? []) as Array<{ id: string; display_name: string | null; email: string | null }>) deciderMap.set(p.id, p.display_name || p.email || '')
+    }
+    const canceller = deciderMap.size ? [...deciderMap.values()][0] : 'the purchasing team'
+    if (request.requester_email && sender && HVE_PASSWORD) {
+      for (const item of allItems) {
+        const html = buildItemCancelledEmail({
+          item: { name: item.item_description ?? 'Item' },
+          cancellerName: canceller,
+          clientName,
+          requestsUrl,
+        })
+        try { await sendSmtp({ host: HVE_HOST, port: HVE_PORT, fromAddress: sender, useTls: true, auth: { type: 'login', username: sender, password: HVE_PASSWORD } }, { recipients: [request.requester_email], subject: 'Item Cancelled', htmlBody: html, fromDisplayName: clientName ? `${clientName} Procurement` : 'Procurement', highPriority: true }) } catch (e) { console.error('item cancelled email failed:', e instanceof Error ? e.message : e) }
+      }
+    }
+    return json({ event: 'item_cancelled', done: true })
   }
 
   let liQuery = db.schema('app_procurement').from('line_items').select('id, item_description, item_url, quantity, product_image_path, custom_location, custom_department, locations!location_id(name), departments!department_id(name)').eq('request_id', requestId)
@@ -116,11 +197,6 @@ Deno.serve(async (req) => {
   // 4. Send rich HVE email (only on full-request runs, not single-item retries).
   let emailSent = false
   if (!body.only_line_item_id && recipientEmails.length && HVE_PASSWORD) {
-    const { data: settings } = await db.from('client_settings').select('key, value').in('key', ['client_name', 'portal_url', 'hve_sender_address'])
-    const sMap = new Map((settings ?? []).map((s: { key: string; value: string }) => [s.key, s.value]))
-    const sender = sMap.get('hve_sender_address')
-    const portalUrl = sMap.get('portal_url') ?? ''
-    const clientName = sMap.get('client_name') ?? ''
     if (sender) {
       // Build a branded HTML email with inline (CID) product screenshots.
       const GREEN = '#2b6450'
@@ -132,7 +208,7 @@ Deno.serve(async (req) => {
         if (captured && li.product_image_path) {
           const dl = await db.storage.from('product-images').download(li.product_image_path)
           if (dl.data) { const cid = `img_${li.id.replace(/-/g, '')}`; images.push({ cid, contentType: 'image/png', base64: toBase64(new Uint8Array(await dl.data.arrayBuffer())) }); imgHtml = `<img src="cid:${cid}" alt="product" style="width:96px;height:auto;border:1px solid #e4e7ea;border-radius:6px;display:block"/>` } else {
-            console.warn(`product-images download returned no data for line item ${li.id}`)
+             console.warn(`product-images download returned no data for line item ${li.id}`)
           }
         }
         const row = li as Record<string, unknown> & { locations?: { name?: string } | null; departments?: { name?: string } | null }
@@ -146,25 +222,16 @@ Deno.serve(async (req) => {
       const thL = 'padding:10px 12px;text-align:left;font-size:12px;font-weight:700;color:#1f4739;background:#dbf0e9;border-bottom:2px solid #b8e0d2'
       const thC = thL.replace('text-align:left', 'text-align:center')
       const requester = request.requester_name ?? request.requester_email ?? 'a requester'
-      const { data: appRow } = await db.from('apps').select('id').eq('slug', 'procurement').maybeSingle()
-      const appBase = portalUrl && appRow?.id ? `${portalUrl}/apps/${appRow.id}` : ''
-      const approvalsUrl = appBase ? `${appBase}/approvals` : ''
       const btn = approvalsUrl ? `<table cellpadding="0" cellspacing="0" role="presentation" align="center" style="margin:0 auto 8px auto"><tr><td align="center"><!--[if mso]><v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" href="${approvalsUrl}" style="height:44px;v-text-anchor:middle;width:220px;" arcsize="12%" strokecolor="${GREEN}" fillcolor="${GREEN}"><w:anchorlock/><center style="color:#ffffff;font-family:Arial,sans-serif;font-size:15px;font-weight:600;">Review &amp; Approve</center></v:roundrect><![endif]--><a href="${approvalsUrl}" target="_blank" style="display:inline-block;background-color:${GREEN};color:#ffffff;padding:12px 24px;border-radius:6px;font-size:15px;font-weight:600;text-decoration:none;border:1px solid ${GREEN}">Review &amp; Approve</a></td></tr></table>` : ''
       const html = `<html xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office"><body style="margin:0;padding:0"><table cellpadding="0" cellspacing="0" width="100%" style="font-family:Arial,sans-serif;background-color:#f4f6f8;padding:24px"><tr><td align="center"><table cellpadding="0" cellspacing="0" width="620" style="background:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 6px rgba(0,0,0,0.08)"><tr><td style="padding:20px;background:${GREEN};color:#ffffff;text-align:left"><h2 style="margin:0;font-size:18px;font-weight:600">Purchase Request Submitted</h2><div style="font-size:12px;opacity:0.95">Action required: Review &amp; Approve</div></td></tr><tr><td style="padding:20px;color:#333333;font-size:14px;line-height:1.5"><p style="margin:0 0 16px 0"><strong>${requester}</strong> has submitted a new purchase request that requires your review.</p><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;border:1px solid #e4e7ea;margin:0 0 20px 0"><tr><th style="${thL}">Product</th><th style="${thL}">Item</th><th style="${thC}">Qty</th><th style="${thL}">Department</th><th style="${thL}">Location</th></tr>${rowsHtml.join('')}</table><p style="margin:0 0 20px 0">Please click the button below to review and take action on this request.</p>${btn}<p style="margin:14px 0 0 0;font-size:12px;color:#555">If you've already reviewed this request, you can disregard this message.</p></td></tr><tr><td style="padding:12px 20px;background:#f7f9fb"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="left" style="font-size:12px;color:#666">Procurement · ${clientName || 'Mainspring Recovery'}</td><td align="right" style="font-size:12px;color:#666">Automated Notification</td></tr></table></td></tr></table></td></tr></table></body></html>`
       try {
         await sendSmtp(
           { host: HVE_HOST, port: HVE_PORT, fromAddress: sender, useTls: true, auth: { type: 'login', username: sender, password: HVE_PASSWORD } },
-          { recipients: recipientEmails, subject: 'New procurement request needs approval', htmlBody: html, fromDisplayName: clientName ? `${clientName} Procurement` : 'Procurement', inlineImages: images },
+          { recipients: recipientEmails, subject: 'New procurement request needs approval', htmlBody: html, fromDisplayName: clientName ? `${clientName} Procurement` : 'Procurement', inlineImages: images, highPriority: true },
         )
         emailSent = true
       } catch (e) { console.error('HVE send failed:', e instanceof Error ? e.message : e) }
     }
-  }
-
-  // 5. Write bell notifications for approvers (full-request runs only).
-  if (!body.only_line_item_id && recipientRows.length) {
-    const bellRows = recipientRows.map((r) => ({ user_id: r.user_id, event_type: 'procurement:request_submitted', title: 'New procurement request needs approval', body: `From ${request.requester_name ?? request.requester_email ?? 'a requester'}`, link: '/apps/procurement', app_slug: 'procurement' }))
-    await db.from('notifications').insert(bellRows)
   }
 
   return json({ request_id: requestId, items: results, email_sent: emailSent, recipients: recipientEmails.length })

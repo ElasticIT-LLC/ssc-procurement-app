@@ -8,6 +8,7 @@ export function buildMimeMessage(opts: {
   subject: string
   html: string
   images: MimeImage[]
+  highPriority?: boolean
 }): string {
   const boundary = `rel_${opts.images.length}_${opts.subject.length}_${opts.to.length}_${crypto.randomUUID().slice(0, 8)}`
   const CRLF = '\r\n'
@@ -15,6 +16,11 @@ export function buildMimeMessage(opts: {
   parts.push(`From: ${opts.fromHeader}`)
   parts.push(`To: ${opts.to.join(', ')}`)
   parts.push(`Subject: ${opts.subject}`)
+  if (opts.highPriority) {
+    parts.push('X-Priority: 1')
+    parts.push('X-MSMail-Priority: High')
+    parts.push('Importance: High')
+  }
   parts.push('MIME-Version: 1.0')
   parts.push(`Content-Type: multipart/related; boundary="${boundary}"`)
   parts.push('')

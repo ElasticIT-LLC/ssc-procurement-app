@@ -3,7 +3,7 @@
   "slug": "procurement",
   "name": "Procurement",
   "icon": "Package",
-"version": "0.9.3",
+"version": "0.10.3",
   "permissions": [
     { "key": "apps/procurement/*", "label": "Full Access", "description": "Full access to Procurement", "group": "Administration" },
     { "key": "apps/procurement/requests/create", "label": "Create requests", "description": "Create and submit purchase requests; mark items received; initiate returns", "group": "Requests" },
@@ -17,10 +17,11 @@
     { "key": "dashboard",  "label": "Dashboard",  "permission": "apps/procurement/requests/view" },
     { "key": "requests",   "label": "Requests",   "permission": "apps/procurement/requests/view" },
     { "key": "approvals",  "label": "Approvals",  "permission": "apps/procurement/approvals/act" },
-    { "key": "purchasing", "label": "Purchasing" },
+    { "key": "purchasing", "label": "Purchasing", "permission": "apps/procurement/purchasing/manage" },
     { "key": "returns",    "label": "Returns",    "permission": "apps/procurement/returns/manage" },
     { "key": "records",    "label": "Records",    "permission": "apps/procurement/admin/manage" },
-    { "key": "admin",      "label": "Admin",      "permission": "apps/procurement/admin/manage" }
+    { "key": "admin",      "label": "Admin",      "permission": "apps/procurement/admin/manage" },
+    { "key": "request-form", "label": "Request Form", "permission": null }
   ],
   "database": {
     "mode": "schema",
@@ -40,7 +41,9 @@
       { "version": 12, "description": "Phase 4 QA: replacement returns route to approved (Purchasing); backfill replacement_ordered", "up": "migrations/012_replacement_routing.sql" },
       { "version": 13, "description": "Phase 4 QA: mark processed returns (return_processed_at) so they leave the Returns queue", "up": "migrations/013_return_processed.sql" },
 { "version": 14, "description": "Phase 5: Purchase Orders (purchase_orders table + create/close RPCs + receive auto-close)", "up": "migrations/014_purchase_orders.sql" },
-      { "version": 15, "description": "Phase 5 fix: allow admins to close purchase orders", "up": "migrations/015_admin_close_po.sql" }
+      { "version": 15, "description": "Phase 5 fix: allow admins to close purchase orders", "up": "migrations/015_admin_close_po.sql" },
+      { "version": 16, "description": "Phase 6: public request form (submit_request_anon RPC + anon RLS)", "up": "migrations/016_public_request_form.sql" },
+      { "version": 17, "description": "Hard-deleted empty requests (delete_line_item) + cancel stamps approved_by", "up": "migrations/017_delete_empty_request.sql" }
     ],
     "tables": [
       { "name": "locations",         "rls": { "read": "authenticated", "write": "admin" } },
@@ -51,6 +54,9 @@
       { "name": "purchase_orders",   "rls": { "read": "authenticated", "write": "admin" } }
     ]
   },
+  "public_forms": [
+    { "app_slug": "procurement", "form_name": "Procurement Request Form", "url": "/public/procurement/request-form" }
+  ],
   "notifications": [
     { "key": "request_submitted", "label": "New request to approve", "description": "A new purchase request was submitted and needs approval.", "sort_order": 1 },
     { "key": "item_approved", "label": "Item approved", "description": "A requested item was approved.", "sort_order": 2 },

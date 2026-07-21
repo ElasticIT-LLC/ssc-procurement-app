@@ -4,7 +4,7 @@ import { DEFAULT_RULES, type FormatRule } from '../formatting/rules'
 
 const SCHEMA = 'app_procurement'
 const TABLES = { requests: 'purchase_requests', lineItems: 'line_items', locations: 'locations', departments: 'departments', config: '_config', purchaseOrders: 'purchase_orders' } as const
-const RPCS = { submit: 'submit_request', decide: 'decide_line_item', order: 'order_line_item', receive: 'receive_line_item', initiateReturn: 'initiate_return', processReturn: 'process_return', setComment: 'set_line_item_comment', deleteItem: 'delete_line_item', cancel: 'cancel_line_item', getUserNames: 'get_user_names', getFormattingRules: 'get_formatting_rules', createPO: 'create_purchase_order', closePO: 'close_purchase_order' } as const
+const RPCS = { submit: 'submit_request', submitAnon: 'submit_request_anon', decide: 'decide_line_item', order: 'order_line_item', receive: 'receive_line_item', initiateReturn: 'initiate_return', processReturn: 'process_return', setComment: 'set_line_item_comment', deleteItem: 'delete_line_item', cancel: 'cancel_line_item', getUserNames: 'get_user_names', getFormattingRules: 'get_formatting_rules', createPO: 'create_purchase_order', closePO: 'close_purchase_order' } as const
 
 export interface RequestRow { id: string; requester_id: string | null; requester_name: string | null; requester_email: string | null; requester_type: string; status: RequestStatus; notes: string | null; submitted_at: string; updated_at: string; request_number: number | null; line_items?: { item_description: string | null }[] }
 export interface LineItemRow { id: string; request_id: string; item_description: string | null; item_url: string | null; memo: string | null; quantity: number; status: LineItemStatus; location_id: string | null; custom_location: string | null; department_id: string | null; custom_department: string | null; date_needed: string | null; eta: string | null; admin_comment: string | null; commented_by: string | null; commented_at: string | null; product_image_path: string | null; return_reason: string | null; return_quantity: number | null; wants_replacement: boolean | null; return_notes: string | null; return_date: string | null; created_at: string; line_no: number | null; return_processed_at: string | null; po_id: string | null }
@@ -76,6 +76,9 @@ export function useProcurementApi() {
   }
   async function submitRequest(notes: string, lineItems: Record<string, unknown>[]): Promise<string> {
     return ok(await db().rpc(RPCS.submit, { p_notes: notes, p_line_items: lineItems })) as string
+  }
+  async function submitRequestAnon(email: string, notes: string, lineItems: Record<string, unknown>[]): Promise<string> {
+    return ok(await db().rpc(RPCS.submitAnon, { p_requester_email: email, p_notes: notes, p_line_items: lineItems })) as string
   }
   async function decideLineItem(id: string, action: 'approved' | 'declined' | 'on_hold'): Promise<void> {
     ok(await db().rpc(RPCS.decide, { p_line_item_id: id, p_action: action }))
@@ -189,6 +192,14 @@ export function useProcurementApi() {
     }
   }
 
+  async function notifyStatusUpdate(requestId: string, lineItemIds: string[], event: string, details?: string): Promise<void> {
+    try {
+      await supabase.functions.invoke('procurement-capture-and-notify', { body: { event, request_id: requestId, line_item_ids: lineItemIds, details } })
+    } catch (e) {
+      console.error(`notifyStatusUpdate(${event}) failed:`, e)
+    }
+  }
+
   async function captureAndNotify(requestId: string, onlyLineItemId?: string) {
     try {
       const { data, error } = await supabase.functions.invoke('procurement-capture-and-notify', {
@@ -234,5 +245,5 @@ export function useProcurementApi() {
     }
   }
 
-  return { listRequests, getRequest, listLineItems, listLocations, listDepartments, listAllLocations, listAllDepartments, submitRequest, decideLineItem, orderLineItem, receiveLineItem, initiateReturn, processReturn, cancelLineItem, listLineItemsByStatus, listLineItemFacets, listAllLineItemsDetailed, countLineItems, setLineItemComment, deleteLineItem, createLocation, createDepartment, updateLocation, updateDepartment, fireNotification, captureAndNotify, getProductImageUrl, notifyApproved, resolveUserNames, getFormattingRules, setFormattingRules, listShipToWorkers, createPurchaseOrder, listPurchaseOrders, closePurchaseOrder }
+  return { listRequests, getRequest, listLineItems, listLocations, listDepartments, listAllLocations, listAllDepartments, submitRequest, submitRequestAnon, decideLineItem, orderLineItem, receiveLineItem, initiateReturn, processReturn, cancelLineItem, listLineItemsByStatus, listLineItemFacets, listAllLineItemsDetailed, countLineItems, setLineItemComment, deleteLineItem, createLocation, createDepartment, updateLocation, updateDepartment, fireNotification, captureAndNotify, getProductImageUrl, notifyApproved, notifyStatusUpdate, resolveUserNames, getFormattingRules, setFormattingRules, listShipToWorkers, createPurchaseOrder, listPurchaseOrders, closePurchaseOrder }
 }

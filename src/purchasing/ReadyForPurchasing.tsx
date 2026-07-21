@@ -83,7 +83,8 @@ export function ReadyForPurchasing() {
         custom_shipping_location: isOther ? (form.custom_shipping_location || null) : null,
         purchase_notes: form.purchase_notes || null,
       })
-      await api.fireNotification('item_ordered')
+      await api.notifyStatusUpdate(item.request.id, [item.id], 'item_ordered')
+      api.fireNotification('item_ordered')
       showToast({ message: 'Order recorded', type: 'success' })
       setOpenFormId(null)
       await load()
@@ -99,7 +100,8 @@ export function ReadyForPurchasing() {
     setSubmittingId(item.id)
     try {
       await api.cancelLineItem(item.id)
-      await api.fireNotification('item_cancelled')
+      await api.notifyStatusUpdate(item.request.id, [item.id], 'item_cancelled')
+      api.fireNotification('item_cancelled')
       showToast({ message: 'Item cancelled', type: 'success' })
       await load()
     } catch (err: unknown) {
