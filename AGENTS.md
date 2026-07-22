@@ -44,10 +44,28 @@ Every ClickUp task handover must include:
 - Release to production on last day of sprint, or when instructed
 - QA testing on mainspring portal
 
+## Mandatory Completion Checklist
+
+Before claiming any task is complete, the agent must verify all applicable items below. Use the `verification-before-completion` skill if unsure. Skipping an item requires explicit user approval.
+
+- [ ] **Semver bump** — `app.manifest.json` version incremented according to the change type.
+  - MAJOR: backwards-incompatible manifest/permission/API changes
+  - MINOR: backwards-compatible new features (new pages, new email templates, new migrations, new workflow events)
+  - PATCH: backwards-compatible fixes (RLS fixes, UI labels, typo/bug fixes)
+- [ ] **Build passes** — `npm run build` succeeds with no errors.
+- [ ] **Tests pass** — `npm run test` succeeds (if tests exist for the changed area).
+- [ ] **Package created** — `npm run package` produces `dist/procurement-X.Y.Z.eitapp`.
+- [ ] **Migrations applied to QA** — any new migration applied to the QA Supabase project (`jkbqaxpfvqbeepwhunhl`).
+- [ ] **Edge functions deployed** — any changed edge function deployed to QA via `supabase functions deploy --project-ref jkbqaxpfvqbeepwhunhl`.
+- [ ] **Committed and pushed to for-qa** — changes committed and pushed to the `for-qa` branch.
+- [ ] **ClickUp updated** — dev update comment posted to the task following the format below.
+- [ ] **QA handover notes** — for any user-facing change, QA handover notes added to the ClickUp task.
+- [ ] **AGENTS.md updated** — if the workflow, conventions, or setup steps changed.
+
 ## App-Specific Conventions
 
 - **Manifest** is single source of truth for slug, permissions, pages, migrations, edge functions, notifications, vault secrets
 - **Never edit an applied migration** — add a new numbered one
 - **SECURITY DEFINER** functions use wrapper-in-public / definer-in-internal pattern
 - **Never expose keys** in committed code
-- **SemVer:** bump `app.manifest.json` version on every feature/fix
+- **SemVer is mandatory:** bump `app.manifest.json` version on every feature/fix and document the reason in the commit message
