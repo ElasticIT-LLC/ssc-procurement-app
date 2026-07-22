@@ -39,7 +39,7 @@ export function ReturnForm({ item, onDone }: ReturnFormProps) {
       })
       const reqId = item.request_id
       if (reqId) await api.notifyStatusUpdate(reqId, [item.id], 'return_notification')
-      api.fireNotification('return_initiated')
+      api.fireNotification('return_initiated', reqId, [item.id])
       showToast({ message: 'Return initiated', type: 'success' })
       onDone()
     } catch (err: unknown) {

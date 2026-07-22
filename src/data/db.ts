@@ -112,15 +112,17 @@ export function useProcurementApi() {
     ok(await db().rpc(RPCS.cancel, { p_line_item_id: id }))
   }
 
-  // Fire an in-app + email notification via the shell's send-notification function.
+  // Fire an in-app + email notification via the app's own procurement-capture-and-notify
+  // edge function. This keeps the shell's notification catalog (bell + preferences) alive
+  // while sending branded HVE emails instead of the generic shell email.
   // Best-effort: never throws into the caller (a notification failure must not break the action).
-  async function fireNotification(key: string, details?: string): Promise<void> {
+  async function fireNotification(key: string, requestId?: string, lineItemIds?: string[], details?: string): Promise<void> {
     try {
-      await supabase.functions.invoke('send-notification', {
-        body: { event_type: `procurement:${key}`, app_slug: 'procurement', app_name: 'Procurement', details: details ?? null },
+      await supabase.functions.invoke('procurement-capture-and-notify', {
+        body: { event: 'notification', notification_key: key, request_id: requestId, line_item_ids: lineItemIds ?? [], details: details ?? null },
       })
     } catch (e) {
-      console.error('send-notification failed:', e)
+      console.error('fireNotification failed:', e)
     }
   }
 

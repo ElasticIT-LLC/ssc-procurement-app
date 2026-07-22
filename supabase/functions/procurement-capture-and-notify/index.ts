@@ -1,6 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
 import { sendSmtp } from './smtp.ts'
-import { buildApprovedEmail, buildSummaryEmail, buildRequesterConfirmation, buildItemOrderedEmail, buildReturnNotificationEmail, buildItemCancelledEmail } from './emails.ts'
+import { buildApprovedEmail, buildSummaryEmail, buildRequesterConfirmation, buildItemOrderedEmail, buildReturnNotificationEmail, buildItemCancelledEmail, buildNotificationEmail } from './emails.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
@@ -21,22 +21,51 @@ function toBase64(bytes: Uint8Array): string {
   return btoa(bin)
 }
 
+async function resolveNotificationRecipients(db: any, eventType: string): Promise<Array<{ user_id: string | null; email: string }>> {
+  const { data, error } = await db.rpc('resolve_notification_recipients', { p_event_type: eventType })
+  if (error) { console.error('resolve_notification_recipients failed:', error); return [] }
+  const out: Array<{ user_id: string | null; email: string }> = []
+  const seen = new Set<string>()
+  for (const v of (data ?? []) as any[]) {
+    let email: string | null = null
+    let userId: string | null = null
+    if (typeof v === 'string') email = v
+    else if (v && typeof v === 'object') { email = v.email ?? null; userId = v.user_id ?? null }
+    if (!email) continue
+    const k = email.toLowerCase()
+    if (seen.has(k)) continue
+    seen.add(k)
+    out.push({ user_id: userId, email: k })
+  }
+  return out
+}
+
+async function fetchNotificationMeta(db: any, appSlug: string, key: string): Promise<{ label: string; display?: Record<string, boolean> } | null> {
+  const { data, error } = await db.from('app_notifications').select('label, display').eq('app_slug', appSlug).eq('key', key).maybeSingle()
+  if (error) { console.error('fetchNotificationMeta failed:', error); return null }
+  return (data as { label: string; display?: Record<string, boolean> } | null) ?? { label: key }
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: cors })
   if (req.method !== 'POST') return json({ error: 'POST only' }, 405)
 
-  let body: { request_id?: string; only_line_item_id?: string; event?: string; line_item_ids?: string[] }
+  let body: { request_id?: string; only_line_item_id?: string; event?: string; line_item_ids?: string[]; notification_key?: string; details?: string }
   try { body = await req.json() } catch { return json({ error: 'invalid JSON' }, 400) }
+  const event = body.event ?? 'submitted'
   const requestId = body.request_id
-  if (!requestId) return json({ error: 'request_id required' }, 400)
+  if (!requestId && event !== 'notification') return json({ error: 'request_id required' }, 400)
 
   const db = createClient(SUPABASE_URL, SERVICE_KEY)
 
-  // 1. Load request + line items.
-  const { data: request, error: reqErr } = await db.schema('app_procurement').from('purchase_requests').select('id, requester_name, requester_email, requester_id, notes, submitted_at, approval_notified_at').eq('id', requestId).maybeSingle()
-  if (reqErr || !request) return json({ error: 'request not found' }, 404)
-
-  const event = body.event ?? 'submitted'
+  // 1. Load request + line items (skip for generic notifications that may lack a request_id).
+  let request: Record<string, any> | null = null
+  if (requestId) {
+    const { data: reqData, error: reqErr } = await db.schema('app_procurement').from('purchase_requests').select('id, requester_name, requester_email, requester_id, notes, submitted_at, approval_notified_at').eq('id', requestId).maybeSingle()
+    if (reqErr) return json({ error: 'request lookup failed' }, 500)
+    request = reqData as Record<string, any> | null
+    if (!request) return json({ error: 'request not found' }, 404)
+  }
 
   // Shared settings loaded once for all event branches
   const { data: settings } = await db.from('client_settings').select('key, value').in('key', ['client_name', 'portal_url', 'hve_sender_address'])
@@ -160,6 +189,58 @@ Deno.serve(async (req) => {
       }
     }
     return json({ event: 'item_cancelled', done: true })
+  }
+
+  // ── Generic shell notification (replaces send-notification for this app) ─
+  if (event === 'notification') {
+    const key = (body.notification_key ?? '') as string
+    if (!key) return json({ event: 'notification', skipped: true, reason: 'no notification_key' })
+    const eventType = `procurement:${key}`
+    const recipients = await resolveNotificationRecipients(db, eventType)
+    if (recipients.length === 0) return json({ event: 'notification', key, skipped: true, reason: 'no recipients' })
+    const meta = await fetchNotificationMeta(db, 'procurement', key)
+    const label = meta?.label ?? key
+    const linkMap: Record<string, string> = {
+      request_submitted: approvalsUrl,
+      item_approved: recordsUrl,
+      item_declined: recordsUrl,
+      item_ordered: recordsUrl,
+      item_cancelled: recordsUrl,
+      return_initiated: returnsUrl,
+    }
+    const linkUrl = linkMap[key] ?? ''
+    const bodyText = (body.details ?? `A procurement event occurred: ${label}`) as string
+    const inAppTitle = `${clientName ? `${clientName} Procurement` : 'Procurement'}: ${label}`
+    const inAppRows = recipients.filter((r) => r.user_id).map((r) => ({
+      user_id: r.user_id,
+      event_type: eventType,
+      title: inAppTitle,
+      body: bodyText,
+      link: linkUrl,
+      app_slug: 'procurement',
+    }))
+    if (inAppRows.length) {
+      const { error: insertErr } = await db.from('notifications').insert(inAppRows)
+      if (insertErr) console.error('notification bell insert failed:', insertErr)
+    }
+    let emailSent = false
+    if (sender && HVE_PASSWORD) {
+      const html = buildNotificationEmail({
+        title: `${clientName ? `${clientName} Procurement` : 'Procurement'}: ${label}`,
+        body: bodyText,
+        linkUrl,
+        linkText: 'View in Portal',
+        clientName,
+      })
+      try {
+        await sendSmtp(
+          { host: HVE_HOST, port: HVE_PORT, fromAddress: sender, useTls: true, auth: { type: 'login', username: sender, password: HVE_PASSWORD } },
+          { recipients: recipients.map((r) => r.email), subject: `${clientName ? `${clientName} Procurement` : 'Procurement'}: ${label}`, htmlBody: html, fromDisplayName: clientName ? `${clientName} Procurement` : 'Procurement', highPriority: false },
+        )
+        emailSent = true
+      } catch (e) { console.error('notification email failed:', e instanceof Error ? e.message : e) }
+    }
+    return json({ event: 'notification', key, bell_rows: inAppRows.length, email_sent: emailSent, recipients: recipients.length })
   }
 
   let liQuery = db.schema('app_procurement').from('line_items').select('id, item_description, item_url, quantity, product_image_path, custom_location, custom_department, locations!location_id(name), departments!department_id(name)').eq('request_id', requestId)

@@ -84,7 +84,7 @@ export function ReadyForPurchasing() {
         purchase_notes: form.purchase_notes || null,
       })
       await api.notifyStatusUpdate(item.request.id, [item.id], 'item_ordered')
-      api.fireNotification('item_ordered')
+      api.fireNotification('item_ordered', item.request.id, [item.id])
       showToast({ message: 'Order recorded', type: 'success' })
       setOpenFormId(null)
       await load()
@@ -101,7 +101,7 @@ export function ReadyForPurchasing() {
     try {
       await api.cancelLineItem(item.id)
       await api.notifyStatusUpdate(item.request.id, [item.id], 'item_cancelled')
-      api.fireNotification('item_cancelled')
+      api.fireNotification('item_cancelled', item.request.id, [item.id])
       showToast({ message: 'Item cancelled', type: 'success' })
       await load()
     } catch (err: unknown) {

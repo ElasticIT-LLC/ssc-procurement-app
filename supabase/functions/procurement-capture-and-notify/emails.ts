@@ -64,6 +64,12 @@ export function buildItemCancelledEmail(o: { item: ItemCancelledItem; cancellerN
   return shell('Item Cancelled', 'Your procurement item has been cancelled', body, o.clientName)
 }
 
+export interface NotificationEmailParams { title: string; body: string; linkUrl: string; linkText: string; clientName: string }
+export function buildNotificationEmail(o: NotificationEmailParams): string {
+  const body = `<p style="margin:0 0 16px 0">${o.body}</p>${o.linkUrl ? vmlButton(o.linkUrl, o.linkText) : ''}<p style="margin:14px 0 0 0;font-size:12px;color:#555">This is an automated notification from Procurement.</p>`
+  return shell(o.title, 'Notification', body, o.clientName)
+}
+
 function purchasingBtn(url: string, text: string): string {
   if (!url) return ''
   return `<p style="margin:0 0 20px 0">Please click the button below to review and take action on this request.</p>${vmlButton(url, text)}`
