@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { usePermissions } from '@elasticit-llc/app-bridge'
+import { usePermissions, useSupabase } from '@elasticit-llc/app-bridge'
 import { useProcurementApi, RequestRow } from '../data/db'
 import { PERMS, formatDate, REQUEST_STATUS } from '../lib/constants'
 import { formatRequestNo } from '../lib/itemRef'
@@ -15,6 +15,7 @@ interface RequestsListProps {
 export function RequestsList({ onNew, onSelect }: RequestsListProps) {
   const api = useProcurementApi()
   const { hasPermission } = usePermissions()
+  const supabase = useSupabase()
   const { toneClassFor } = useFormattingRules()
 
   const [requests, setRequests] = useState<RequestRow[]>([])
@@ -27,10 +28,21 @@ export function RequestsList({ onNew, onSelect }: RequestsListProps) {
 
   useEffect(() => {
     setLoading(true)
-    api.listRequests()
+    const load = async () => {
+      const isPrivileged =
+        hasPermission(PERMS.approve) || hasPermission(PERMS.purchase) || hasPermission(PERMS.admin)
+      if (isPrivileged) {
+        return api.listRequests()
+      }
+      const { data, error: authErr } = await supabase.auth.getUser()
+      if (authErr || !data.user) throw new Error('Unable to identify current user')
+      return api.listRequests(data.user.id)
+    }
+    load()
       .then((rows) => setRequests(rows))
       .catch((err: unknown) => setError(err instanceof Error ? err.message : 'Failed to load requests'))
       .finally(() => setLoading(false))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const canCreate = hasPermission(PERMS.create)
