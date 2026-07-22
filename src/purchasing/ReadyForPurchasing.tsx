@@ -207,7 +207,7 @@ export function ReadyForPurchasing() {
               </p>
             </div>
 
-            {/* Place Order / Cancel actions */}
+            {/* Place Order / Cancel Order actions */}
             {!isOpen && (
               <div className="flex gap-2">
                 <button
@@ -223,7 +223,7 @@ export function ReadyForPurchasing() {
                   onClick={() => handleCancel(item)}
                   className="self-start inline-flex items-center rounded-md border border-destructive/40 px-3 py-1.5 text-xs font-medium text-destructive hover:bg-destructive/10 disabled:opacity-50"
                 >
-                  Cancel
+                  Cancel Order
                 </button>
               </div>
             )}
