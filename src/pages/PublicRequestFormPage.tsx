@@ -80,10 +80,12 @@ export function PublicRequestFormPage() {
   const { showToast } = useToast()
   const { workers, loading: workersLoading, refresh: refreshWorkers } = useShipToWorkers()
 
-  // Public form requires authentication. Redirect to the shell login page; the
-  // shell will return the user here after SSO.
+  // Public form requires authentication. Redirect to the shell login page and
+  // store the current path so the shell returns the user here after SSO.
   useEffect(() => {
     if (!ctx.user) {
+      const returnPath = window.location.pathname + window.location.search
+      try { sessionStorage.setItem('shell:returnTo', returnPath) } catch { /* ignore */ }
       window.location.href = '/login'
     }
   }, [ctx.user])
