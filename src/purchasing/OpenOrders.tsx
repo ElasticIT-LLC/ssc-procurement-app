@@ -11,7 +11,6 @@ export function OpenOrders() {
   const api = useProcurementApi()
   const { showToast } = useToast()
   const [pos, setPos] = useState<PurchaseOrderRow[]>([])
-  const [loose, setLoose] = useState<LineItemWithRequest[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
@@ -20,12 +19,8 @@ export function OpenOrders() {
     setLoading(true)
     setError(null)
     try {
-      const [openPos, ordered] = await Promise.all([
-        api.listPurchaseOrders('open'),
-        api.listLineItemsByStatus(['ordered', 'replacement_ordered']),
-      ])
+      const openPos = await api.listPurchaseOrders('open')
       setPos(openPos)
-      setLoose(ordered.filter(i => !i.po_id)) // standalone per-item orders (no PO)
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to load orders')
     } finally {
@@ -40,6 +35,21 @@ export function OpenOrders() {
     catch (err: unknown) { showToast({ message: err instanceof Error ? err.message : 'Failed to mark received', type: 'error' }) }
     finally { setBusyId(null) }
   }
+  async function cancel(item: LineItemWithRequest) {
+    if (!window.confirm(`Cancel this ordered item? ${item.item_description || 'Item'} will be marked cancelled and the requester will need to submit a new request if needed.`)) return
+    setBusyId(item.id)
+    try {
+      await api.cancelLineItem(item.id)
+      await api.notifyStatusUpdate(item.request.id, [item.id], 'item_cancelled')
+      api.fireNotification('item_cancelled', item.request.id, [item.id])
+      showToast({ message: 'Item cancelled', type: 'success' })
+      await load()
+    } catch (err: unknown) {
+      showToast({ message: err instanceof Error ? err.message : 'Failed to cancel item', type: 'error' })
+    } finally {
+      setBusyId(null)
+    }
+  }
   async function closePo(id: string) {
     if (!window.confirm('Close this purchase order? Remaining items will stay in their current state.')) return
     setBusyId(id)
@@ -50,7 +60,7 @@ export function OpenOrders() {
 
   if (loading) return <div className="py-8 text-center text-muted-foreground text-sm">Loading…</div>
   if (error) return <div className="rounded-md bg-destructive/10 border border-destructive/30 p-4 text-sm text-destructive">{error}</div>
-  if (pos.length === 0 && loose.length === 0) return <p className="text-sm text-muted-foreground">No open orders.</p>
+  if (pos.length === 0) return <p className="text-sm text-muted-foreground">No open orders.</p>
 
   return (
     <div className="grid gap-4">
@@ -76,7 +86,10 @@ export function OpenOrders() {
                     <ReplacementBadge item={item} />
                     <StatusBadge status={item.status} />
                     {item.status === 'ordered' && (
-                      <button type="button" disabled={busyId === item.id} onClick={() => receive(item.id)} className="inline-flex items-center rounded-md bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50">Mark Received</button>
+                      <>
+                        <button type="button" disabled={busyId === item.id} onClick={() => receive(item.id)} className="inline-flex items-center rounded-md bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50">Mark Received</button>
+                        <button type="button" disabled={busyId === item.id} onClick={() => cancel(item)} className="inline-flex items-center rounded-md border border-destructive/40 px-2.5 py-1 text-xs font-medium text-destructive hover:bg-destructive/10 disabled:opacity-50">Cancel Order</button>
+                      </>
                     )}
                   </div>
                 </div>
@@ -85,27 +98,6 @@ export function OpenOrders() {
           </div>
         )
       })}
-
-      {loose.length > 0 && (
-        <div className="grid gap-2">
-          <h3 className="text-sm font-semibold text-foreground">Individual Orders (no PO)</h3>
-          {loose.map(item => (
-            <div key={item.id} className="rounded-lg border border-border bg-card px-4 py-3 flex items-center justify-between gap-2">
-              <div className="min-w-0">
-                <p className="text-sm text-foreground truncate">{formatItemRef(item.request?.request_number, item.line_no)} — {item.item_description || 'Unnamed item'}</p>
-                <p className="text-xs text-muted-foreground">Qty: {item.quantity}{item.eta ? ` · ETA ${formatDate(item.eta)}` : ''}</p>
-              </div>
-              <div className="flex items-center gap-2">
-                <ReplacementBadge item={item} />
-                <StatusBadge status={item.status} />
-                {item.status === 'ordered' && (
-                  <button type="button" disabled={busyId === item.id} onClick={() => receive(item.id)} className="inline-flex items-center rounded-md bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50">Mark Received</button>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
     </div>
   )
 }

@@ -264,6 +264,7 @@ Deno.serve(async (req) => {
       const up = await db.storage.from('product-images').upload(path, png, { contentType: 'image/png', upsert: true })
       if (up.error) throw up.error
       await db.schema('app_procurement').from('line_items').update({ product_image_path: path }).eq('id', li.id)
+      li.product_image_path = path
       results.push({ line_item_id: li.id, captured: true })
     } catch (e) {
       results.push({ line_item_id: li.id, captured: false, error: e instanceof Error ? e.message : String(e) })

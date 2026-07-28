@@ -30,7 +30,7 @@ export function ShipToCombobox({ value, onChange, workers, loading, onRefresh }:
   }, [])
 
   const q = query.trim().toLowerCase()
-  const matches = (q ? workers.filter((w) => w.label.toLowerCase().includes(q)) : workers).slice(0, 50)
+  const matches = q ? workers.filter((w) => w.label.toLowerCase().includes(q)) : workers
   const showUseTyped = query.trim().length > 0 && !workers.some((w) => w.label === query.trim())
 
   function commit(v: string) { onChange(v); setQuery(v); setOpen(false) }

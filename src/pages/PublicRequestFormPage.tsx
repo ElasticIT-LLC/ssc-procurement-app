@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useShellContext, useToast } from '@elasticit-llc/app-bridge'
 import { useProcurementApi, Location, Department } from '../data/db'
+import { ShipToCombobox } from '../requester/ShipToCombobox'
+import { useShipToWorkers } from '../requester/useShipToWorkers'
 
 interface AnonLineItemDraft {
   ship_to_name: string
@@ -76,17 +78,26 @@ export function PublicRequestFormPage() {
   const ctx = useShellContext()
   const api = useProcurementApi()
   const { showToast } = useToast()
+  const { workers, loading: workersLoading, refresh: refreshWorkers } = useShipToWorkers()
 
-  if ((ctx as any).mode !== 'public') {
+  // Public form requires authentication. Redirect to the shell login page; the
+  // shell will return the user here after SSO.
+  useEffect(() => {
+    if (!ctx.user) {
+      window.location.href = '/login'
+    }
+  }, [ctx.user])
+
+  // Show nothing while the redirect is in progress so unauthenticated users don't
+  // see a flash of form fields.
+  if (!ctx.user) {
     return (
       <div className="max-w-lg mx-auto rounded-lg border border-border bg-card p-6 text-center">
-        <p className="text-muted-foreground">This form is only available via its public link.</p>
+        <p className="text-muted-foreground">Redirecting to sign in…</p>
       </div>
     )
   }
 
-  const [email, setEmail] = useState('')
-  const [emailError, setEmailError] = useState('')
   const [notes, setNotes] = useState('')
   const [items, setItems] = useState<AnonLineItemDraft[]>([emptyItem()])
   const [itemErrors, setItemErrors] = useState<LineItemDraftErrors[]>([{}])
@@ -122,12 +133,6 @@ export function PublicRequestFormPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
 
-    if (!email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      setEmailError('A valid email is required')
-      return
-    }
-    setEmailError('')
-
     const allErrors = items.map(validateItem)
     setItemErrors(allErrors)
     if (allErrors.some(hasErrors)) return
@@ -147,16 +152,16 @@ export function PublicRequestFormPage() {
         substitution_ok: item.substitution_ok,
         date_needed: item.date_needed,
       }))
-      const id = await api.submitRequestAnon(email, notes, lineItems)
+      const id = await api.submitRequest(notes, lineItems)
       setRequestId(id)
       setSubmitted(true)
       showToast({ message: 'Request submitted successfully', type: 'success' })
+      await api.notifyStatusUpdate(id, [], 'requester_confirmation')
       const res = await api.captureAndNotify(id)
       if (res) {
         const captured = res.items.filter((i) => i.captured).length
         showToast({ message: `Captured ${captured}/${res.items.length} product images, notified ${res.recipients} approver(s)`, type: captured === res.items.length ? 'success' : 'info' })
       }
-      await api.notifyStatusUpdate(id, [], 'requester_confirmation')
     } catch (err: unknown) {
       showToast({ message: err instanceof Error ? err.message : 'Failed to submit request', type: 'error' })
     } finally {
@@ -192,18 +197,6 @@ export function PublicRequestFormPage() {
       <p className="text-sm text-muted-foreground mt-1">Submit a new purchase request.</p>
 
       <form onSubmit={handleSubmit} className="grid gap-6 mt-6">
-        {/* Requester Email */}
-        <Field label="Your Email" error={emailError}>
-          <input
-            type="email"
-            placeholder="you@example.com"
-            value={email}
-            onChange={(e) => { setEmail(e.target.value); setEmailError('') }}
-          className="h-9 w-full rounded-md border border-border bg-input px-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-              />
-            </Field>
-
-        <hr className="border-border" />
 
         {/* Line items */}
         <div className="grid gap-4">
@@ -224,12 +217,12 @@ export function PublicRequestFormPage() {
 
               {/* Ship To Name */}
               <Field label="Ship To Name">
-                <input
-                  type="text"
-                  placeholder="e.g. John Doe"
+                <ShipToCombobox
                   value={item.ship_to_name}
-                  onChange={(e) => updateItem(index, { ...item, ship_to_name: e.target.value })}
-                  className="h-9 w-full rounded-md border border-border bg-input px-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                  onChange={(v) => updateItem(index, { ...item, ship_to_name: v })}
+                  workers={workers}
+                  loading={workersLoading}
+                  onRefresh={refreshWorkers}
                 />
               </Field>
 

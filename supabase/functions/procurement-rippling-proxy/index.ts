@@ -74,6 +74,10 @@ async function fetchAllPages(path: string, token: string): Promise<Record<string
 
 interface ShipToWorker { id: string; name: string; location: string | null; label: string }
 
+function toProperCase(s: string): string {
+  return s.replace(/\w\S*/g, (txt) => txt.charAt(0).toUpperCase() + txt.slice(1).toLowerCase())
+}
+
 function buildWorkers(workerRaw: Record<string, unknown>[], locMap: Map<string, string>): ShipToWorker[] {
   const out: ShipToWorker[] = []
   for (const w of workerRaw) {
@@ -82,10 +86,11 @@ function buildWorkers(workerRaw: Record<string, unknown>[], locMap: Map<string, 
     if (!id) continue
     const user = w.user && typeof w.user === 'object' ? w.user as Record<string, unknown> : null
     const uname = user && user.name && typeof user.name === 'object' ? user.name as Record<string, unknown> : null
-    const name = (user && typeof user.display_name === 'string' ? user.display_name : null)
+    const rawName = (user && typeof user.display_name === 'string' ? user.display_name : null)
       ?? (uname && typeof uname.formatted === 'string' ? uname.formatted : null)
       ?? (typeof w.work_email === 'string' ? w.work_email : null)
       ?? 'Unknown'
+    const name = toProperCase(rawName)
     const loc = w.location && typeof w.location === 'object' ? w.location as Record<string, unknown> : null
     const wlId = loc && typeof loc.work_location_id === 'string' ? loc.work_location_id : null
     const location = wlId ? (locMap.get(wlId) ?? null) : null

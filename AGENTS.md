@@ -1,71 +1,86 @@
-# Procurement App — Agent Workflows
+# Agent Workflows — ElasticIT Portal (Orchestrator)
+
+## Important: This Repo Is Documentation Only
+
+This `elasticit-portal` repo is a **documentation hub** — reference and guides only.
+Real code lives in the individual repos listed in `README.md` (framework, client shells, apps).
+When searching for code, always look in the actual repos, NOT this one.
 
 ## Team
-- **Dev:** Jerome
-- Based on ElasticIT Portal agent standards.
+
+- **Devs:** Jerome, Robert
+- All process rules apply to sessions with either developer.
 
 ## Process Rules
 
 ### Backward Compatibility
+
 All updates should be backwards-compatible by default. Avoid breaking changes unless absolutely necessary. When a breaking change is required:
 - Increment the MAJOR version
-- Coordinate before implementing
+- Run breaking change impact analysis (see below) before releasing
+- Coordinate with the other dev before implementing
 
 ### Semantic Versioning
 
-App version lives in `app.manifest.json` — that is authoritative. `package.json` version may lag.
+All packages follow semver: `MAJOR.MINOR.PATCH`
+- **MAJOR** — Backwards-incompatible API changes (e.g., `2.0.0` → `3.0.0`)
+- **MINOR** — Backwards-compatible new features (e.g., `2.1.0` → `2.2.0`)
+- **PATCH** — Backwards-compatible bug fixes (e.g., `2.1.1` → `2.1.2`)
 
-- **MAJOR** — Backwards-incompatible changes (e.g., breaking manifest contract, removed permissions/pages)
-- **MINOR** — Backwards-compatible new features (e.g., new pages, new email templates, new migration)
-- **PATCH** — Backwards-compatible fixes (e.g., missing permission on page, typo fix)
+Before committing a version bump, validate the bump reason matches the increment type. If possible, automate this check.
 
-Before bumping, validate the reason matches the increment type.
+### Remove Old Build Artifacts
+
+After bumping a version and building (e.g., packaging a new `.eitapp`), **always remove the old build artifact** from the output directory (e.g., `dist/`). Only the current version's artifact should remain. This prevents accidental uploads of stale versions.
 
 ### QA Handover Format
 
 Every ClickUp task handover must include:
-1. **What changed & why** — short summary
-2. **Expected behavior** — clear, testable pass/fail statements
-3. **How to test it** — URL, test accounts, step-by-step actions
+1. **What changed & why** — short summary of what was built/fixed and the reason
+2. **Expected behavior** — clear, testable pass/fail statements QA should verify
+3. **How to test it** — environment/URL, test accounts or data, step-by-step actions
 
 ### ClickUp Task Update Comment Format
 
-- **Header:** `Procurement — Dev update (YYYY-MM-DD): vX.Y.Z in progress`
+Every dev update comment on a ClickUp task should follow this structure (reference: https://app.clickup.com/t/90182493682/86exz0ujv?comment=90180235956452):
+
+- **Header:** `AppName — Dev update (YYYY-MM-DD): vX.Y.Z in progress`
 - **Intro:** One sentence context
-- ✅ **✅ Completed** — bullet points
-- 🟡 **🟡 In progress** — status details
-- ℹ️ **ℹ️ Investigated** — research notes
-- 🛠️ **🛠️ Errors found & fixed** — ordered list
-- ⏳ **⏳ Pending (next session)** — remaining work
+- ✅ **✅ Completed** — completed work with bullet points (sub-items indented)
+- 🟡 **🟡 In progress** — work currently underway with status details
+- ℹ️ **ℹ️ Investigated** — items researched/confirmed, no changes needed
+- 🛠️ **🛠️ Errors found & fixed** — ordered list of bugs caught and how
+- ⏳ **⏳ Pending (next session)** — remaining work plan as bullet points
+- **Note:** italic note for important caveats (e.g., version state, QA dependencies)
 
 ### Commit, Branch, and Release Workflow
 
-- All updates → commit and push to `for-qa` branch
-- Release to production on last day of sprint, or when instructed
-- QA testing on mainspring portal
+- All updates → commit and push to `for-qa` branch in each affected repo
+- Release to production on the last day of the sprint, or when instructed
+- Pre-release workflow: `elasticit-shell` uses pre-release versions (e.g., `0.24.1-qa.6`) for `for-qa` staging
+- QA testing currently happens through mainspring shell (only client with Supabase QA branch)
+- Other client shells (`certus`, `solterra`, `elasticit`) have `for-qa` branches and will get Supabase QA branches
 
-## Mandatory Completion Checklist
+## Cross-Repo Version Sync
 
-Before claiming any task is complete, the agent must verify all applicable items below. Use the `verification-before-completion` skill if unsure. Skipping an item requires explicit user approval.
+**Trigger:** Weekly or on-demand
+**Task:** Check all client-*-shell repos for outdated `@elasticit-llc/*` dependencies. For each outdated dependency, create a PR bumping to latest.
+**How:** Run `scripts/push-all.sh --status`, then check `npm outdated` in each client shell.
 
-- [ ] **Semver bump** — `app.manifest.json` version incremented according to the change type.
-  - MAJOR: backwards-incompatible manifest/permission/API changes
-  - MINOR: backwards-compatible new features (new pages, new email templates, new migrations, new workflow events)
-  - PATCH: backwards-compatible fixes (RLS fixes, UI labels, typo/bug fixes)
-- [ ] **Build passes** — `npm run build` succeeds with no errors.
-- [ ] **Tests pass** — `npm run test` succeeds (if tests exist for the changed area).
-- [ ] **Package created** — `npm run package` produces `dist/procurement-X.Y.Z.eitapp`.
-- [ ] **Migrations applied to QA** — any new migration applied to the QA Supabase project (`jkbqaxpfvqbeepwhunhl`).
-- [ ] **Edge functions deployed** — any changed edge function deployed to QA via `supabase functions deploy --project-ref jkbqaxpfvqbeepwhunhl`.
-- [ ] **Committed and pushed to for-qa** — changes committed and pushed to the `for-qa` branch.
-- [ ] **ClickUp updated** — dev update comment posted to the task following the format below.
-- [ ] **QA handover notes** — for any user-facing change, QA handover notes added to the ClickUp task.
-- [ ] **AGENTS.md updated** — if the workflow, conventions, or setup steps changed.
+## Ecosystem Audit
 
-## App-Specific Conventions
+**Trigger:** On-demand
+**Task:** Run `/audit` in each repo, collect results into a unified health dashboard.
+**How:** Iterate through REPOS array in `scripts/push-all.sh`, run audit checks per repo.
 
-- **Manifest** is single source of truth for slug, permissions, pages, migrations, edge functions, notifications, vault secrets
-- **Never edit an applied migration** — add a new numbered one
-- **SECURITY DEFINER** functions use wrapper-in-public / definer-in-internal pattern
-- **Never expose keys** in committed code
-- **SemVer is mandatory:** bump `app.manifest.json` version on every feature/fix and document the reason in the commit message
+## Breaking Change Impact Analysis
+
+**Trigger:** Before publishing shell or app-bridge with breaking changes
+**Task:** Search all downstream repos for usages of changed interfaces. Report which repos would break.
+**How:** Grep for changed type/function names across all repos.
+
+## Documentation Freshness
+
+**Trigger:** After PR merges to elasticit-shell or elasticit-app-bridge
+**Task:** Check if CLAUDE.md needs updating (new exports, changed APIs). Draft update if needed.
+**How:** Compare CLAUDE.md export lists against actual barrel exports in `src/index.ts`.

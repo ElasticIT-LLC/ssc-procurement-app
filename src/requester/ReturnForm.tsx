@@ -112,6 +112,11 @@ export function ReturnForm({ item, onDone }: ReturnFormProps) {
         />
         <label htmlFor={`repl-${item.id}`} className="text-sm text-foreground">Request replacement</label>
       </div>
+      {wantsReplacement && (
+        <p className="text-xs text-muted-foreground">
+          Items for return with replacement will have to be reordered. This request will show up under the Purchasing tab.
+        </p>
+      )}
 
       {/* Return notes */}
       <div className="grid gap-1">
