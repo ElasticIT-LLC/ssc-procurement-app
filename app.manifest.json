@@ -59,9 +59,6 @@
       { "name": "purchase_orders",   "rls": { "read": "authenticated", "write": "admin" } }
     ]
   },
-  "public_forms": [
-    { "app_slug": "procurement", "form_name": "Procurement Request Form", "url": "/public/procurement/request-form" }
-  ],
   "notifications": [
     { "key": "request_submitted", "label": "New request to approve", "description": "A new purchase request was submitted and needs approval.", "sort_order": 1 },
     { "key": "item_approved", "label": "Item approved", "description": "A requested item was approved.", "sort_order": 2 },
