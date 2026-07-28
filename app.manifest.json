@@ -23,6 +23,9 @@
     { "key": "admin",      "label": "Admin",      "permission": "apps/procurement/admin/manage" },
     { "key": "request-form", "label": "Request Form", "permission": "apps/procurement/requests/create" }
   ],
+  "public_forms": [
+    { "app_slug": "procurement", "form_name": "Procurement Request Form", "url": "/public/procurement/request-form" }
+  ],
   "database": {
     "mode": "schema",
     "schema": "app_procurement",
@@ -48,7 +51,8 @@
       { "version": 19, "description": "Restrict anon INSERT policies to public-form submissions only", "up": "migrations/019_restrict_anon_rls.sql" },
       { "version": 20, "description": "Allow public_form as a submission_source value", "up": "migrations/020_widen_submission_source_check.sql" },
       { "version": 21, "description": "Every individual order creates a single-item PO", "up": "migrations/021_order_line_item_creates_po.sql" },
-      { "version": 22, "description": "Cancel button applies to ordered items and updates PO status", "up": "migrations/022_cancel_ordered_item.sql" }
+      { "version": 22, "description": "Cancel button applies to ordered items and updates PO status", "up": "migrations/022_cancel_ordered_item.sql" },
+      { "version": 23, "description": "Allow anon read on active locations/departments for public form dropdowns", "up": "migrations/023_public_form_reference_read.sql" }
     ],
     "tables": [
       { "name": "locations",         "rls": { "read": "authenticated", "write": "admin" } },
