@@ -21,7 +21,7 @@
     { "key": "returns",    "label": "Returns",    "permission": "apps/procurement/returns/manage" },
     { "key": "records",    "label": "Records",    "permission": "apps/procurement/admin/manage" },
     { "key": "admin",      "label": "Admin",      "permission": "apps/procurement/admin/manage" },
-    { "key": "request-form", "label": "Request Form", "permission": null }
+    { "key": "request-form", "label": "Request Form", "permission": "apps/procurement/requests/create" }
   ],
   "database": {
     "mode": "schema",

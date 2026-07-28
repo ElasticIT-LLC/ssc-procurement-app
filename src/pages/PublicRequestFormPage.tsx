@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useShellContext, useToast } from '@elasticit-llc/app-bridge'
+import { useToast } from '@elasticit-llc/app-bridge'
 import { useProcurementApi, Location, Department } from '../data/db'
 import { ShipToCombobox } from '../requester/ShipToCombobox'
 import { useShipToWorkers } from '../requester/useShipToWorkers'
@@ -75,30 +75,9 @@ function Field({ label, error, children }: { label: string; error?: string; chil
 }
 
 export function PublicRequestFormPage() {
-  const ctx = useShellContext()
   const api = useProcurementApi()
   const { showToast } = useToast()
   const { workers, loading: workersLoading, refresh: refreshWorkers } = useShipToWorkers()
-
-  // Public form requires authentication. Redirect to the shell login page and
-  // store the current path so the shell returns the user here after SSO.
-  useEffect(() => {
-    if (!ctx.user) {
-      const returnPath = window.location.pathname + window.location.search
-      try { sessionStorage.setItem('shell:returnTo', returnPath) } catch { /* ignore */ }
-      window.location.href = '/login'
-    }
-  }, [ctx.user])
-
-  // Show nothing while the redirect is in progress so unauthenticated users don't
-  // see a flash of form fields.
-  if (!ctx.user) {
-    return (
-      <div className="max-w-lg mx-auto rounded-lg border border-border bg-card p-6 text-center">
-        <p className="text-muted-foreground">Redirecting to sign in…</p>
-      </div>
-    )
-  }
 
   const [notes, setNotes] = useState('')
   const [items, setItems] = useState<AnonLineItemDraft[]>([emptyItem()])
