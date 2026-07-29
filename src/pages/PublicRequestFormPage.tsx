@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
+import { useShellContext } from '@elasticit-llc/app-bridge'
 import { useToast } from '@elasticit-llc/app-bridge'
 import { useProcurementApi, Location, Department } from '../data/db'
+import { NewRequestForm } from '../requester/NewRequestForm'
 
 interface AnonLineItemDraft {
   ship_to_name: string
@@ -73,6 +75,7 @@ function Field({ label, error, children }: { label: string; error?: string; chil
 }
 
 export function PublicRequestFormPage() {
+  const { user } = useShellContext()
   const api = useProcurementApi()
   const { showToast } = useToast()
 
@@ -153,6 +156,10 @@ export function PublicRequestFormPage() {
     } finally {
       setSubmitting(false)
     }
+  }
+
+  if (user) {
+    return <AuthenticatedRequestForm />
   }
 
   if (submitted) {
@@ -384,6 +391,31 @@ export function PublicRequestFormPage() {
           </button>
         </div>
       </form>
+    </div>
+  )
+}
+
+function AuthenticatedRequestForm() {
+  const [success, setSuccess] = useState(false)
+
+  if (success) {
+    return (
+      <div className="max-w-2xl mx-auto rounded-lg border border-border bg-card p-8 text-center">
+        <h2 className="text-xl font-semibold text-foreground">Request Submitted</h2>
+        <p className="text-muted-foreground mt-2">
+          Your purchase request has been submitted successfully. You will receive a confirmation email shortly.
+        </p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="max-w-3xl mx-auto py-6 px-4">
+      <h1 className="text-2xl font-bold text-foreground">Purchase Request</h1>
+      <p className="text-sm text-muted-foreground mt-1">Submit a new purchase request.</p>
+      <div className="mt-6">
+        <NewRequestForm onSuccess={() => setSuccess(true)} />
+      </div>
     </div>
   )
 }

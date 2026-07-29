@@ -5,7 +5,7 @@ import { LineItemFormRow, LineItemDraft, LineItemDraftErrors } from './LineItemF
 import { useShipToWorkers } from './useShipToWorkers'
 
 interface NewRequestFormProps {
-  onCancel: () => void
+  onCancel?: () => void
   onSuccess: () => void
 }
 
@@ -174,14 +174,16 @@ export function NewRequestForm({ onCancel, onSuccess }: NewRequestFormProps) {
       </div>
 
       <div className="flex gap-3 justify-end">
-        <button
-          type="button"
-          onClick={onCancel}
-          disabled={submitting}
-          className="inline-flex items-center rounded-md border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-muted disabled:opacity-50"
-        >
-          Cancel
-        </button>
+        {onCancel && (
+          <button
+            type="button"
+            onClick={onCancel}
+            disabled={submitting}
+            className="inline-flex items-center rounded-md border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-muted disabled:opacity-50"
+          >
+            Cancel
+          </button>
+        )}
         <button
           type="submit"
           disabled={submitting}

@@ -11,7 +11,8 @@
     { "key": "apps/procurement/approvals/act", "label": "Approve items", "description": "Approve, decline, or hold requested items", "group": "Approvals" },
     { "key": "apps/procurement/purchasing/manage", "label": "Manage purchasing", "description": "Place orders and record shipping for approved items", "group": "Purchasing" },
     { "key": "apps/procurement/returns/manage", "label": "Manage returns", "description": "Process returns and order replacements", "group": "Returns" },
-    { "key": "apps/procurement/admin/manage", "label": "Manage settings", "description": "Manage locations, departments, and roles", "group": "Administration" }
+    { "key": "apps/procurement/admin/manage", "label": "Manage settings", "description": "Manage locations, departments, and roles", "group": "Administration" },
+    { "key": "apps/procurement/forms/view", "label": "View public form links", "description": "View and copy the procurement request form link in the Forms page", "group": "Requests" }
   ],
   "pages": [
     { "key": "dashboard",  "label": "Dashboard",  "permission": "apps/procurement/requests/view" },
@@ -24,7 +25,7 @@
     { "key": "request-form", "label": "Request Form", "permission": "apps/procurement/requests/create" }
   ],
   "public_forms": [
-    { "app_slug": "procurement", "form_name": "Procurement Request Form", "url": "/public/procurement/request-form" }
+    { "app_slug": "procurement", "form_name": "Procurement Request Form", "url": "/forms/procurement/request-form", "access": "private" }
   ],
   "database": {
     "mode": "schema",
