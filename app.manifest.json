@@ -3,7 +3,7 @@
   "slug": "procurement",
   "name": "Procurement",
   "icon": "Package",
-"version": "0.13.0",
+  "version": "0.14.0",
   "permissions": [
     { "key": "apps/procurement/*", "label": "Full Access", "description": "Full access to Procurement", "group": "Administration" },
     { "key": "apps/procurement/requests/create", "label": "Create requests", "description": "Create and submit purchase requests; mark items received; initiate returns", "group": "Requests" },
@@ -21,8 +21,7 @@
     { "key": "purchasing", "label": "Purchasing", "permission": "apps/procurement/purchasing/manage" },
     { "key": "returns",    "label": "Returns",    "permission": "apps/procurement/returns/manage" },
     { "key": "records",    "label": "Records",    "permission": "apps/procurement/admin/manage" },
-    { "key": "admin",      "label": "Admin",      "permission": "apps/procurement/admin/manage" },
-    { "key": "request-form", "label": "Request Form", "permission": "apps/procurement/requests/create" }
+    { "key": "admin",      "label": "Admin",      "permission": "apps/procurement/admin/manage" }
   ],
   "public_forms": [
     { "app_slug": "procurement", "form_name": "Procurement Request Form", "url": "/forms/procurement/request-form", "access": "private" }

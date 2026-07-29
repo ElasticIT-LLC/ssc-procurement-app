@@ -9,5 +9,4 @@ export const setup = (api: AppAPI) => {
   api.registerPage('returns', lazy(() => import('./pages/ReturnsPage')))
   api.registerPage('records', lazy(() => import('./records/RecordsPage')))
   api.registerPage('admin', lazy(() => import('./pages/AdminPage')))
-  api.registerPage('request-form', lazy(() => import('./pages/PublicRequestFormPage')))
 }

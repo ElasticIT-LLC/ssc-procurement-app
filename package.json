@@ -1,6 +1,6 @@
 {
   "name": "procurement",
-  "version": "0.2.0",
+  "version": "0.14.0",
   "description": "ElasticIT portal app — deployed via Admin UI `.eitapp` upload",
   "type": "module",
   "private": true,
