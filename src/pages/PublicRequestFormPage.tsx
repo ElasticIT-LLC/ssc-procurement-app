@@ -141,7 +141,7 @@ export function PublicRequestFormPage() {
         substitution_ok: item.substitution_ok,
         date_needed: item.date_needed,
       }))
-      const id = await api.submitRequestAnon(email, notes, lineItems)
+      const id = await api.submitRequestAnon(email, null, notes, lineItems)
       setRequestId(id)
       setSubmitted(true)
       showToast({ message: 'Request submitted successfully', type: 'success' })
@@ -159,7 +159,7 @@ export function PublicRequestFormPage() {
   }
 
   if (user) {
-    return <AuthenticatedRequestForm api={api} userEmail={user.email} />
+    return <AuthenticatedRequestForm api={api} userEmail={user.email} userName={user.name ?? null} />
   }
 
   if (submitted) {
@@ -398,9 +398,10 @@ export function PublicRequestFormPage() {
 interface AuthenticatedRequestFormProps {
   api: ReturnType<typeof useProcurementApi>
   userEmail: string
+  userName: string | null
 }
 
-function AuthenticatedRequestForm({ api, userEmail }: AuthenticatedRequestFormProps) {
+function AuthenticatedRequestForm({ api, userEmail, userName }: AuthenticatedRequestFormProps) {
   const [success, setSuccess] = useState(false)
 
   if (success) {
@@ -421,7 +422,7 @@ function AuthenticatedRequestForm({ api, userEmail }: AuthenticatedRequestFormPr
       <div className="mt-6">
         <NewRequestForm
           onSuccess={() => setSuccess(true)}
-          submitFn={(notes, lineItems) => api.submitRequestAnon(userEmail, notes, lineItems)}
+          submitFn={(notes, lineItems) => api.submitRequestAnon(userEmail, userName, notes, lineItems)}
         />
       </div>
     </div>

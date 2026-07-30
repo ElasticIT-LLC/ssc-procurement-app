@@ -3,7 +3,7 @@
   "slug": "procurement",
   "name": "Procurement",
   "icon": "Package",
-  "version": "0.15.0",
+  "version": "0.16.0",
   "permissions": [
     { "key": "apps/procurement/*", "label": "Full Access", "description": "Full access to Procurement", "group": "Administration" },
     { "key": "apps/procurement/requests/create", "label": "Create requests", "description": "Create and submit purchase requests; mark items received; initiate returns", "group": "Requests" },
@@ -54,7 +54,8 @@
       { "version": 20, "description": "Allow public_form as a submission_source value", "up": "migrations/020_widen_submission_source_check.sql" },
       { "version": 21, "description": "Every individual order creates a single-item PO", "up": "migrations/021_order_line_item_creates_po.sql" },
       { "version": 22, "description": "Cancel button applies to ordered items and updates PO status", "up": "migrations/022_cancel_ordered_item.sql" },
-      { "version": 23, "description": "Allow anon read on active locations/departments for public form dropdowns", "up": "migrations/023_public_form_reference_read.sql" }
+      { "version": 23, "description": "Allow anon read on active locations/departments for public form dropdowns", "up": "migrations/023_public_form_reference_read.sql" },
+      { "version": 24, "description": "Record requester name on private-form submissions", "up": "migrations/024_submit_request_anon_name.sql" }
     ],
     "tables": [
       { "name": "locations",         "rls": { "read": "authenticated", "write": "admin" } },
