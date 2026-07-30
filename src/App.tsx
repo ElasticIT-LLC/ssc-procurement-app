@@ -6,6 +6,7 @@ import { PurchasingPage } from './pages/PurchasingPage'
 import { ReturnsPage } from './pages/ReturnsPage'
 import { RecordsPage } from './records/RecordsPage'
 import { AdminPage } from './pages/AdminPage'
+import { PublicRequestFormPage } from './pages/PublicRequestFormPage'
 import './app.css'
 
 export default function App() {
@@ -15,9 +16,10 @@ export default function App() {
     case 'approvals':  return <ApprovalsPage />
     case 'purchasing': return <PurchasingPage />
     case 'returns':    return <ReturnsPage />
-    case 'records':    return <RecordsPage />
-    case 'admin':      return <AdminPage />
+    case 'records':       return <RecordsPage />
+    case 'admin':         return <AdminPage />
+    case 'request-form':  return <PublicRequestFormPage />
     case 'dashboard':
-    default:           return <DashboardPage />
+    default:              return <DashboardPage />
   }
 }

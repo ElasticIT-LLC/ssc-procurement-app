@@ -5,7 +5,7 @@
 // names, and caches the compact list in app_procurement._config for 6h.
 // verify_jwt=false at the platform gate (shell uses Entra ES256 tokens); the
 // function authenticates the caller itself. Any authenticated portal user. Body: { refresh?: boolean }.
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
+import { createClient } from 'npm:@supabase/supabase-js@2'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!

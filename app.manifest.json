@@ -3,7 +3,7 @@
   "slug": "procurement",
   "name": "Procurement",
   "icon": "Package",
-  "version": "0.14.0",
+  "version": "0.15.0",
   "permissions": [
     { "key": "apps/procurement/*", "label": "Full Access", "description": "Full access to Procurement", "group": "Administration" },
     { "key": "apps/procurement/requests/create", "label": "Create requests", "description": "Create and submit purchase requests; mark items received; initiate returns", "group": "Requests" },
@@ -12,7 +12,8 @@
     { "key": "apps/procurement/purchasing/manage", "label": "Manage purchasing", "description": "Place orders and record shipping for approved items", "group": "Purchasing" },
     { "key": "apps/procurement/returns/manage", "label": "Manage returns", "description": "Process returns and order replacements", "group": "Returns" },
     { "key": "apps/procurement/admin/manage", "label": "Manage settings", "description": "Manage locations, departments, and roles", "group": "Administration" },
-    { "key": "apps/procurement/forms/view", "label": "View public form links", "description": "View and copy the procurement request form link in the Forms page", "group": "Requests" }
+    { "key": "apps/procurement/forms/view", "label": "View public form links", "description": "View and copy the procurement request form link in the Forms page", "group": "Requests" },
+    { "key": "apps/procurement/forms/submit", "label": "Submit shared forms", "description": "Access the procurement request form through shared private links (not required for share recipients; controls sidebar visibility)", "group": "Requests" }
   ],
   "pages": [
     { "key": "dashboard",  "label": "Dashboard",  "permission": "apps/procurement/requests/view" },
@@ -20,8 +21,9 @@
     { "key": "approvals",  "label": "Approvals",  "permission": "apps/procurement/approvals/act" },
     { "key": "purchasing", "label": "Purchasing", "permission": "apps/procurement/purchasing/manage" },
     { "key": "returns",    "label": "Returns",    "permission": "apps/procurement/returns/manage" },
-    { "key": "records",    "label": "Records",    "permission": "apps/procurement/admin/manage" },
-    { "key": "admin",      "label": "Admin",      "permission": "apps/procurement/admin/manage" }
+    { "key": "records",      "label": "Records",      "permission": "apps/procurement/admin/manage" },
+    { "key": "admin",        "label": "Admin",        "permission": "apps/procurement/admin/manage" },
+    { "key": "request-form", "label": "Request Form", "permission": "apps/procurement/forms/submit" }
   ],
   "public_forms": [
     { "app_slug": "procurement", "form_name": "Procurement Request Form", "url": "/forms/procurement/request-form", "access": "private" }

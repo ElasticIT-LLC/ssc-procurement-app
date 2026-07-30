@@ -159,7 +159,7 @@ export function PublicRequestFormPage() {
   }
 
   if (user) {
-    return <AuthenticatedRequestForm />
+    return <AuthenticatedRequestForm api={api} userEmail={user.email} />
   }
 
   if (submitted) {
@@ -395,7 +395,12 @@ export function PublicRequestFormPage() {
   )
 }
 
-function AuthenticatedRequestForm() {
+interface AuthenticatedRequestFormProps {
+  api: ReturnType<typeof useProcurementApi>
+  userEmail: string
+}
+
+function AuthenticatedRequestForm({ api, userEmail }: AuthenticatedRequestFormProps) {
   const [success, setSuccess] = useState(false)
 
   if (success) {
@@ -414,7 +419,10 @@ function AuthenticatedRequestForm() {
       <h1 className="text-2xl font-bold text-foreground">Purchase Request</h1>
       <p className="text-sm text-muted-foreground mt-1">Submit a new purchase request.</p>
       <div className="mt-6">
-        <NewRequestForm onSuccess={() => setSuccess(true)} />
+        <NewRequestForm
+          onSuccess={() => setSuccess(true)}
+          submitFn={(notes, lineItems) => api.submitRequestAnon(userEmail, notes, lineItems)}
+        />
       </div>
     </div>
   )

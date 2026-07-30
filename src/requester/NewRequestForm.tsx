@@ -7,6 +7,7 @@ import { useShipToWorkers } from './useShipToWorkers'
 interface NewRequestFormProps {
   onCancel?: () => void
   onSuccess: () => void
+  submitFn?: (notes: string, lineItems: Record<string, unknown>[]) => Promise<string>
 }
 
 function emptyItem(): LineItemDraft {
@@ -44,7 +45,7 @@ function hasErrors(errs: LineItemDraftErrors): boolean {
   return Object.keys(errs).length > 0
 }
 
-export function NewRequestForm({ onCancel, onSuccess }: NewRequestFormProps) {
+export function NewRequestForm({ onCancel, onSuccess, submitFn }: NewRequestFormProps) {
   const api = useProcurementApi()
   const { showToast } = useToast()
   const { workers, loading: workersLoading, refresh: refreshWorkers } = useShipToWorkers()
@@ -103,7 +104,7 @@ export function NewRequestForm({ onCancel, onSuccess }: NewRequestFormProps) {
         substitution_ok: item.substitution_ok,
         date_needed: item.date_needed,
       }))
-      const requestId = await api.submitRequest(notes, lineItems)
+      const requestId = submitFn ? await submitFn(notes, lineItems) : await api.submitRequest(notes, lineItems)
       showToast({ message: 'Request submitted successfully', type: 'success' })
       // Wait for notifications before navigating away — onSuccess() unmounts this component
       // and cancels any in-flight fetches.
