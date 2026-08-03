@@ -18,7 +18,8 @@
  * Import this file in src/App.tsx.
  */
 
-@import "tailwindcss/utilities";
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities);
 
 /* Scan this app's source for Tailwind class usage */
 @source "./";

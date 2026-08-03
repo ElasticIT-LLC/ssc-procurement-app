@@ -759,14 +759,14 @@ if (viteConfig) {
 
 if (appCss) {
   const hasFullImport = /@import\s+["']tailwindcss["']/.test(appCss)
-  const hasUtilities = /@import\s+["']tailwindcss\/utilities["']/.test(appCss)
+  const hasUtilities = /@import\s+["']tailwindcss\/utilities(?:\.css)?["']/.test(appCss)
   if (hasFullImport && !hasUtilities) {
     const idx = appCss.search(/@import\s+["']tailwindcss["']/)
     add({
       level: 'error',
       code: 'CSS_FULL_TAILWIND_IMPORT',
       message: '@import "tailwindcss" bundles a full CSS reset + theme that overrides the shell\'s brand colors at runtime',
-      fix: 'Replace `@import "tailwindcss"` with `@import "tailwindcss/utilities"` in src/app.css',
+      fix: 'Replace `@import "tailwindcss"` with `@import "tailwindcss/utilities"` (or theme + utilities) in src/app.css',
       file: rel(APP_CSS_PATH),
       line: idx >= 0 ? lineOf(appCss, idx) : undefined,
     })
@@ -775,7 +775,7 @@ if (appCss) {
       level: 'warn',
       code: 'CSS_NO_TAILWIND',
       message: 'src/app.css does not import tailwindcss/utilities',
-      fix: 'Add `@import "tailwindcss/utilities";` to the top of src/app.css',
+      fix: 'Add `@import "tailwindcss/utilities";` (or `@import "tailwindcss/theme.css" layer(theme);` + `@import "tailwindcss/utilities.css" layer(utilities);`) to the top of src/app.css',
       file: rel(APP_CSS_PATH),
     })
   }
