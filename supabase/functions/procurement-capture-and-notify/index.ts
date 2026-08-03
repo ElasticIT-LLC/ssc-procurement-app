@@ -7,8 +7,14 @@ const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 const HVE_PASSWORD = Deno.env.get('NOTIFICATION_HVE_PASSWORD') ?? ''
 const HVE_HOST = 'smtp-hve.office365.com'
 const HVE_PORT = 587
-const SCREENSHOT_URL = 'https://msr-screenshot.livelysky-4eedc56b.eastus.azurecontainerapps.io/screenshot'
+const DEFAULT_SCREENSHOT_URL = 'https://msr-screenshot.livelysky-4eedc56b.eastus.azurecontainerapps.io/screenshot'
 const APPROVE_PERMISSION = 'apps/procurement/approvals/act'
+
+async function getAppSecret(db: any, name: string): Promise<string | null> {
+  const { data, error } = await db.rpc('get_app_secret', { p_name: name })
+  if (error) { console.warn(`get_app_secret(${name}) failed:`, error.message); return null }
+  return data as string | null
+}
 
 const STATUS_MAP: Record<string, string> = { pending: 'Pending', approved: 'Approved', declined: 'Declined', on_hold: 'On hold', ordered: 'Ordered', received: 'Received', returned: 'Returned', replacement_ordered: 'Replacement ordered', cancelled: 'Cancelled' }
 
@@ -68,11 +74,12 @@ Deno.serve(async (req) => {
   }
 
   // Shared settings loaded once for all event branches
-  const { data: settings } = await db.from('client_settings').select('key, value').in('key', ['client_name', 'portal_url', 'hve_sender_address'])
+  const { data: settings } = await db.from('client_settings').select('key, value').in('key', ['client_name', 'portal_url', 'hve_sender_address', 'procurement_brand_color'])
   const sMap = new Map((settings ?? []).map((s: { key: string; value: string }) => [s.key, s.value]))
   const sender = sMap.get('hve_sender_address')
   const portalUrl = sMap.get('portal_url') ?? ''
   const clientName = sMap.get('client_name') ?? ''
+  const brandColor = sMap.get('procurement_brand_color') ?? ''
   const { data: appRow } = await db.from('apps').select('id').eq('slug', 'procurement').maybeSingle()
   const appBase = portalUrl && appRow?.id ? `${portalUrl}/apps/${appRow.id}` : ''
   const approvalsUrl = appBase ? `${appBase}/approvals` : ''
@@ -102,11 +109,11 @@ Deno.serve(async (req) => {
       const { data: purchasers } = await db.schema('app_procurement').rpc('get_permission_holders', { p_permission: 'apps/procurement/purchasing/manage' })
       const purchaserEmails = ((purchasers ?? []) as Array<{ email: string }>).map((p) => p.email)
       if (allItems.length && purchaserEmails.length) {
-        const html = buildApprovedEmail({ requester, approverName, recordsUrl, purchasingUrl, clientName, items: allItems.map((i) => ({ name: i.item_description ?? 'Item', qty: String(i.quantity), status: STATUS_MAP[i.status] ?? i.status, dept: dp(i), location: nm(i), approvedBy: deciderMap.get(i.approved_by) ?? '', url: i.item_url ?? null })) })
+        const html = buildApprovedEmail({ requester, approverName, recordsUrl, purchasingUrl, clientName, brandColor, items: allItems.map((i) => ({ name: i.item_description ?? 'Item', qty: String(i.quantity), status: STATUS_MAP[i.status] ?? i.status, dept: dp(i), location: nm(i), approvedBy: deciderMap.get(i.approved_by) ?? '', url: i.item_url ?? null })) })
         try { await sendSmtp({ host: HVE_HOST, port: HVE_PORT, fromAddress: sender, useTls: true, auth: { type: 'login', username: sender, password: HVE_PASSWORD } }, { recipients: purchaserEmails, subject: 'Approved Procurement Request', htmlBody: html, fromDisplayName: clientName ? `${clientName} Procurement` : 'Procurement', highPriority: true }); purchaserEmailed = true } catch (e) { console.error('purchaser email failed:', e instanceof Error ? e.message : e) }
       }
       if (request.requester_email) {
-        const html = buildSummaryEmail({ clientName, approverName, items: allItems.map((i) => ({ name: i.item_description ?? 'Item', status: STATUS_MAP[i.status] ?? i.status, comments: i.admin_comment ?? '', decidedBy: deciderMap.get(i.approved_by) ?? '', returnUrl: requestsUrl, canReturn: ['approved', 'ordered', 'received'].includes(i.status) })) })
+        const html = buildSummaryEmail({ clientName, approverName, brandColor, items: allItems.map((i) => ({ name: i.item_description ?? 'Item', status: STATUS_MAP[i.status] ?? i.status, comments: i.admin_comment ?? '', decidedBy: deciderMap.get(i.approved_by) ?? '', returnUrl: requestsUrl, canReturn: ['approved', 'ordered', 'received'].includes(i.status) })) })
         try { await sendSmtp({ host: HVE_HOST, port: HVE_PORT, fromAddress: sender, useTls: true, auth: { type: 'login', username: sender, password: HVE_PASSWORD } }, { recipients: [request.requester_email], subject: 'Procurement Request Summary', htmlBody: html, fromDisplayName: clientName ? `${clientName} Procurement` : 'Procurement', highPriority: true }); requesterEmailed = true } catch (e) { console.error('requester email failed:', e instanceof Error ? e.message : e) }
       }
     }
@@ -121,7 +128,7 @@ Deno.serve(async (req) => {
     const nm = (li: Record<string, any>) => li.locations?.name ?? li.custom_location ?? '—'
     const dp = (li: Record<string, any>) => li.departments?.name ?? li.custom_department ?? '—'
     if (request.requester_email && sender && HVE_PASSWORD) {
-      const html = buildRequesterConfirmation({ requestNumber: (request as Record<string, unknown>).request_number ?? null, items: allItems.map((i) => ({ name: i.item_description ?? 'Item', qty: String(i.quantity), dept: dp(i), location: nm(i) })), clientName, requestsUrl })
+      const html = buildRequesterConfirmation({ requestNumber: (request as Record<string, unknown>).request_number ?? null, items: allItems.map((i) => ({ name: i.item_description ?? 'Item', qty: String(i.quantity), dept: dp(i), location: nm(i) })), clientName, requestsUrl, brandColor })
       try { await sendSmtp({ host: HVE_HOST, port: HVE_PORT, fromAddress: sender, useTls: true, auth: { type: 'login', username: sender, password: HVE_PASSWORD } }, { recipients: [request.requester_email], subject: 'Procurement Request Submitted', htmlBody: html, fromDisplayName: clientName ? `${clientName} Procurement` : 'Procurement', highPriority: true }) } catch (e) { console.error('requester confirmation email failed:', e instanceof Error ? e.message : e) }
     }
     return json({ event: 'requester_confirmation', done: true })
@@ -141,6 +148,7 @@ Deno.serve(async (req) => {
           purchaserName: body.details ?? 'the purchasing team',
           clientName,
           requestsUrl,
+          brandColor,
         })
         try { await sendSmtp({ host: HVE_HOST, port: HVE_PORT, fromAddress: sender, useTls: true, auth: { type: 'login', username: sender, password: HVE_PASSWORD } }, { recipients: [request.requester_email], subject: 'Item Ordered', htmlBody: html, fromDisplayName: clientName ? `${clientName} Procurement` : 'Procurement', highPriority: true }) } catch (e) { console.error('item ordered email failed:', e instanceof Error ? e.message : e) }
       }
@@ -158,7 +166,7 @@ Deno.serve(async (req) => {
     const { data: purchasers } = await db.schema('app_procurement').rpc('get_permission_holders', { p_permission: 'apps/procurement/purchasing/manage' })
     const purchaserEmails = ((purchasers ?? []) as Array<{ email: string }>).map((p) => p.email)
     if (sender && HVE_PASSWORD && allItems.length && purchaserEmails.length) {
-      const html = buildReturnNotificationEmail({ requester: request.requester_name ?? request.requester_email ?? 'a requester', items: allItems.map((i) => ({ name: i.item_description ?? 'Item', qty: String(i.quantity), reason: i.return_reason ?? '', wantsReplacement: !!i.wants_replacement })), returnsUrl, clientName })
+      const html = buildReturnNotificationEmail({ requester: request.requester_name ?? request.requester_email ?? 'a requester', items: allItems.map((i) => ({ name: i.item_description ?? 'Item', qty: String(i.quantity), reason: i.return_reason ?? '', wantsReplacement: !!i.wants_replacement })), returnsUrl, clientName, brandColor })
       try { await sendSmtp({ host: HVE_HOST, port: HVE_PORT, fromAddress: sender, useTls: true, auth: { type: 'login', username: sender, password: HVE_PASSWORD } }, { recipients: purchaserEmails, subject: 'Items Returned', htmlBody: html, fromDisplayName: clientName ? `${clientName} Procurement` : 'Procurement', highPriority: true }) } catch (e) { console.error('return notification email failed:', e instanceof Error ? e.message : e) }
     }
     return json({ event: 'return_notification', done: true })
@@ -184,6 +192,7 @@ Deno.serve(async (req) => {
           cancellerName: canceller,
           clientName,
           requestsUrl,
+          brandColor,
         })
         try { await sendSmtp({ host: HVE_HOST, port: HVE_PORT, fromAddress: sender, useTls: true, auth: { type: 'login', username: sender, password: HVE_PASSWORD } }, { recipients: [request.requester_email], subject: 'Item Cancelled', htmlBody: html, fromDisplayName: clientName ? `${clientName} Procurement` : 'Procurement', highPriority: true }) } catch (e) { console.error('item cancelled email failed:', e instanceof Error ? e.message : e) }
       }
@@ -231,6 +240,7 @@ Deno.serve(async (req) => {
         linkUrl,
         linkText: 'View in Portal',
         clientName,
+        brandColor,
       })
       try {
         await sendSmtp(
@@ -249,15 +259,14 @@ Deno.serve(async (req) => {
   if (liErr) return json({ error: liErr.message }, 500)
 
   // 2. Capture screenshots (non-fatal per item).
-  const secretRes = await db.rpc('get_app_secret', { p_name: 'SCREENSHOT_API_KEY' })
-  if (secretRes.error) console.warn('get_app_secret(SCREENSHOT_API_KEY) failed:', secretRes.error.message)
-  const apiKey = secretRes.data as string | null
+  const apiKey = await getAppSecret(db, 'SCREENSHOT_API_KEY')
+  const screenshotUrl = (await getAppSecret(db, 'SCREENSHOT_URL')) ?? DEFAULT_SCREENSHOT_URL
   const results: { line_item_id: string; captured: boolean; error?: string }[] = []
   for (const li of lineItems ?? []) {
     if (!li.item_url || (li.product_image_path && !body.only_line_item_id)) { results.push({ line_item_id: li.id, captured: !!li.product_image_path }); continue }
     if (!apiKey) { results.push({ line_item_id: li.id, captured: false, error: 'SCREENSHOT_API_KEY not set' }); continue }
     try {
-      const shot = await fetch(SCREENSHOT_URL, { method: 'POST', headers: { 'x-api-key': apiKey, 'Content-Type': 'application/json' }, body: JSON.stringify({ url: li.item_url }) })
+      const shot = await fetch(screenshotUrl, { method: 'POST', headers: { 'x-api-key': apiKey, 'Content-Type': 'application/json' }, body: JSON.stringify({ url: li.item_url }) })
       if (!shot.ok) throw new Error(`screenshot ${shot.status}`)
       const png = new Uint8Array(await shot.arrayBuffer())
       const path = `${requestId}/${li.id}.png`
@@ -281,7 +290,7 @@ Deno.serve(async (req) => {
   if (!body.only_line_item_id && recipientEmails.length && HVE_PASSWORD) {
     if (sender) {
       // Build a branded HTML email with inline (CID) product screenshots.
-      const GREEN = '#2b6450'
+      const c = brandColor || '#2b6450'
       const images: { cid: string; contentType: string; base64: string }[] = []
       const rowsHtml: string[] = []
       for (const li of lineItems ?? []) {
@@ -297,15 +306,15 @@ Deno.serve(async (req) => {
         const loc = row.locations?.name ?? li.custom_location ?? '—'
         const dept = row.departments?.name ?? li.custom_department ?? '—'
         const itemName = li.item_description ?? 'Item'
-        const nameCell = li.item_url ? `<a href="${li.item_url}" style="color:${GREEN};font-weight:600;text-decoration:none">${itemName}</a>` : `<strong>${itemName}</strong>`
+        const nameCell = li.item_url ? `<a href="${li.item_url}" style="color:${c};font-weight:600;text-decoration:none">${itemName}</a>` : `<strong>${itemName}</strong>`
         const td = 'padding:10px 12px;border-bottom:1px solid #e4e7ea;font-size:14px;color:#36414d;vertical-align:top'
         rowsHtml.push(`<tr><td style="${td}">${imgHtml}</td><td style="${td}">${nameCell}</td><td style="${td};text-align:center">${li.quantity}</td><td style="${td}">${dept}</td><td style="${td}">${loc}</td></tr>`)
       }
-      const thL = 'padding:10px 12px;text-align:left;font-size:12px;font-weight:700;color:#1f4739;background:#dbf0e9;border-bottom:2px solid #b8e0d2'
+      const thL = `padding:10px 12px;text-align:left;font-size:12px;font-weight:700;color:${c};background:#eef2f5;border-bottom:2px solid ${c}`
       const thC = thL.replace('text-align:left', 'text-align:center')
       const requester = request.requester_name ?? request.requester_email ?? 'a requester'
-      const btn = approvalsUrl ? `<table cellpadding="0" cellspacing="0" role="presentation" align="center" style="margin:0 auto 8px auto"><tr><td align="center"><!--[if mso]><v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" href="${approvalsUrl}" style="height:44px;v-text-anchor:middle;width:220px;" arcsize="12%" strokecolor="${GREEN}" fillcolor="${GREEN}"><w:anchorlock/><center style="color:#ffffff;font-family:Arial,sans-serif;font-size:15px;font-weight:600;">Review &amp; Approve</center></v:roundrect><![endif]--><a href="${approvalsUrl}" target="_blank" style="display:inline-block;background-color:${GREEN};color:#ffffff;padding:12px 24px;border-radius:6px;font-size:15px;font-weight:600;text-decoration:none;border:1px solid ${GREEN}">Review &amp; Approve</a></td></tr></table>` : ''
-      const html = `<html xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office"><body style="margin:0;padding:0"><table cellpadding="0" cellspacing="0" width="100%" style="font-family:Arial,sans-serif;background-color:#f4f6f8;padding:24px"><tr><td align="center"><table cellpadding="0" cellspacing="0" width="620" style="background:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 6px rgba(0,0,0,0.08)"><tr><td style="padding:20px;background:${GREEN};color:#ffffff;text-align:left"><h2 style="margin:0;font-size:18px;font-weight:600">New Procurement Request</h2><div style="font-size:12px;opacity:0.95">Approval Required</div></td></tr><tr><td style="padding:20px;color:#333333;font-size:14px;line-height:1.5"><p style="margin:0 0 16px 0"><strong>${requester}</strong> has submitted a new procurement request for your review and approval.</p><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;border:1px solid #e4e7ea;margin:0 0 20px 0"><tr><th style="${thL}">Product</th><th style="${thL}">Item</th><th style="${thC}">Qty</th><th style="${thL}">Department</th><th style="${thL}">Location</th></tr>${rowsHtml.join('')}</table><p style="margin:0 0 20px 0">Please review the request and take action using the button below.</p>${btn}<p style="margin:14px 0 0 0;font-size:12px;color:#555">If you have already reviewed this request, you may disregard this message.</p></td></tr><tr><td style="padding:12px 20px;background:#f7f9fb"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="left" style="font-size:12px;color:#666">Procurement · ${clientName || 'Mainspring Recovery'}</td><td align="right" style="font-size:12px;color:#666">Automated Notification</td></tr></table></td></tr></table></td></tr></table></body></html>`
+      const btn = approvalsUrl ? `<table cellpadding="0" cellspacing="0" role="presentation" align="center" style="margin:0 auto 8px auto"><tr><td align="center"><!--[if mso]><v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" href="${approvalsUrl}" style="height:44px;v-text-anchor:middle;width:220px;" arcsize="12%" strokecolor="${c}" fillcolor="${c}"><w:anchorlock/><center style="color:#ffffff;font-family:Arial,sans-serif;font-size:15px;font-weight:600;">Review &amp; Approve</center></v:roundrect><![endif]--><a href="${approvalsUrl}" target="_blank" style="display:inline-block;background-color:${c};color:#ffffff;padding:12px 24px;border-radius:6px;font-size:15px;font-weight:600;text-decoration:none;border:1px solid ${c}">Review &amp; Approve</a></td></tr></table>` : ''
+      const html = `<html xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office"><body style="margin:0;padding:0"><table cellpadding="0" cellspacing="0" width="100%" style="font-family:Arial,sans-serif;background-color:#f4f6f8;padding:24px"><tr><td align="center"><table cellpadding="0" cellspacing="0" width="620" style="background:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 6px rgba(0,0,0,0.08)"><tr><td style="padding:20px;background:${c};color:#ffffff;text-align:left"><h2 style="margin:0;font-size:18px;font-weight:600">New Procurement Request</h2><div style="font-size:12px;opacity:0.95">Approval Required</div></td></tr><tr><td style="padding:20px;color:#333333;font-size:14px;line-height:1.5"><p style="margin:0 0 16px 0"><strong>${requester}</strong> has submitted a new procurement request for your review and approval.</p><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;border:1px solid #e4e7ea;margin:0 0 20px 0"><tr><th style="${thL}">Product</th><th style="${thL}">Item</th><th style="${thC}">Qty</th><th style="${thL}">Department</th><th style="${thL}">Location</th></tr>${rowsHtml.join('')}</table><p style="margin:0 0 20px 0">Please review the request and take action using the button below.</p>${btn}<p style="margin:14px 0 0 0;font-size:12px;color:#555">If you have already reviewed this request, you may disregard this message.</p></td></tr><tr><td style="padding:12px 20px;background:#f7f9fb"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="left" style="font-size:12px;color:#666">Procurement · ${clientName || 'Mainspring Recovery'}</td><td align="right" style="font-size:12px;color:#666">Automated Notification</td></tr></table></td></tr></table></td></tr></table></body></html>`
       try {
         await sendSmtp(
           { host: HVE_HOST, port: HVE_PORT, fromAddress: sender, useTls: true, auth: { type: 'login', username: sender, password: HVE_PASSWORD } },

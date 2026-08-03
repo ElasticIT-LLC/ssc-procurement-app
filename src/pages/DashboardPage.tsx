@@ -139,7 +139,7 @@ export function DashboardPage() {
           </div>
 
           {/* Charts */}
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
             <div className="rounded-lg border border-border bg-card p-4">
               <h3 className="text-sm font-semibold text-foreground mb-2">Requests by Status</h3>
               <Chart type="pie" data={reqStatusData as unknown as Record<string, unknown>[]} xKey="status" yKey="count" height={240} />

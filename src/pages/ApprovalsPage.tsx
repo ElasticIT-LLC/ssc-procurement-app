@@ -195,7 +195,7 @@ export function ApprovalsPage() {
               type="button"
               disabled={busyId === item.id}
               onClick={() => handleAction(item.id, 'declined')}
-              className="inline-flex items-center rounded-md bg-destructive/15 px-3 py-1.5 text-xs font-medium text-destructive hover:bg-destructive/25 disabled:opacity-50"
+              className="inline-flex items-center rounded-md border border-destructive/40 bg-destructive/15 px-3 py-1.5 text-xs font-medium text-destructive hover:bg-destructive/25 disabled:opacity-50"
             >
               Decline
             </button>
@@ -203,7 +203,7 @@ export function ApprovalsPage() {
               type="button"
               disabled={busyId === item.id}
               onClick={() => handleAction(item.id, 'on_hold')}
-              className="inline-flex items-center rounded-md bg-warning/15 px-3 py-1.5 text-xs font-medium text-warning hover:bg-warning/25 disabled:opacity-50"
+              className="inline-flex items-center rounded-md border border-warning/40 bg-warning/15 px-3 py-1.5 text-xs font-medium text-warning hover:bg-warning/25 disabled:opacity-50"
             >
               Hold
             </button>
