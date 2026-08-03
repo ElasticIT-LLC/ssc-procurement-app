@@ -1,4 +1,6 @@
-# ElasticIT App Template
+# Solterra Procurement App
+
+Forked from [`msr-procurement-app`](https://github.com/ElasticIT-LLC/msr-procurement-app) for the Solterra School portal. See the upstream repo for the base procurement feature set.
 
 > ⚠️ **Use Claude Code with the "Local" environment selected** (look at the bottom-left of the Claude window — flip the environment selector from "Default"/"Cloud" to "Local"). The cloud environments are Anthropic-hosted sandboxes that can't reach your computer, so the local test environment, scaffolding, and packaging steps fail there. The session-start prerequisite hook detects the cloud case and walks you through the one-click fix; if you see that message, just flip the selector and continue.
 
