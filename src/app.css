@@ -1,9 +1,10 @@
 /*
  * App CSS — compiled at build time by Tailwind.
  *
- * IMPORTANT: Use @import "tailwindcss/utilities" — NOT @import "tailwindcss".
- * The full import bundles a CSS reset + theme layer that overrides the shell's
- * brand colors when loaded at runtime. Utilities-only avoids this.
+ * IMPORTANT: Import theme + utilities separately — NOT the full "tailwindcss".
+ * The full import bundles a CSS reset that overrides the shell's brand colors
+ * when loaded at runtime. The theme import is needed so responsive breakpoints
+ * (sm:, md:, lg:, xl:) are generated; utilities-only would drop them.
  *
  * Token system (ui-kit v0.5.0+):
  *   - Chrome (sidebar/topbar/login) is owned by the shell — always dark
@@ -18,7 +19,8 @@
  * Import this file in src/App.tsx.
  */
 
-@import "tailwindcss/utilities";
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities);
 
 /* Scan this app's source for Tailwind class usage */
 @source "./";
