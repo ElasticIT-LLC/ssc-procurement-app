@@ -145,12 +145,8 @@ export function PublicRequestFormPage() {
       setRequestId(id)
       setSubmitted(true)
       showToast({ message: 'Request submitted successfully', type: 'success' })
-      const res = await api.captureAndNotify(id)
-      if (res) {
-        const captured = res.items.filter((i) => i.captured).length
-        showToast({ message: `Captured ${captured}/${res.items.length} product images, notified ${res.recipients} approver(s)`, type: captured === res.items.length ? 'success' : 'info' })
-      }
-      await api.notifyStatusUpdate(id, [], 'requester_confirmation')
+      // Screenshots and notification emails are handled by the database trigger on
+      // purchase_requests insert.
     } catch (err: unknown) {
       showToast({ message: err instanceof Error ? err.message : 'Failed to submit request', type: 'error' })
     } finally {
