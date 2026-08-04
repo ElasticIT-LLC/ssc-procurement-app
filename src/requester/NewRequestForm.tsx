@@ -106,15 +106,9 @@ export function NewRequestForm({ onCancel, onSuccess, submitFn }: NewRequestForm
       }))
       const requestId = submitFn ? await submitFn(notes, lineItems) : await api.submitRequest(notes, lineItems)
       showToast({ message: 'Request submitted successfully', type: 'success' })
-      // Wait for notifications before navigating away — onSuccess() unmounts this component
-      // and cancels any in-flight fetches.
-      await api.notifyStatusUpdate(requestId, [], 'requester_confirmation')
-      const res = await api.captureAndNotify(requestId)
-      if (res) {
-        const captured = res.items.filter((i) => i.captured).length
-        showToast({ message: `Captured ${captured}/${res.items.length} product images, notified ${res.recipients} approver(s)`, type: captured === res.items.length ? 'success' : 'info' })
-      }
       onSuccess()
+      // Screenshots and notification emails are handled by the database trigger on
+      // purchase_requests insert, so the success UI appears immediately.
     } catch (err: unknown) {
       showToast({ message: err instanceof Error ? err.message : 'Failed to submit request', type: 'error' })
     } finally {
