@@ -7,7 +7,7 @@ const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 const HVE_PASSWORD = Deno.env.get('NOTIFICATION_HVE_PASSWORD') ?? ''
 const HVE_HOST = 'smtp-hve.office365.com'
 const HVE_PORT = 587
-const DEFAULT_SCREENSHOT_URL = 'https://msr-screenshot.livelysky-4eedc56b.eastus.azurecontainerapps.io/screenshot'
+const DEFAULT_SCREENSHOT_URL = 'https://ssc-screenshot.politewater-8de52bfb.eastus2.azurecontainerapps.io/screenshot'
 const APPROVE_PERMISSION = 'apps/procurement/approvals/act'
 
 async function getAppSecret(db: any, name: string): Promise<string | null> {
@@ -290,7 +290,7 @@ Deno.serve(async (req) => {
   if (!body.only_line_item_id && recipientEmails.length && HVE_PASSWORD) {
     if (sender) {
       // Build a branded HTML email with inline (CID) product screenshots.
-      const c = brandColor || '#2b6450'
+      const c = brandColor || '#094D73'
       const images: { cid: string; contentType: string; base64: string }[] = []
       const rowsHtml: string[] = []
       for (const li of lineItems ?? []) {
