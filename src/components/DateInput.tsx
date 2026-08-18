@@ -23,10 +23,11 @@ export function DateInput({ value, onChange, className = '', ...rest }: DateInpu
       value={value}
       onChange={(e) => onChange(e.target.value)}
       onClick={openPicker}
-      onFocus={openPicker}
       placeholder="YYYY-MM-DD"
       pattern="\\d{4}-\\d{2}-\\d{2}"
       title="Enter date as YYYY-MM-DD"
+      min="1900-01-01"
+      max="9999-12-31"
       lang="en"
       className={className}
       {...rest}
