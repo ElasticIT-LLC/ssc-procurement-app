@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useShellContext } from '@elasticit-llc/app-bridge'
-import { usePermissions } from '@elasticit-llc/app-bridge'
+import { useAppPermissions } from '../lib/useAppPermissions'
 import { Chart } from '@elasticit-llc/ui-kit'
 import { useProcurementApi, RequestRow, LineItemWithRequest, Location } from '../data/db'
 import { StatusBadge } from '../requester/StatusBadge'
@@ -25,7 +25,7 @@ function KpiCard({ label, value, sub }: KpiCardProps) {
 
 export function DashboardPage() {
   const { user } = useShellContext()
-  const { hasPermission } = usePermissions()
+  const { hasAppPermission } = useAppPermissions()
   const api = useProcurementApi()
 
   const [requests, setRequests] = useState<RequestRow[]>([])
@@ -38,10 +38,10 @@ export function DashboardPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const canApprove = hasPermission(PERMS.approve)
-  const canPurchase = hasPermission(PERMS.purchase)
-  const canReturns = hasPermission(PERMS.returns)
-  const canCreate = hasPermission(PERMS.create)
+  const canApprove = hasAppPermission(PERMS.approve)
+  const canPurchase = hasAppPermission(PERMS.purchase)
+  const canReturns = hasAppPermission(PERMS.returns)
+  const canCreate = hasAppPermission(PERMS.create)
 
   const load = useCallback(async () => {
     setLoading(true)

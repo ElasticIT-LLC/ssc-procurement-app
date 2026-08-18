@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
-import { useToast, usePermissions } from '@elasticit-llc/app-bridge'
+import { useToast } from '@elasticit-llc/app-bridge'
+import { useAppPermissions } from '../lib/useAppPermissions'
 import { useProcurementApi, Location, Department } from '../data/db'
 import { PERMS, LINE_ITEM_STATUS } from '../lib/constants'
 import { FIELD_OPTIONS, OPERATOR_OPTIONS, DEFAULT_RULES, type FormatRule, type FormatField, type FormatOperator } from '../formatting/rules'
@@ -498,7 +499,7 @@ function FormattingRulesCard() {
 export function AdminPage() {
   const api = useProcurementApi()
   const { showToast } = useToast()
-  const { hasPermission } = usePermissions()
+  const { hasAppPermission } = useAppPermissions()
 
   const [locations, setLocations] = useState<Location[]>([])
   const [departments, setDepartments] = useState<Department[]>([])
@@ -588,7 +589,7 @@ export function AdminPage() {
     }
   }
 
-  if (!hasPermission(PERMS.admin)) {
+  if (!hasAppPermission(PERMS.admin)) {
     return (
       <div className="rounded-md bg-destructive/10 border border-destructive/30 p-4 text-sm text-destructive">
         You do not have permission to view this page.

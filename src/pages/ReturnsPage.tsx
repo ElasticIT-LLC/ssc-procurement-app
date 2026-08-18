@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
-import { useToast, usePermissions } from '@elasticit-llc/app-bridge'
+import { useToast } from '@elasticit-llc/app-bridge'
+import { useAppPermissions } from '../lib/useAppPermissions'
 import { useProcurementApi, LineItemWithRequest } from '../data/db'
 import { StatusBadge } from '../requester/StatusBadge'
 import { PERMS, formatDate } from '../lib/constants'
@@ -104,7 +105,7 @@ function ReturnCard({
 export function ReturnsPage() {
   const api = useProcurementApi()
   const { showToast } = useToast()
-  const { hasPermission } = usePermissions()
+  const { hasAppPermission } = useAppPermissions()
 
   const [items, setItems] = useState<LineItemWithRequest[]>([])
   const [loading, setLoading] = useState(true)
@@ -139,7 +140,7 @@ export function ReturnsPage() {
     }
   }
 
-  if (!hasPermission(PERMS.returns)) {
+  if (!hasAppPermission(PERMS.returns)) {
     return (
       <div className="rounded-md bg-destructive/10 border border-destructive/30 p-4 text-sm text-destructive">
         You do not have permission to view this page.

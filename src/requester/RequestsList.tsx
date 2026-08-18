@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
-import { usePermissions, useSupabase } from '@elasticit-llc/app-bridge'
+import { useAppPermissions } from '../lib/useAppPermissions'
+import { useSupabase } from '@elasticit-llc/app-bridge'
 import { useProcurementApi, RequestRow } from '../data/db'
 import { PERMS, formatDate, REQUEST_STATUS } from '../lib/constants'
 import { formatRequestNo } from '../lib/itemRef'
@@ -14,7 +15,7 @@ interface RequestsListProps {
 
 export function RequestsList({ onNew, onSelect }: RequestsListProps) {
   const api = useProcurementApi()
-  const { hasPermission } = usePermissions()
+  const { hasAppPermission } = useAppPermissions()
   const supabase = useSupabase()
   const { toneClassFor } = useFormattingRules()
 
@@ -30,7 +31,7 @@ export function RequestsList({ onNew, onSelect }: RequestsListProps) {
     setLoading(true)
     const load = async () => {
       const isPrivileged =
-        hasPermission(PERMS.approve) || hasPermission(PERMS.purchase) || hasPermission(PERMS.admin)
+        hasAppPermission(PERMS.approve) || hasAppPermission(PERMS.purchase) || hasAppPermission(PERMS.admin)
       if (isPrivileged) {
         return api.listRequests()
       }
@@ -45,7 +46,7 @@ export function RequestsList({ onNew, onSelect }: RequestsListProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const canCreate = hasPermission(PERMS.create)
+  const canCreate = hasAppPermission(PERMS.create)
 
   if (loading) {
     return <div className="py-8 text-center text-muted-foreground text-sm">Loading…</div>

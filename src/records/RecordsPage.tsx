@@ -1,13 +1,12 @@
 import { Fragment, useState, useEffect, useCallback } from 'react'
-import { useToast, usePermissions } from '@elasticit-llc/app-bridge'
+import { useToast } from '@elasticit-llc/app-bridge'
+import { useAppPermissions } from '../lib/useAppPermissions'
 import { useProcurementApi, LineItemDetailed, LineItemWithRequest } from '../data/db'
 import { StatusBadge } from '../requester/StatusBadge'
 import { ReplacementBadge } from '../requester/ReplacementBadge'
 import { ReturnForm } from '../requester/ReturnForm'
-import { PERMS, formatDate } from '../lib/constants'
+import { FULL_ACCESS, PERMS, formatDate } from '../lib/constants'
 import { useFormattingRules } from '../formatting/useFormattingRules'
-
-const FULL_ACCESS = 'apps/procurement/*'
 
 function locationName(item: LineItemDetailed): string {
   return item.location?.name ?? item.custom_location ?? '—'
@@ -54,12 +53,12 @@ function exportCsv(rows: LineItemDetailed[]) {
 export function RecordsPage() {
   const api = useProcurementApi()
   const { showToast } = useToast()
-  const { hasPermission } = usePermissions()
+  const { hasAppPermission } = useAppPermissions()
   const { toneClassFor } = useFormattingRules()
 
-  const canComment = hasPermission(PERMS.approve) || hasPermission(PERMS.purchase) || hasPermission(PERMS.admin)
-  const canDelete = hasPermission(FULL_ACCESS)
-  const canReturn = hasPermission(PERMS.returns) || hasPermission(PERMS.admin)
+  const canComment = hasAppPermission(PERMS.approve) || hasAppPermission(PERMS.purchase) || hasAppPermission(PERMS.admin)
+  const canDelete = hasAppPermission(FULL_ACCESS)
+  const canReturn = hasAppPermission(PERMS.returns) || hasAppPermission(PERMS.admin)
 
   const [items, setItems] = useState<LineItemDetailed[]>([])
   const [names, setNames] = useState<Record<string, string>>({})
@@ -114,7 +113,7 @@ export function RecordsPage() {
     }
   }
 
-  if (!hasPermission(PERMS.admin)) {
+  if (!hasAppPermission(PERMS.admin)) {
     return (
       <div className="rounded-md bg-destructive/10 border border-destructive/30 p-4 text-sm text-destructive">
         You do not have permission to view this page.

@@ -3,6 +3,7 @@ import { useShellContext } from '@elasticit-llc/app-bridge'
 import { useToast } from '@elasticit-llc/app-bridge'
 import { useProcurementApi, Location, Department } from '../data/db'
 import { NewRequestForm } from '../requester/NewRequestForm'
+import { DateInput } from '../components/DateInput'
 
 interface AnonLineItemDraft {
   ship_to_name: string
@@ -344,10 +345,9 @@ export function PublicRequestFormPage() {
 
               {/* Date Needed */}
               <Field label="Date Needed" error={itemErrors[index]?.date_needed}>
-                <input
-                  type="date"
+                <DateInput
                   value={item.date_needed}
-                  onChange={(e) => updateItem(index, { ...item, date_needed: e.target.value })}
+                  onChange={(v) => updateItem(index, { ...item, date_needed: v })}
                   className="h-9 w-full rounded-md border border-border bg-input px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                 />
               </Field>

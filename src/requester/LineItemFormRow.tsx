@@ -1,6 +1,7 @@
 import { Location, Department } from '../data/db'
 import { ShipToWorker } from '../data/db'
 import { ShipToCombobox } from './ShipToCombobox'
+import { DateInput } from '../components/DateInput'
 
 export interface LineItemDraft {
   ship_to_name: string
@@ -208,10 +209,9 @@ export function LineItemFormRow({
 
       {/* Date Needed */}
       <Field label="Date Needed" error={errors.date_needed}>
-        <input
-          type="date"
+        <DateInput
           value={value.date_needed}
-          onChange={(e) => set({ date_needed: e.target.value })}
+          onChange={(v) => set({ date_needed: v })}
           className="h-9 w-full rounded-md border border-border bg-input px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
         />
       </Field>

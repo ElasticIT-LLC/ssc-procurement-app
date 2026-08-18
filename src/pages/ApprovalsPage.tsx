@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
-import { useToast, usePermissions } from '@elasticit-llc/app-bridge'
+import { useToast } from '@elasticit-llc/app-bridge'
+import { useAppPermissions } from '../lib/useAppPermissions'
 import { useProcurementApi, LineItemWithRequest } from '../data/db'
 import { StatusBadge } from '../requester/StatusBadge'
 import { PERMS, formatDate } from '../lib/constants'
@@ -9,7 +10,7 @@ import { formatItemRef } from '../lib/itemRef'
 export function ApprovalsPage() {
   const api = useProcurementApi()
   const { showToast } = useToast()
-  const { hasPermission } = usePermissions()
+  const { hasAppPermission } = useAppPermissions()
   const { toneClassFor } = useFormattingRules()
 
   const [items, setItems] = useState<LineItemWithRequest[]>([])
@@ -61,9 +62,9 @@ export function ApprovalsPage() {
     }
   }
 
-  const canComment = hasPermission(PERMS.approve) || hasPermission(PERMS.purchase) || hasPermission(PERMS.admin)
+  const canComment = hasAppPermission(PERMS.approve) || hasAppPermission(PERMS.purchase) || hasAppPermission(PERMS.admin)
 
-  if (!hasPermission(PERMS.approve)) {
+  if (!hasAppPermission(PERMS.approve)) {
     return (
       <div className="rounded-md bg-destructive/10 border border-destructive/30 p-4 text-sm text-destructive">
         You do not have permission to view this page.
