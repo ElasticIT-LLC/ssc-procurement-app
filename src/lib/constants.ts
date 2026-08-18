@@ -39,5 +39,5 @@ export function formatDate(value: string | null | undefined, options?: Intl.Date
   const d = dateOnly
     ? new Date(Number(dateOnly[1]), Number(dateOnly[2]) - 1, Number(dateOnly[3]))
     : new Date(value)
-  return d.toLocaleDateString(options ? 'en-US' : undefined, options)
+  return d.toLocaleDateString('en-US', options ?? { month: '2-digit', day: '2-digit', year: 'numeric' })
 }

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useProcurementApi, Location } from '../data/db'
+import { DateInput } from '../components/DateInput'
 
 interface Props {
   itemIds: string[]
@@ -53,11 +54,19 @@ export function CreatePurchaseOrderForm({ itemIds, locations, onCancel, onCreate
       </div>
       <div className="grid gap-1">
         <label className="text-xs font-medium text-foreground">Date Purchased</label>
-        <input type="date" value={datePurchased} onChange={e => setDatePurchased(e.target.value)} className="w-full rounded-md border border-input bg-input px-3 py-1.5 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring" />
+        <DateInput
+          value={datePurchased}
+          onChange={setDatePurchased}
+          className="w-full rounded-md border border-input bg-input px-3 py-1.5 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+        />
       </div>
       <div className="grid gap-1">
         <label className="text-xs font-medium text-foreground">ETA</label>
-        <input type="date" value={eta} onChange={e => setEta(e.target.value)} className="w-full rounded-md border border-input bg-input px-3 py-1.5 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring" />
+        <DateInput
+          value={eta}
+          onChange={setEta}
+          className="w-full rounded-md border border-input bg-input px-3 py-1.5 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+        />
       </div>
       <div className="grid gap-1">
         <label className="text-xs font-medium text-foreground">Shipping Location</label>

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useToast } from '@elasticit-llc/app-bridge'
 import { useProcurementApi, LineItemWithRequest, Location } from '../data/db'
+import { DateInput } from '../components/DateInput'
 import { StatusBadge } from '../requester/StatusBadge'
 import { ReplacementBadge } from '../requester/ReplacementBadge'
 import { formatDate } from '../lib/constants'
@@ -211,20 +212,18 @@ export function ReadyForPurchasing() {
 
                 <div className="grid gap-1">
                   <label className="text-xs font-medium text-foreground">Date Purchased</label>
-                  <input
-                    type="date"
+                  <DateInput
                     value={form.date_purchased}
-                    onChange={e => updateForm(item.id, { date_purchased: e.target.value })}
+                    onChange={(v) => updateForm(item.id, { date_purchased: v })}
                     className="w-full rounded-md border border-input bg-input px-3 py-1.5 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                   />
                 </div>
 
                 <div className="grid gap-1">
                   <label className="text-xs font-medium text-foreground">ETA</label>
-                  <input
-                    type="date"
+                  <DateInput
                     value={form.eta}
-                    onChange={e => updateForm(item.id, { eta: e.target.value })}
+                    onChange={(v) => updateForm(item.id, { eta: v })}
                     className="w-full rounded-md border border-input bg-input px-3 py-1.5 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                   />
                 </div>

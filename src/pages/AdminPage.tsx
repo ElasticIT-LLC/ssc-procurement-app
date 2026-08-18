@@ -3,6 +3,7 @@ import { useToast } from '@elasticit-llc/app-bridge'
 import { useAppPermissions } from '../lib/useAppPermissions'
 import { useProcurementApi, Location, Department } from '../data/db'
 import { PERMS, LINE_ITEM_STATUS } from '../lib/constants'
+import { DateInput } from '../components/DateInput'
 import { FIELD_OPTIONS, OPERATOR_OPTIONS, DEFAULT_RULES, type FormatRule, type FormatField, type FormatOperator } from '../formatting/rules'
 import { TONE_OPTIONS } from '../formatting/tones'
 
@@ -302,10 +303,9 @@ function FormattingRuleRow({ rule, index, count, onChange, onMove, onDelete }: F
         )}
 
         {showValue && type === 'date' && (
-          <input
-            type="date"
+          <DateInput
             value={rule.value ?? ''}
-            onChange={e => onChange(index, { ...rule, value: e.target.value })}
+            onChange={(v) => onChange(index, { ...rule, value: v })}
             className="rounded-md border border-input bg-input px-2 py-1 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
           />
         )}
