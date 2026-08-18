@@ -58,24 +58,11 @@ function addMonths(date: Date, delta: number): Date {
 function Calendar({
   value,
   onChange,
-  onClose,
 }: {
   value: string
   onChange: (value: string) => void
-  onClose: () => void
 }) {
   const [monthDate, setMonthDate] = useState(() => startOfMonth(parseIso(value) ?? new Date()))
-  const calendarRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    function handleClickOutside(e: MouseEvent) {
-      if (calendarRef.current && !calendarRef.current.contains(e.target as Node)) {
-        onClose()
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [onClose])
 
   const year = monthDate.getFullYear()
   const month = monthDate.getMonth()
@@ -101,12 +88,10 @@ function Calendar({
 
   function selectDate(day: number) {
     onChange(toIso(new Date(year, month, day)))
-    onClose()
   }
 
   return (
     <div
-      ref={calendarRef}
       className="absolute z-50 mt-1 w-64 rounded-md border border-border bg-card p-2 shadow-lg"
       style={{ top: '100%', left: 0 }}
     >
@@ -190,31 +175,72 @@ function Calendar({
 export function DateInput({ value, onChange, className = '', ...rest }: DateInputProps) {
   const [displayValue, setDisplayValue] = useState(() => toDisplay(value))
   const [open, setOpen] = useState(false)
+  const wrapperRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+  const justSelectedRef = useRef(false)
 
   useEffect(() => {
     setDisplayValue(toDisplay(value))
   }, [value])
 
+  // Close the calendar when clicking outside the whole component.
+  useEffect(() => {
+    if (!open) return
+    function handleClickOutside(e: MouseEvent) {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
+        setOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [open])
+
+  // Parse the text and close the calendar when focus leaves the component.
+  useEffect(() => {
+    const wrapper = wrapperRef.current
+    if (!wrapper) return
+
+    function handleFocusOut(e: FocusEvent) {
+      const next = e.relatedTarget as Node | null
+      if (next && wrapperRef.current?.contains(next)) {
+        return
+      }
+      if (justSelectedRef.current) {
+        justSelectedRef.current = false
+        return
+      }
+      const iso = fromDisplay(displayValue)
+      if (iso !== null) {
+        onChange(iso)
+      } else if (displayValue === '') {
+        onChange('')
+      } else {
+        onChange('')
+      }
+      setOpen(false)
+    }
+
+    wrapper.addEventListener('focusout', handleFocusOut)
+    return () => wrapper.removeEventListener('focusout', handleFocusOut)
+  }, [displayValue, onChange])
+
   function handleTextChange(e: React.ChangeEvent<HTMLInputElement>) {
     setDisplayValue(e.target.value)
   }
 
-  function handleBlur() {
-    const iso = fromDisplay(displayValue)
-    if (iso !== null) {
-      onChange(iso)
-    } else if (displayValue === '') {
-      onChange('')
-    } else {
-      // Invalid text: clear the stored value so validation shows an error,
-      // but keep the typed text so the user can correct it.
-      onChange('')
+  function handleFocus() {
+    if (justSelectedRef.current) {
+      justSelectedRef.current = false
+      return
     }
+    setOpen(true)
   }
 
   function handleCalendarSelect(iso: string) {
+    justSelectedRef.current = true
     onChange(iso)
     setOpen(false)
+    inputRef.current?.focus()
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
@@ -224,13 +250,14 @@ export function DateInput({ value, onChange, className = '', ...rest }: DateInpu
   }
 
   return (
-    <div className="relative">
+    <div ref={wrapperRef} className="relative">
       <input
+        ref={inputRef}
         type="text"
         inputMode="numeric"
         value={displayValue}
         onChange={handleTextChange}
-        onBlur={handleBlur}
+        onFocus={handleFocus}
         onKeyDown={handleKeyDown}
         placeholder="MM/DD/YYYY"
         pattern="^(0?[1-9]|1[0-2])\/(0?[1-9]|[12]\d|3[01])\/\d{4}$"
@@ -266,7 +293,7 @@ export function DateInput({ value, onChange, className = '', ...rest }: DateInpu
         </svg>
       </button>
       {open && (
-        <Calendar value={value} onChange={handleCalendarSelect} onClose={() => setOpen(false)} />
+        <Calendar value={value} onChange={handleCalendarSelect} />
       )}
     </div>
   )
