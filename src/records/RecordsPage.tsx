@@ -228,7 +228,7 @@ export function RecordsPage() {
                           </button>
                         </div>
                         {item.commented_at && (
-                          <p className="text-[11px] text-muted-foreground mt-0.5">— {names[item.commented_by ?? ''] ?? 'Unknown'} · {formatDate(item.commented_at, { month: 'short', day: 'numeric', year: 'numeric' })}</p>
+                          <p className="text-[11px] text-muted-foreground mt-0.5">— {names[item.commented_by ?? ''] ?? 'Unknown'} · {formatDate(item.commented_at)}</p>
                         )}
                       </div>
                     ) : (

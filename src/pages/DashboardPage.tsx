@@ -176,7 +176,7 @@ export function DashboardPage() {
                       {req.requester_name ?? req.requester_email ?? 'Request'}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      Updated {formatDate(req.updated_at, { month: 'short', day: 'numeric', year: 'numeric' })}
+                      Updated {formatDate(req.updated_at)}
                     </p>
                   </div>
                   <StatusBadge status={req.status} />
