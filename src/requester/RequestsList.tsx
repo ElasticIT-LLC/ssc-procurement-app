@@ -30,14 +30,9 @@ export function RequestsList({ onNew, onSelect }: RequestsListProps) {
   useEffect(() => {
     setLoading(true)
     const load = async () => {
-      const isPrivileged =
-        hasAppPermission(PERMS.approve) || hasAppPermission(PERMS.purchase) || hasAppPermission(PERMS.admin)
-      if (isPrivileged) {
-        return api.listRequests()
-      }
       const { data, error: authErr } = await supabase.auth.getUser()
       if (authErr || !data.user) throw new Error('Unable to identify current user')
-      return api.listRequests(data.user.id)
+      return api.listRequests(data.user.id, data.user.email)
     }
     load()
       .then((rows) => setRequests(rows))
@@ -75,7 +70,7 @@ export function RequestsList({ onNew, onSelect }: RequestsListProps) {
         )}
       </div>
 
-      <div className="flex flex-wrap gap-1 border-b border-border">
+      <div className="flex overflow-x-auto gap-1 border-b border-border">
         {TABS.map((t) => (
           <button
             key={t}

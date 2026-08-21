@@ -49,11 +49,14 @@ export function useProcurementApi() {
   const db = () => supabase.schema(SCHEMA)
   const ok = <T,>(res: { data: T; error: { message: string } | null }): T => { if (res.error) throw new Error(res.error.message); return res.data }
 
-  async function listRequests(requesterId?: string): Promise<RequestRow[]> {
+  async function listRequests(requesterId?: string, requesterEmail?: string): Promise<RequestRow[]> {
     let query = db().from(TABLES.requests).select('*, line_items(item_description)')
       .order('line_no', { ascending: true, referencedTable: 'line_items' })
       .order('updated_at', { ascending: false })
-    if (requesterId) query = query.eq('requester_id', requesterId)
+    const filters: string[] = []
+    if (requesterId) filters.push(`requester_id.eq.${requesterId}`)
+    if (requesterId && requesterEmail) filters.push(`and(requester_id.is.null,requester_email.eq.${requesterEmail})`)
+    if (filters.length) query = query.or(filters.join(','))
     return (ok(await query) ?? []) as RequestRow[]
   }
   async function getRequest(id: string): Promise<RequestRow | null> {
