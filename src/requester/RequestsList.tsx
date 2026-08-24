@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useAppPermissions } from '../lib/useAppPermissions'
-import { useShellContext, useSupabase } from '@elasticit-llc/app-bridge'
+import { useShellContext } from '@elasticit-llc/app-bridge'
 import { useProcurementApi, RequestRow } from '../data/db'
 import { PERMS, formatDate, REQUEST_STATUS, FULL_ACCESS } from '../lib/constants'
 import { formatRequestNo } from '../lib/itemRef'
@@ -17,8 +17,10 @@ export function RequestsList({ onNew, onSelect }: RequestsListProps) {
   const api = useProcurementApi()
   const { hasAppPermission } = useAppPermissions()
   const { user: shellUser } = useShellContext()
-  const supabase = useSupabase()
   const { toneClassFor } = useFormattingRules()
+
+  const canCreate = hasAppPermission(PERMS.create)
+  const canSeeAll = hasAppPermission(FULL_ACCESS)
 
   const [requests, setRequests] = useState<RequestRow[]>([])
   const [loading, setLoading] = useState(true)
@@ -30,27 +32,25 @@ export function RequestsList({ onNew, onSelect }: RequestsListProps) {
 
   useEffect(() => {
     setLoading(true)
+    setError(null)
     const load = async () => {
-      const { data, error: authErr } = await supabase.auth.getUser()
-      if (authErr || !data.user) throw new Error('Unable to identify current user')
-      // System admins (role=admin) and Full Access app-role users see every request;
-      // RLS (check_user_permission) already grants them read on all rows.
-      if (hasAppPermission(FULL_ACCESS)) return api.listRequests()
-      // SSO users can have a NULL email on the auth record (no email claim in the JWT);
-      // the shell profile (user_profiles) carries the directory email — use it as a
-      // fallback so public/private form submissions match this user.
-      const email = data.user.email || shellUser?.email || undefined
-      return api.listRequests(data.user.id, email)
+      // Scope by the shell (effective) user, which reflects impersonation (preview as
+      // target). The Supabase JWT stays the real operator during preview, so
+      // auth.getUser() would return the operator and scope the list to the wrong person.
+      // SSO users can have a NULL email on the auth record; the shell profile carries
+      // the directory email, so use it to match public-form submissions.
+      const id = shellUser?.id
+      if (!id) throw new Error('Unable to identify current user')
+      if (canSeeAll) return api.listRequests()
+      const email = shellUser?.email || undefined
+      return api.listRequests(id, email)
     }
     load()
       .then((rows) => setRequests(rows))
       .catch((err: unknown) => setError(err instanceof Error ? err.message : 'Failed to load requests'))
       .finally(() => setLoading(false))
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  const canCreate = hasAppPermission(PERMS.create)
-  const canSeeAll = hasAppPermission(FULL_ACCESS)
+  }, [shellUser?.id, shellUser?.email, canSeeAll])
 
   if (loading) {
     return <div className="py-8 text-center text-muted-foreground text-sm">Loading…</div>
