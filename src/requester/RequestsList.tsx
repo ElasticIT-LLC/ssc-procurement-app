@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useAppPermissions } from '../lib/useAppPermissions'
-import { useSupabase } from '@elasticit-llc/app-bridge'
+import { useShellContext, useSupabase } from '@elasticit-llc/app-bridge'
 import { useProcurementApi, RequestRow } from '../data/db'
-import { PERMS, formatDate, REQUEST_STATUS } from '../lib/constants'
+import { PERMS, formatDate, REQUEST_STATUS, FULL_ACCESS } from '../lib/constants'
 import { formatRequestNo } from '../lib/itemRef'
 import { countByStatus, filterByStatus } from '../lib/requestFilter'
 import { StatusBadge } from './StatusBadge'
@@ -16,6 +16,7 @@ interface RequestsListProps {
 export function RequestsList({ onNew, onSelect }: RequestsListProps) {
   const api = useProcurementApi()
   const { hasAppPermission } = useAppPermissions()
+  const { user: shellUser } = useShellContext()
   const supabase = useSupabase()
   const { toneClassFor } = useFormattingRules()
 
@@ -32,7 +33,14 @@ export function RequestsList({ onNew, onSelect }: RequestsListProps) {
     const load = async () => {
       const { data, error: authErr } = await supabase.auth.getUser()
       if (authErr || !data.user) throw new Error('Unable to identify current user')
-      return api.listRequests(data.user.id, data.user.email)
+      // System admins (role=admin) and Full Access app-role users see every request;
+      // RLS (check_user_permission) already grants them read on all rows.
+      if (hasAppPermission(FULL_ACCESS)) return api.listRequests()
+      // SSO users can have a NULL email on the auth record (no email claim in the JWT);
+      // the shell profile (user_profiles) carries the directory email — use it as a
+      // fallback so public/private form submissions match this user.
+      const email = data.user.email || shellUser?.email || undefined
+      return api.listRequests(data.user.id, email)
     }
     load()
       .then((rows) => setRequests(rows))
@@ -42,6 +50,7 @@ export function RequestsList({ onNew, onSelect }: RequestsListProps) {
   }, [])
 
   const canCreate = hasAppPermission(PERMS.create)
+  const canSeeAll = hasAppPermission(FULL_ACCESS)
 
   if (loading) {
     return <div className="py-8 text-center text-muted-foreground text-sm">Loading…</div>
@@ -58,7 +67,7 @@ export function RequestsList({ onNew, onSelect }: RequestsListProps) {
   return (
     <div className="grid gap-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-foreground">My Requests</h2>
+        <h2 className="text-lg font-semibold text-foreground">{canSeeAll ? 'All Requests' : 'My Requests'}</h2>
         {canCreate && (
           <button
             type="button"
