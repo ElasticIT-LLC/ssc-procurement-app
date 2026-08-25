@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useShellContext } from '@elasticit-llc/app-bridge'
 import { useAppPermissions } from '../lib/useAppPermissions'
-import { Chart } from '@elasticit-llc/ui-kit'
+import { Chart, exportCsv } from '@elasticit-llc/ui-kit'
+import * as XLSX from 'xlsx'
 import { useProcurementApi, RequestRow, LineItemDetailed, Location } from '../data/db'
 import { StatusBadge } from '../requester/StatusBadge'
 import { Modal } from '../components/Modal'
@@ -101,6 +102,41 @@ function ItemDrilldownRows({ rows }: { rows: LineItemDetailed[] }) {
       </tbody>
     </table>
   )
+}
+
+interface DrilldownTable {
+  headers: string[]
+  rows: Record<string, string | number>[]
+}
+
+function drilldownTable(drill: Drilldown): DrilldownTable {
+  if (drill.kind === 'request') {
+    return {
+      headers: ['Request', 'Requester', 'Status', 'Submitted', 'Items'],
+      rows: drill.rows.map(r => ({
+        Request: formatRequestNo(r.request_number),
+        Requester: r.requester_name ?? r.requester_email ?? '—',
+        Status: r.status,
+        Submitted: formatDate(r.submitted_at),
+        Items: r.line_items?.length ?? 0,
+      })),
+    }
+  }
+  return {
+    headers: ['Item', 'Description', 'Qty', 'Requester', 'Status', 'Submitted'],
+    rows: drill.rows.map(i => ({
+      Item: formatItemRef(i.request.request_number, i.line_no),
+      Description: i.item_description ?? '—',
+      Qty: i.quantity,
+      Requester: i.request.requester_name ?? i.request.requester_email ?? '—',
+      Status: i.status,
+      Submitted: formatDate(i.request.submitted_at),
+    })),
+  }
+}
+
+function drilldownSlug(title: string): string {
+  return title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
 }
 
 export function DashboardPage() {
@@ -298,6 +334,35 @@ export function DashboardPage() {
 
       {drilldown && (
         <Modal title={drilldown.title} onClose={() => setDrilldown(null)}>
+          <div className="flex justify-end gap-2 mb-3">
+            <button
+              type="button"
+              onClick={() => {
+                const table = drilldownTable(drilldown)
+                exportCsv(
+                  table.rows,
+                  table.headers.map(h => ({ key: h, header: h })),
+                  `procurement-${drilldownSlug(drilldown.title)}.csv`
+                )
+              }}
+              className="rounded border border-border px-2.5 py-1 text-xs text-foreground hover:bg-muted transition-colors"
+            >
+              Download CSV
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                const table = drilldownTable(drilldown)
+                const ws = XLSX.utils.json_to_sheet(table.rows)
+                const wb = XLSX.utils.book_new()
+                XLSX.utils.book_append_sheet(wb, ws, 'Report')
+                XLSX.writeFile(wb, `procurement-${drilldownSlug(drilldown.title)}.xlsx`)
+              }}
+              className="rounded border border-border px-2.5 py-1 text-xs text-foreground hover:bg-muted transition-colors"
+            >
+              Download Excel
+            </button>
+          </div>
           {drilldown.kind === 'request'
             ? <RequestDrilldownRows rows={drilldown.rows} />
             : <ItemDrilldownRows rows={drilldown.rows} />}

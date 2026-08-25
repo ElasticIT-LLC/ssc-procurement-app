@@ -5,7 +5,8 @@
   "type": "module",
   "private": true,
   "dependencies": {
-    "recharts": "^3.10.1"
+    "recharts": "^3.10.1",
+    "xlsx": "^0.18.5"
   },
   "scripts": {
     "dev": "vite build --watch",
