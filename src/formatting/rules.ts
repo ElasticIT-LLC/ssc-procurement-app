@@ -2,7 +2,7 @@ import type { Tone } from './tones'
 
 export type FormatField = 'status' | 'date_needed' | 'eta' | 'quantity' | 'department' | 'location' | 'item_description'
 export type FormatOperator = 'equals' | 'not_equals' | 'contains' | 'gt' | 'lt' | 'gte' | 'lte' | 'before' | 'after' | 'is_overdue' | 'is_empty' | 'is_not_empty'
-export interface FormatRule { id: string; label?: string; field: FormatField; operator: FormatOperator; value: string | null; tone: Tone; enabled: boolean }
+export interface FormatRule { id: string; label?: string; field: FormatField; operator: FormatOperator; value: string | null; tone: Tone; bold?: boolean; italic?: boolean; underline?: boolean; enabled: boolean }
 
 export const FIELD_OPTIONS: { field: FormatField; label: string; type: 'status' | 'date' | 'number' | 'text' }[] = [
   { field: 'status', label: 'Status', type: 'status' },
@@ -68,11 +68,15 @@ function matchRule(row: Record<string, unknown>, r: FormatRule, now: Date): bool
     default: return false
   }
 }
-// First enabled matching rule wins. Total: never throws.
-export function evalRowTone(row: Record<string, unknown>, rules: FormatRule[], now: Date = new Date()): Tone | null {
+// Presentation of the first enabled matching rule: background tone plus any
+// font flags. Total: never throws. Legacy rules without font flags render none.
+export interface RowFormat { tone: Tone; bold: boolean; italic: boolean; underline: boolean }
+export function evalRowFormat(row: Record<string, unknown>, rules: FormatRule[], now: Date = new Date()): RowFormat {
   for (const r of rules) {
     if (!r.enabled) continue
-    try { if (matchRule(row, r, now)) return r.tone } catch { /* skip bad rule */ }
+    try {
+      if (matchRule(row, r, now)) return { tone: r.tone, bold: !!r.bold, italic: !!r.italic, underline: !!r.underline }
+    } catch { /* skip bad rule */ }
   }
-  return null
+  return { tone: 'neutral', bold: false, italic: false, underline: false }
 }

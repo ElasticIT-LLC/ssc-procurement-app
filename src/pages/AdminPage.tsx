@@ -339,6 +339,20 @@ function FormattingRuleRow({ rule, index, count, onChange, onMove, onDelete }: F
           ))}
         </select>
 
+        <div className="flex items-center gap-2.5" aria-label="Font style">
+          {([['bold', 'Bold'], ['italic', 'Italic'], ['underline', 'Underline']] as const).map(([key, label]) => (
+            <label key={key} className="inline-flex items-center gap-1 text-xs text-muted-foreground select-none">
+              <input
+                type="checkbox"
+                checked={!!rule[key]}
+                onChange={e => onChange(index, { ...rule, [key]: e.target.checked })}
+                className="h-3.5 w-3.5 rounded border-border accent-primary"
+              />
+              {label}
+            </label>
+          ))}
+        </div>
+
         <div className="ml-auto flex items-center gap-1 shrink-0">
           <button
             type="button"
@@ -412,7 +426,7 @@ function FormattingRulesCard() {
   }
 
   function handleAdd() {
-    setRules(prev => [...prev, { id: crypto.randomUUID(), field: 'status', operator: 'equals', value: '', tone: 'neutral', enabled: true }])
+    setRules(prev => [...prev, { id: crypto.randomUUID(), field: 'status', operator: 'equals', value: '', tone: 'neutral', bold: false, italic: false, underline: false, enabled: true }])
   }
 
   function handleReset() {
@@ -435,7 +449,7 @@ function FormattingRulesCard() {
     <CollapsibleCard title="Conditional Formatting" right={`${rules.length} rule${rules.length === 1 ? '' : 's'}`}>
       <div className="grid gap-3">
       <p className="text-sm text-muted-foreground">
-        Rules are evaluated top to bottom — the first enabled match sets the row's tint. Applies across Records, Requests, Approvals, Purchasing, and Returns.
+        Rules are evaluated top to bottom — the first enabled match sets the row's tint and font style. Applies across Records, Requests, Approvals, Purchasing, and Returns.
       </p>
       <p className="text-sm text-muted-foreground">
         Formatting rules only color rows — they do not create new statuses. The status list is fixed.
