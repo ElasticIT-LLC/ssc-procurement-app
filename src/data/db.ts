@@ -3,7 +3,7 @@ import type { LineItemStatus, RequestStatus } from '../lib/constants'
 import { DEFAULT_RULES, type FormatRule } from '../formatting/rules'
 
 const SCHEMA = 'app_procurement'
-const TABLES = { requests: 'purchase_requests', lineItems: 'line_items', locations: 'locations', departments: 'departments', config: '_config', purchaseOrders: 'purchase_orders' } as const
+const TABLES = { requests: 'purchase_requests', lineItems: 'line_items', locations: 'locations', departments: 'departments', config: '_config', purchaseOrders: 'purchase_orders', favoriteItems: 'favorite_items' } as const
 const RPCS = { submit: 'submit_request', submitAnon: 'submit_request_anon', decide: 'decide_line_item', order: 'order_line_item', receive: 'receive_line_item', initiateReturn: 'initiate_return', processReturn: 'process_return', setComment: 'set_line_item_comment', deleteItem: 'delete_line_item', archiveItem: 'archive_line_item', cancel: 'cancel_line_item', getUserNames: 'get_user_names', getFormattingRules: 'get_formatting_rules', createPO: 'create_purchase_order', closePO: 'close_purchase_order' } as const
 
 export interface RequestRow { id: string; requester_id: string | null; requester_name: string | null; requester_email: string | null; requester_type: string; status: RequestStatus; notes: string | null; submitted_at: string; updated_at: string; request_number: number | null; line_items?: { item_description: string | null }[] }
@@ -43,6 +43,7 @@ export interface LineItemDetailed extends LineItemRow {
 export interface Location { id: string; name: string; is_active: boolean }
 export interface Department { id: string; name: string; is_active: boolean }
 export interface ShipToWorker { id: string; name: string; location: string | null; label: string }
+export interface FavoriteItem { id: string; name: string; item_url: string | null; created_by: string | null; created_at: string }
 
 export function useProcurementApi() {
   const supabase = useSupabase()
@@ -255,5 +256,15 @@ export function useProcurementApi() {
     }
   }
 
-  return { listRequests, getRequest, listLineItems, listLocations, listDepartments, listAllLocations, listAllDepartments, submitRequest, submitRequestAnon, decideLineItem, orderLineItem, receiveLineItem, initiateReturn, processReturn, cancelLineItem, listLineItemsByStatus, listLineItemFacets, listAllLineItemsDetailed, countLineItems, setLineItemComment, deleteLineItem, archiveLineItem, createLocation, createDepartment, updateLocation, updateDepartment, fireNotification, captureAndNotify, getProductImageUrl, notifyApproved, notifyStatusUpdate, resolveUserNames, getFormattingRules, setFormattingRules, listShipToWorkers, createPurchaseOrder, listPurchaseOrders, closePurchaseOrder }
+  async function listFavorites(): Promise<FavoriteItem[]> {
+    return (ok(await db().from(TABLES.favoriteItems).select('*').order('name')) ?? []) as FavoriteItem[]
+  }
+  async function addFavorite(name: string, itemUrl?: string | null): Promise<void> {
+    ok(await db().from(TABLES.favoriteItems).insert({ name, item_url: itemUrl || null }))
+  }
+  async function removeFavorite(id: string): Promise<void> {
+    ok(await db().from(TABLES.favoriteItems).delete().eq('id', id))
+  }
+
+  return { listRequests, getRequest, listLineItems, listLocations, listDepartments, listAllLocations, listAllDepartments, listFavorites, addFavorite, removeFavorite, submitRequest, submitRequestAnon, decideLineItem, orderLineItem, receiveLineItem, initiateReturn, processReturn, cancelLineItem, listLineItemsByStatus, listLineItemFacets, listAllLineItemsDetailed, countLineItems, setLineItemComment, deleteLineItem, archiveLineItem, createLocation, createDepartment, updateLocation, updateDepartment, fireNotification, captureAndNotify, getProductImageUrl, notifyApproved, notifyStatusUpdate, resolveUserNames, getFormattingRules, setFormattingRules, listShipToWorkers, createPurchaseOrder, listPurchaseOrders, closePurchaseOrder }
 }
