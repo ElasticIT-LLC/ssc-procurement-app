@@ -205,7 +205,20 @@ Deno.serve(async (req) => {
     const key = (body.notification_key ?? '') as string
     if (!key) return json({ event: 'notification', skipped: true, reason: 'no notification_key' })
     const eventType = `procurement:${key}`
-    const recipients = await resolveNotificationRecipients(db, eventType)
+    let recipients = await resolveNotificationRecipients(db, eventType)
+    // "New request to approve" is approver-facing: restrict delivery to users who
+    // can actually approve (system admins + approvals/act + full-access holders,
+    // via wildcard match) even if they opted in. Requesters only receive
+    // notifications about their own requests.
+    if (key === 'request_submitted') {
+      const { data: holders, error: holderErr } = await db.schema('app_procurement').rpc('get_permission_holders', { p_permission: APPROVE_PERMISSION })
+      if (holderErr) {
+        console.error('get_permission_holders failed:', holderErr.message)
+      } else {
+        const holderIds = new Set(((holders ?? []) as Array<{ user_id: string }>).map((h) => h.user_id))
+        recipients = recipients.filter((r) => r.user_id !== null && holderIds.has(r.user_id))
+      }
+    }
     if (recipients.length === 0) return json({ event: 'notification', key, skipped: true, reason: 'no recipients' })
     const meta = await fetchNotificationMeta(db, 'procurement', key)
     const label = meta?.label ?? key
