@@ -59,7 +59,9 @@
       { "version": 25, "description": "Allow requesters to read public/private form submissions via requester_email", "up": "migrations/025_requester_email_rls.sql" },
       { "version": 26, "description": "Extend email RLS fallback to user_profiles.email for SSO users (no JWT email)", "up": "migrations/026_requester_profile_email_rls.sql" },
       { "version": 27, "description": "NULLIF empty JWT email claim (SSO issues \"email\":\"\"), COALESCE missed the profile fallback", "up": "migrations/027_nullif_jwt_email_rls.sql" },
-      { "version": 28, "description": "Records archive: line_items.archived_at + archive_line_item RPC (soft delete replaces UI delete)", "up": "migrations/028_archive_line_item.sql" }
+      { "version": 28, "description": "Records archive: line_items.archived_at + archive_line_item RPC (soft delete replaces UI delete)", "up": "migrations/028_archive_line_item.sql" },
+      { "version": 29, "description": "Favorite items catalog (admin-curated, form auto-suggestions) + RLS", "up": "migrations/029_favorite_items.sql" },
+      { "version": 30, "description": "Converge favorite_items RLS: drop loose per-action policies, canonical read-all / admin-write only", "up": "migrations/030_favorite_items_rls_convergence.sql" }
     ],
     "tables": [
       { "name": "locations",         "rls": { "read": "authenticated", "write": "admin" } },
@@ -67,7 +69,8 @@
       { "name": "purchase_requests", "rls": { "read": "authenticated", "write": "authenticated" } },
       { "name": "line_items",        "rls": { "read": "authenticated", "write": "authenticated" } },
       { "name": "_config",           "rls": { "read": "admin", "write": "admin" } },
-      { "name": "purchase_orders",   "rls": { "read": "authenticated", "write": "admin" } }
+      { "name": "purchase_orders",   "rls": { "read": "authenticated", "write": "admin" } },
+      { "name": "favorite_items",    "rls": { "read": "authenticated", "write": "admin" } }
     ]
   },
   "notifications": [
