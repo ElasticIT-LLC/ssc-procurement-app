@@ -58,7 +58,8 @@
       { "version": 24, "description": "Record requester name on private-form submissions", "up": "migrations/024_submit_request_anon_name.sql" },
       { "version": 25, "description": "Allow requesters to read public/private form submissions via requester_email", "up": "migrations/025_requester_email_rls.sql" },
       { "version": 26, "description": "Extend email RLS fallback to user_profiles.email for SSO users (no JWT email)", "up": "migrations/026_requester_profile_email_rls.sql" },
-      { "version": 27, "description": "NULLIF empty JWT email claim (SSO issues \"email\":\"\"), COALESCE missed the profile fallback", "up": "migrations/027_nullif_jwt_email_rls.sql" }
+      { "version": 27, "description": "NULLIF empty JWT email claim (SSO issues \"email\":\"\"), COALESCE missed the profile fallback", "up": "migrations/027_nullif_jwt_email_rls.sql" },
+      { "version": 28, "description": "Records archive: line_items.archived_at + archive_line_item RPC (soft delete replaces UI delete)", "up": "migrations/028_archive_line_item.sql" }
     ],
     "tables": [
       { "name": "locations",         "rls": { "read": "authenticated", "write": "admin" } },
