@@ -29,6 +29,10 @@ function toIso(date: Date): string {
   return `${y}-${m}-${d}`
 }
 
+export function todayIso(): string {
+  return toIso(new Date())
+}
+
 function toDisplay(value: string): string {
   if (!value) return ''
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value)

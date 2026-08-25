@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useProcurementApi, Location } from '../data/db'
-import { DateInput } from '../components/DateInput'
+import { DateInput, todayIso } from '../components/DateInput'
 
 interface Props {
   itemIds: string[]
@@ -12,7 +12,7 @@ interface Props {
 export function CreatePurchaseOrderForm({ itemIds, locations, onCancel, onCreated }: Props) {
   const api = useProcurementApi()
   const [vendor, setVendor] = useState('')
-  const [datePurchased, setDatePurchased] = useState('')
+  const [datePurchased, setDatePurchased] = useState(todayIso())
   const [eta, setEta] = useState('')
   const [shippingLocationId, setShippingLocationId] = useState('')
   const [customShipping, setCustomShipping] = useState('')

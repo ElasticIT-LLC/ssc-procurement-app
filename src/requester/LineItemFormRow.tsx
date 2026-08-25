@@ -153,7 +153,7 @@ export function LineItemFormRow({
       </Field>
 
       {/* Item URL */}
-      <Field label="Item URL (optional)">
+      <Field label="Item URL (highly recommended)">
         <input
           type="url"
           placeholder="https://..."

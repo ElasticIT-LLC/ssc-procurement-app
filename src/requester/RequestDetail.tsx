@@ -110,6 +110,7 @@ export function RequestDetail({ requestId, onBack }: RequestDetailProps) {
                   <ReplacementBadge item={item} className="ml-2" />
                 </p>
                 <p className="text-xs text-muted-foreground">Qty: {item.quantity}</p>
+                <p className="text-xs text-muted-foreground">Substitution: {item.substitution_ok ? 'Yes' : 'No'}</p>
               </div>
               <StatusBadge status={item.status} />
             </div>

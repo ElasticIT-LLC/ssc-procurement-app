@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useToast } from '@elasticit-llc/app-bridge'
 import { useProcurementApi, LineItemWithRequest, Location } from '../data/db'
-import { DateInput } from '../components/DateInput'
+import { DateInput, todayIso } from '../components/DateInput'
 import { StatusBadge } from '../requester/StatusBadge'
 import { ReplacementBadge } from '../requester/ReplacementBadge'
 import { formatDate } from '../lib/constants'
@@ -18,7 +18,7 @@ interface OrderForm {
 }
 
 function emptyForm(): OrderForm {
-  return { date_purchased: '', eta: '', shipping_location_id: '', custom_shipping_location: '', purchase_notes: '' }
+  return { date_purchased: todayIso(), eta: '', shipping_location_id: '', custom_shipping_location: '', purchase_notes: '' }
 }
 
 export function ReadyForPurchasing() {

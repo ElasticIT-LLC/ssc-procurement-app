@@ -167,6 +167,7 @@ export function RecordsPage() {
                 <th className={head}>Requester</th>
                 <th className={head}>Item</th>
                 <th className={head}>Qty</th>
+                <th className={head}>Substitution</th>
                 <th className={head}>Location</th>
                 <th className={head}>Department</th>
                 <th className={head}>Status</th>
@@ -198,6 +199,7 @@ export function RecordsPage() {
                     )}
                   </td>
                   <td className={cell}>{item.quantity}</td>
+                  <td className={cell}>{item.substitution_ok ? 'Yes' : 'No'}</td>
                   <td className={cell}>{locationName(item)}</td>
                   <td className={cell}>{departmentName(item)}</td>
                   <td className={cell}><span className="inline-flex flex-wrap items-center gap-1"><StatusBadge status={item.status} /><ReplacementBadge item={item} /></span></td>

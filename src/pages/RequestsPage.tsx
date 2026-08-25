@@ -24,11 +24,11 @@ export function RequestsPage() {
 
       {view.type === 'new' && (
         <div className="grid gap-4">
-          <div className="flex items-center gap-3">
+          <div className="grid gap-1">
             <button
               type="button"
               onClick={() => setView({ type: 'list' })}
-              className="text-sm text-muted-foreground hover:text-foreground"
+              className="text-sm text-muted-foreground hover:text-foreground self-start"
             >
               ← Back
             </button>

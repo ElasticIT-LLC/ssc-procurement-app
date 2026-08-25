@@ -102,6 +102,7 @@ export function ApprovalsPage() {
                 {formatItemRef(item.request?.request_number, item.line_no)} — {item.item_description || 'Unnamed item'}
               </p>
               <p className="text-xs text-muted-foreground">Qty: {item.quantity}</p>
+              <p className="text-xs text-muted-foreground">Substitution: {item.substitution_ok ? 'Yes' : 'No'}</p>
             </div>
             <StatusBadge status={item.status} />
           </div>

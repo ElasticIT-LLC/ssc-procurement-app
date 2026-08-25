@@ -7,7 +7,7 @@ const TABLES = { requests: 'purchase_requests', lineItems: 'line_items', locatio
 const RPCS = { submit: 'submit_request', submitAnon: 'submit_request_anon', decide: 'decide_line_item', order: 'order_line_item', receive: 'receive_line_item', initiateReturn: 'initiate_return', processReturn: 'process_return', setComment: 'set_line_item_comment', deleteItem: 'delete_line_item', cancel: 'cancel_line_item', getUserNames: 'get_user_names', getFormattingRules: 'get_formatting_rules', createPO: 'create_purchase_order', closePO: 'close_purchase_order' } as const
 
 export interface RequestRow { id: string; requester_id: string | null; requester_name: string | null; requester_email: string | null; requester_type: string; status: RequestStatus; notes: string | null; submitted_at: string; updated_at: string; request_number: number | null; line_items?: { item_description: string | null }[] }
-export interface LineItemRow { id: string; request_id: string; item_description: string | null; item_url: string | null; memo: string | null; quantity: number; status: LineItemStatus; location_id: string | null; custom_location: string | null; department_id: string | null; custom_department: string | null; date_needed: string | null; eta: string | null; admin_comment: string | null; commented_by: string | null; commented_at: string | null; product_image_path: string | null; return_reason: string | null; return_quantity: number | null; wants_replacement: boolean | null; return_notes: string | null; return_date: string | null; created_at: string; line_no: number | null; return_processed_at: string | null; po_id: string | null }
+export interface LineItemRow { id: string; request_id: string; item_description: string | null; item_url: string | null; memo: string | null; quantity: number; substitution_ok: boolean; status: LineItemStatus; location_id: string | null; custom_location: string | null; department_id: string | null; custom_department: string | null; date_needed: string | null; eta: string | null; admin_comment: string | null; commented_by: string | null; commented_at: string | null; product_image_path: string | null; return_reason: string | null; return_quantity: number | null; wants_replacement: boolean | null; return_notes: string | null; return_date: string | null; created_at: string; line_no: number | null; return_processed_at: string | null; po_id: string | null }
 export interface LineItemWithRequest extends LineItemRow {
   request: {
     id: string
@@ -36,7 +36,7 @@ export interface PurchaseOrderRow {
 // One flat row per line item for the Records table: line-item fields + admin_comment,
 // the request it belongs to, and the resolved location/department names.
 export interface LineItemDetailed extends LineItemRow {
-  request: { requester_name: string | null; requester_email: string | null; notes: string | null; submitted_at: string; status: RequestStatus }
+  request: { id: string; request_number: number | null; requester_name: string | null; requester_email: string | null; notes: string | null; submitted_at: string; status: RequestStatus }
   location: { name: string } | null
   department: { name: string } | null
 }
@@ -142,10 +142,10 @@ export function useProcurementApi() {
 
   async function listAllLineItemsDetailed(): Promise<LineItemDetailed[]> {
     const rows = ok(await db().from(TABLES.lineItems)
-      .select('*, purchase_requests!request_id(requester_name, requester_email, notes, submitted_at, status), locations!location_id(name), departments!department_id(name)')
+      .select('*, purchase_requests!request_id(id, request_number, requester_name, requester_email, notes, submitted_at, status), locations!location_id(name), departments!department_id(name)')
       .order('created_at', { ascending: false })) ?? []
     return (rows as unknown as (LineItemRow & {
-      purchase_requests: { requester_name: string | null; requester_email: string | null; notes: string | null; submitted_at: string; status: RequestStatus }
+      purchase_requests: { id: string; request_number: number | null; requester_name: string | null; requester_email: string | null; notes: string | null; submitted_at: string; status: RequestStatus }
       locations: { name: string } | null
       departments: { name: string } | null
     })[]).map(row => {
