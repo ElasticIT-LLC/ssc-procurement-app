@@ -1,6 +1,7 @@
-import { Location, Department } from '../data/db'
+import { Location, Department, FavoriteItem } from '../data/db'
 import { ShipToWorker } from '../data/db'
 import { ShipToCombobox } from './ShipToCombobox'
+import { ItemNameCombobox } from './ItemNameCombobox'
 import { DateInput } from '../components/DateInput'
 
 export interface LineItemDraft {
@@ -42,6 +43,7 @@ interface LineItemFormRowProps {
   workers: ShipToWorker[]
   workersLoading: boolean
   onRefreshWorkers: () => void
+  favorites: FavoriteItem[]
 }
 
 function Field({ label, error, children }: { label: string; error?: string; children: React.ReactNode }) {
@@ -56,7 +58,7 @@ function Field({ label, error, children }: { label: string; error?: string; chil
 
 export function LineItemFormRow({
   index, value, onChange, onRemove, disableRemove, locations, departments, errors,
-  workers, workersLoading, onRefreshWorkers,
+  workers, workersLoading, onRefreshWorkers, favorites,
 }: LineItemFormRowProps) {
   const set = (patch: Partial<LineItemDraft>) => onChange({ ...value, ...patch })
 
@@ -188,13 +190,12 @@ export function LineItemFormRow({
 
       {/* Item Name (stored as item_description) */}
       <Field label="Item Name" error={errors.item_description}>
-        <input
-          type="text"
+        <ItemNameCombobox
           value={value.item_description}
-          onChange={(e) => set({ item_description: e.target.value })}
-          placeholder="e.g. Dell 27&quot; Monitor"
-          className="w-full rounded-md border border-border bg-input px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+          onChange={(name, url) => set({ item_description: name, ...(url && !value.item_url ? { item_url: url } : {}) })}
+          favorites={favorites}
         />
+        <p className="text-xs text-muted-foreground">Tip: items on the favorites list are suggested as you type.</p>
       </Field>
 
       {/* Memo */}
