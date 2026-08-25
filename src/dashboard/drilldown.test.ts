@@ -22,6 +22,7 @@ const item = (over: Partial<LineItemDetailed>): LineItemDetailed => ({
   commented_at: null, product_image_path: null, return_reason: null, return_quantity: null,
   wants_replacement: null, return_notes: null, return_date: null,
   created_at: '2026-08-01T10:00:00.000Z', line_no: 1, return_processed_at: null, po_id: null,
+  archived_at: null,
   substitution_ok: true,
   request: { id: 'r1', request_number: 1, requester_name: 'Jane', requester_email: 'jane@x.com', notes: null, submitted_at: '2026-08-01T10:00:00.000Z', status: 'pending' },
   location: null, department: null,

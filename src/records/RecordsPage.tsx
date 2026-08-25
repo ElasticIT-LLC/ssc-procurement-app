@@ -57,7 +57,7 @@ export function RecordsPage() {
   const { toneClassFor } = useFormattingRules()
 
   const canComment = hasAppPermission(PERMS.approve) || hasAppPermission(PERMS.purchase) || hasAppPermission(PERMS.admin)
-  const canDelete = hasAppPermission(FULL_ACCESS)
+  const canArchive = hasAppPermission(FULL_ACCESS)
   const canReturn = hasAppPermission(PERMS.returns) || hasAppPermission(PERMS.admin)
 
   const [items, setItems] = useState<LineItemDetailed[]>([])
@@ -67,12 +67,13 @@ export function RecordsPage() {
   const [drafts, setDrafts] = useState<Record<string, string>>({})
   const [busyId, setBusyId] = useState<string | null>(null)
   const [returnOpenId, setReturnOpenId] = useState<string | null>(null)
+  const [showArchived, setShowArchived] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
-      const data = await api.listAllLineItemsDetailed()
+      const data = await api.listAllLineItemsDetailed(showArchived)
       setItems(data)
       setDrafts(Object.fromEntries(data.map(i => [i.id, i.admin_comment ?? ''])))
       const map = await api.resolveUserNames(data.map((r) => r.commented_by).filter((x): x is string => !!x))
@@ -99,15 +100,17 @@ export function RecordsPage() {
     }
   }
 
-  async function handleDelete(item: LineItemDetailed) {
-    if (!window.confirm(`Delete "${item.item_description ?? 'this item'}"? This cannot be undone.`)) return
+  async function handleArchive(item: LineItemDetailed) {
+    const archiving = !item.archived_at
+    const label = item.item_description ?? 'this item'
+    if (!window.confirm(archiving ? `Archive "${label}"? It will be hidden from Records and the dashboard until unarchived.` : `Unarchive "${label}"?`)) return
     setBusyId(item.id)
     try {
-      await api.deleteLineItem(item.id)
-      showToast({ message: 'Item deleted', type: 'success' })
+      await api.archiveLineItem(item.id, archiving)
+      showToast({ message: archiving ? 'Item archived' : 'Item unarchived', type: 'success' })
       await load()
     } catch (err: unknown) {
-      showToast({ message: err instanceof Error ? err.message : 'Failed to delete item', type: 'error' })
+      showToast({ message: err instanceof Error ? err.message : 'Failed to update item', type: 'error' })
     } finally {
       setBusyId(null)
     }
@@ -123,7 +126,7 @@ export function RecordsPage() {
 
   const cell = 'px-3 py-2 align-top text-xs text-foreground'
   const head = 'px-3 py-2 text-left text-xs font-semibold text-muted-foreground whitespace-nowrap'
-  const showActionsColumn = canDelete || canReturn
+  const showActionsColumn = canArchive || canReturn
   // 11 fixed columns (Submitted…Admin Comment) + the conditional Actions column.
   const columnCount = 11 + (showActionsColumn ? 1 : 0)
 
@@ -134,14 +137,25 @@ export function RecordsPage() {
           <h1 className="text-2xl font-semibold text-foreground mb-1">Records</h1>
           <p className="text-muted-foreground text-sm">Every requested item, one row each.</p>
         </div>
-        <button
-          type="button"
-          onClick={() => exportCsv(items)}
-          disabled={items.length === 0}
-          className="inline-flex items-center rounded-md border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted disabled:opacity-50"
-        >
-          Export CSV
-        </button>
+        <div className="flex items-center gap-4">
+          <label className="inline-flex items-center gap-2 text-sm text-muted-foreground select-none">
+            <input
+              type="checkbox"
+              checked={showArchived}
+              onChange={e => setShowArchived(e.target.checked)}
+              className="h-4 w-4 rounded border-border accent-primary"
+            />
+            Show archived
+          </label>
+          <button
+            type="button"
+            onClick={() => exportCsv(items)}
+            disabled={items.length === 0}
+            className="inline-flex items-center rounded-md border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted disabled:opacity-50"
+          >
+            Export CSV
+          </button>
+        </div>
       </div>
 
       {loading && (
@@ -202,7 +216,7 @@ export function RecordsPage() {
                   <td className={cell}>{item.substitution_ok ? 'Yes' : 'No'}</td>
                   <td className={cell}>{locationName(item)}</td>
                   <td className={cell}>{departmentName(item)}</td>
-                  <td className={cell}><span className="inline-flex flex-wrap items-center gap-1"><StatusBadge status={item.status} /><ReplacementBadge item={item} /></span></td>
+                  <td className={cell}><span className="inline-flex flex-wrap items-center gap-1"><StatusBadge status={item.status} /><ReplacementBadge item={item} />{item.archived_at && <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">Archived</span>}</span></td>
                   <td className={`${cell} whitespace-nowrap`}>{formatDate(item.date_needed) || '—'}</td>
                   <td className={`${cell} whitespace-nowrap`}>{formatDate(item.eta) || '—'}</td>
                   <td className={`${cell} max-w-[14rem] text-muted-foreground`}>
@@ -249,14 +263,14 @@ export function RecordsPage() {
                             Return
                           </button>
                         )}
-                        {canDelete && (
+                        {canArchive && (
                           <button
                             type="button"
                             disabled={busyId === item.id}
-                            onClick={() => handleDelete(item)}
-                            className="inline-flex items-center rounded-md bg-destructive/15 px-2 py-1.5 text-xs font-medium text-destructive hover:bg-destructive/25 disabled:opacity-50"
+                            onClick={() => handleArchive(item)}
+                            className="inline-flex items-center rounded-md border border-border px-2 py-1.5 text-xs font-medium text-foreground hover:bg-muted disabled:opacity-50"
                           >
-                            Delete
+                            {item.archived_at ? 'Unarchive' : 'Archive'}
                           </button>
                         )}
                       </div>

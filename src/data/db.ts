@@ -4,10 +4,10 @@ import { DEFAULT_RULES, type FormatRule } from '../formatting/rules'
 
 const SCHEMA = 'app_procurement'
 const TABLES = { requests: 'purchase_requests', lineItems: 'line_items', locations: 'locations', departments: 'departments', config: '_config', purchaseOrders: 'purchase_orders' } as const
-const RPCS = { submit: 'submit_request', submitAnon: 'submit_request_anon', decide: 'decide_line_item', order: 'order_line_item', receive: 'receive_line_item', initiateReturn: 'initiate_return', processReturn: 'process_return', setComment: 'set_line_item_comment', deleteItem: 'delete_line_item', cancel: 'cancel_line_item', getUserNames: 'get_user_names', getFormattingRules: 'get_formatting_rules', createPO: 'create_purchase_order', closePO: 'close_purchase_order' } as const
+const RPCS = { submit: 'submit_request', submitAnon: 'submit_request_anon', decide: 'decide_line_item', order: 'order_line_item', receive: 'receive_line_item', initiateReturn: 'initiate_return', processReturn: 'process_return', setComment: 'set_line_item_comment', deleteItem: 'delete_line_item', archiveItem: 'archive_line_item', cancel: 'cancel_line_item', getUserNames: 'get_user_names', getFormattingRules: 'get_formatting_rules', createPO: 'create_purchase_order', closePO: 'close_purchase_order' } as const
 
 export interface RequestRow { id: string; requester_id: string | null; requester_name: string | null; requester_email: string | null; requester_type: string; status: RequestStatus; notes: string | null; submitted_at: string; updated_at: string; request_number: number | null; line_items?: { item_description: string | null }[] }
-export interface LineItemRow { id: string; request_id: string; item_description: string | null; item_url: string | null; memo: string | null; quantity: number; substitution_ok: boolean; status: LineItemStatus; location_id: string | null; custom_location: string | null; department_id: string | null; custom_department: string | null; date_needed: string | null; eta: string | null; admin_comment: string | null; commented_by: string | null; commented_at: string | null; product_image_path: string | null; return_reason: string | null; return_quantity: number | null; wants_replacement: boolean | null; return_notes: string | null; return_date: string | null; created_at: string; line_no: number | null; return_processed_at: string | null; po_id: string | null }
+export interface LineItemRow { id: string; request_id: string; item_description: string | null; item_url: string | null; memo: string | null; quantity: number; substitution_ok: boolean; status: LineItemStatus; location_id: string | null; custom_location: string | null; department_id: string | null; custom_department: string | null; date_needed: string | null; eta: string | null; admin_comment: string | null; commented_by: string | null; commented_at: string | null; product_image_path: string | null; return_reason: string | null; return_quantity: number | null; wants_replacement: boolean | null; return_notes: string | null; return_date: string | null; created_at: string; line_no: number | null; return_processed_at: string | null; po_id: string | null; archived_at: string | null }
 export interface LineItemWithRequest extends LineItemRow {
   request: {
     id: string
@@ -140,10 +140,12 @@ export function useProcurementApi() {
     })
   }
 
-  async function listAllLineItemsDetailed(): Promise<LineItemDetailed[]> {
-    const rows = ok(await db().from(TABLES.lineItems)
+  async function listAllLineItemsDetailed(includeArchived = false): Promise<LineItemDetailed[]> {
+    let query = db().from(TABLES.lineItems)
       .select('*, purchase_requests!request_id(id, request_number, requester_name, requester_email, notes, submitted_at, status), locations!location_id(name), departments!department_id(name)')
-      .order('created_at', { ascending: false })) ?? []
+      .order('created_at', { ascending: false })
+    if (!includeArchived) query = query.is('archived_at', null)
+    const rows = ok(await query) ?? []
     return (rows as unknown as (LineItemRow & {
       purchase_requests: { id: string; request_number: number | null; requester_name: string | null; requester_email: string | null; notes: string | null; submitted_at: string; status: RequestStatus }
       locations: { name: string } | null
@@ -156,7 +158,7 @@ export function useProcurementApi() {
   // Count-only query (head:true returns no rows, just the exact count). RLS scopes it to
   // what the caller may read — all items for an admin, only their own for a requester.
   async function countLineItems(): Promise<number> {
-    const res = await db().from(TABLES.lineItems).select('*', { count: 'exact', head: true })
+    const res = await db().from(TABLES.lineItems).select('*', { count: 'exact', head: true }).is('archived_at', null)
     if (res.error) throw new Error(res.error.message)
     return res.count ?? 0
   }
@@ -168,10 +170,11 @@ export function useProcurementApi() {
   // Location". One read serves both. Capped at 1000 rows by PostgREST — fine for
   // the dashboard; TODO: move to grouped-count RPCs if volume grows.
   async function listLineItemFacets(): Promise<{ status: string; location_id: string | null; custom_location: string | null }[]> {
-    return (ok(await db().from(TABLES.lineItems).select('status, location_id, custom_location')) ?? []) as { status: string; location_id: string | null; custom_location: string | null }[]
+    return (ok(await db().from(TABLES.lineItems).select('status, location_id, custom_location').is('archived_at', null)) ?? []) as { status: string; location_id: string | null; custom_location: string | null }[]
   }
   async function setLineItemComment(id: string, comment: string): Promise<void> { ok(await db().rpc(RPCS.setComment, { p_line_item_id: id, p_comment: comment })) }
   async function deleteLineItem(id: string): Promise<void> { ok(await db().rpc(RPCS.deleteItem, { p_line_item_id: id })) }
+  async function archiveLineItem(id: string, archived: boolean): Promise<void> { ok(await db().rpc(RPCS.archiveItem, { p_line_item_id: id, p_archived: archived })) }
 
   // Resolve a set of user ids → display names via a SECURITY DEFINER RPC. The client can't read
   // other users' public.user_profiles rows (RLS: own-row + admins only), so name resolution goes
@@ -252,5 +255,5 @@ export function useProcurementApi() {
     }
   }
 
-  return { listRequests, getRequest, listLineItems, listLocations, listDepartments, listAllLocations, listAllDepartments, submitRequest, submitRequestAnon, decideLineItem, orderLineItem, receiveLineItem, initiateReturn, processReturn, cancelLineItem, listLineItemsByStatus, listLineItemFacets, listAllLineItemsDetailed, countLineItems, setLineItemComment, deleteLineItem, createLocation, createDepartment, updateLocation, updateDepartment, fireNotification, captureAndNotify, getProductImageUrl, notifyApproved, notifyStatusUpdate, resolveUserNames, getFormattingRules, setFormattingRules, listShipToWorkers, createPurchaseOrder, listPurchaseOrders, closePurchaseOrder }
+  return { listRequests, getRequest, listLineItems, listLocations, listDepartments, listAllLocations, listAllDepartments, submitRequest, submitRequestAnon, decideLineItem, orderLineItem, receiveLineItem, initiateReturn, processReturn, cancelLineItem, listLineItemsByStatus, listLineItemFacets, listAllLineItemsDetailed, countLineItems, setLineItemComment, deleteLineItem, archiveLineItem, createLocation, createDepartment, updateLocation, updateDepartment, fireNotification, captureAndNotify, getProductImageUrl, notifyApproved, notifyStatusUpdate, resolveUserNames, getFormattingRules, setFormattingRules, listShipToWorkers, createPurchaseOrder, listPurchaseOrders, closePurchaseOrder }
 }
