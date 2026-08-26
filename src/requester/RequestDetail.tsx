@@ -192,7 +192,7 @@ export function RequestDetail({ requestId, onBack }: RequestDetailProps) {
                     className={`text-base leading-none rounded-md border px-2 py-1 transition-colors disabled:opacity-50 ${
                       isFavorite(item)
                         ? 'text-destructive border-destructive/40 bg-destructive/10'
-                        : 'text-muted-foreground border-border hover:text-destructive hover:border-destructive/40 hover:bg-destructive/5'
+                        : 'text-muted-foreground border-border hover:text-foreground hover:border-foreground/40 hover:bg-muted'
                     }`}
                   >
                     {isFavorite(item) ? '♥' : '♡'}
