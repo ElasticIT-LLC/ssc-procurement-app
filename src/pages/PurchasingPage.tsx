@@ -25,12 +25,11 @@ if (!hasAppPermission(PERMS.purchase) && !hasAppPermission(PERMS.admin)) {
     )
   }
 
-  // The Favorites tab is the admin-curated catalog manager — visible to
-  // procurement admins only. Non-admin purchasers never see it.
-  const canManageFavorites = hasAppPermission(PERMS.admin)
-  const tabs: { key: Tab; label: string }[] = canManageFavorites
-    ? [...TABS, { key: 'favorites', label: 'Favorites' }]
-    : TABS
+  // The Favorite Items tab manages the shared reorder catalog — visible to
+  // everyone who can view this page (purchasers and admins). Approvers reach
+  // the same tab from the Approvals page. Adding is allowed for all three
+  // roles (RLS migration 032); removing stays admin-only.
+  const tabs: { key: Tab; label: string }[] = [...TABS, { key: 'favorites', label: 'Favorite Items' }]
 
   return (
     <div className="grid gap-6">
@@ -53,7 +52,7 @@ if (!hasAppPermission(PERMS.purchase) && !hasAppPermission(PERMS.admin)) {
       {tab === 'ready' && <ReadyForPurchasing />}
       {tab === 'open' && <OpenOrders />}
       {tab === 'closed' && <ClosedOrders />}
-      {tab === 'favorites' && canManageFavorites && <FavoritesTab />}
+      {tab === 'favorites' && <FavoritesTab />}
     </div>
   )
 }

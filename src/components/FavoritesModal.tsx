@@ -44,6 +44,9 @@ export function FavoritesModal({ open, onClose }: FavoritesModalProps) {
 
   return (
     <Modal title="Favorite Items" onClose={onClose}>
+      <p className="text-xs text-muted-foreground mb-3">
+        The shared reorder list — items marked with ♥ in requests and orders. Approvers, purchasers, and admins can add items.
+      </p>
       {loading ? (
         <div className="py-8 text-center text-muted-foreground text-sm">Loading…</div>
       ) : error ? (
@@ -95,7 +98,7 @@ export function FavoritesLink() {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="self-start text-xs text-muted-foreground underline hover:text-foreground"
+        className="self-start justify-self-start text-xs text-muted-foreground underline hover:text-foreground"
       >
         ♡ Favorite items — see the shared list
       </button>

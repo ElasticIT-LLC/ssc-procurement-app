@@ -51,7 +51,7 @@ export function RequestDetail({ requestId, onBack }: RequestDetailProps) {
     if (existing) {
       if (!isAdmin) {
         showToast({
-          message: 'Already in favorites — an admin can remove it in Purchasing → Favorites',
+          message: 'Already in favorites — an admin can remove it in the Favorite Items tab',
           type: 'info',
         })
         return
@@ -187,7 +187,7 @@ export function RequestDetail({ requestId, onBack }: RequestDetailProps) {
                     type="button"
                     onClick={() => handleHeart(item)}
                     disabled={heartBusyId === item.id}
-                    title={isFavorite(item) ? 'Remove from favorites' : 'Add to favorites'}
+                    title={isFavorite(item) ? 'In the shared favorites list' : 'Add to the shared favorites list'}
                     aria-label={isFavorite(item) ? 'Remove from favorites' : 'Add to favorites'}
                     className={`text-base leading-none rounded-md border px-2 py-1 transition-colors disabled:opacity-50 ${
                       isFavorite(item)

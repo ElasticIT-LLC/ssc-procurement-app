@@ -3,6 +3,7 @@ import { useToast } from '@elasticit-llc/app-bridge'
 import { useAppPermissions } from '../lib/useAppPermissions'
 import { useProcurementApi, LineItemWithRequest } from '../data/db'
 import { StatusBadge } from '../requester/StatusBadge'
+import { FavoritesTab } from '../purchasing/FavoritesTab'
 import { PERMS, formatDate } from '../lib/constants'
 import { formatItemRef } from '../lib/itemRef'
 
@@ -18,6 +19,7 @@ export function ApprovalsPage() {
   const [imageUrls, setImageUrls] = useState<Record<string, string>>({})
   const [names, setNames] = useState<Record<string, string>>({})
   const [drafts, setDrafts] = useState<Record<string, string>>({})
+  const [tab, setTab] = useState<'items' | 'favorites'>('items')
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -77,21 +79,38 @@ export function ApprovalsPage() {
         <p className="text-muted-foreground text-sm">Review pending and on-hold items.</p>
       </div>
 
-      {loading && (
+      <div className="flex gap-1 border-b border-border">
+        <button
+          type="button"
+          onClick={() => setTab('items')}
+          className={`px-3 py-2 text-sm font-medium -mb-px border-b-2 ${tab === 'items' ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
+        >
+          Items
+        </button>
+        <button
+          type="button"
+          onClick={() => setTab('favorites')}
+          className={`px-3 py-2 text-sm font-medium -mb-px border-b-2 ${tab === 'favorites' ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
+        >
+          Favorite Items
+        </button>
+      </div>
+
+      {tab === 'items' && loading && (
         <div className="py-8 text-center text-muted-foreground text-sm">Loading…</div>
       )}
 
-      {!loading && error && (
+      {tab === 'items' && !loading && error && (
         <div className="rounded-md bg-destructive/10 border border-destructive/30 p-4 text-sm text-destructive">
           {error}
         </div>
       )}
 
-      {!loading && !error && items.length === 0 && (
+      {tab === 'items' && !loading && !error && items.length === 0 && (
         <p className="text-sm text-muted-foreground">No items pending approval.</p>
       )}
 
-      {!loading && !error && items.map(item => (
+      {tab === 'items' && !loading && !error && items.map(item => (
         <div key={item.id} className="rounded-lg border border-border bg-card p-4 grid gap-3">
           {/* Header: description + status */}
           <div className="flex items-start justify-between gap-2">
@@ -209,7 +228,9 @@ export function ApprovalsPage() {
             </button>
           </div>
         </div>
-      ))}
+        ))}
+
+      {tab === 'favorites' && <FavoritesTab />}
     </div>
   )
 }

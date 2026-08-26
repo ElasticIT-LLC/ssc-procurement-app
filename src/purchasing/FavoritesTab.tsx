@@ -1,13 +1,18 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useToast } from '@elasticit-llc/app-bridge'
 import { useProcurementApi, FavoriteItem } from '../data/db'
-import { formatDate } from '../lib/constants'
+import { useAppPermissions } from '../lib/useAppPermissions'
+import { PERMS, formatDate } from '../lib/constants'
 
-// Admin-curated catalog of standard items, surfaced as auto-suggestions in
-// request forms. Only procurement admins reach this tab (PurchasingPage gates it).
+// Curated shared reorder catalog, surfaced as auto-suggestions in request forms
+// and readable by everyone. Approvers, purchasers, and admins can add items
+// (RLS migration 032); removing stays admin-only. Reached from Purchasing →
+// Favorite Items and Approvals → Favorite Items.
 export function FavoritesTab() {
   const api = useProcurementApi()
   const { showToast } = useToast()
+  const { hasAppPermission } = useAppPermissions()
+  const isAdmin = hasAppPermission(PERMS.admin)
 
   const [favorites, setFavorites] = useState<FavoriteItem[]>([])
   const [loading, setLoading] = useState(true)
@@ -35,7 +40,11 @@ export function FavoritesTab() {
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault()
     const name = newName.trim()
-    if (!name || adding) return
+    if (adding) return
+    if (!name) {
+      showToast({ message: 'Item name is required', type: 'error' })
+      return
+    }
     setAdding(true)
     try {
       await api.addFavorite(name, newUrl.trim() || null)
@@ -93,7 +102,7 @@ export function FavoritesTab() {
         />
         <button
           type="submit"
-          disabled={adding || !newName.trim()}
+          disabled={adding}
           className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
         >
           {adding ? 'Adding…' : 'Add Favorite'}
@@ -126,14 +135,18 @@ export function FavoritesTab() {
                   </td>
                   <td className="px-3 py-2 text-xs text-muted-foreground whitespace-nowrap">{formatDate(fav.created_at)}</td>
                   <td className="px-3 py-2 whitespace-nowrap">
-                    <button
-                      type="button"
-                      disabled={removingId === fav.id}
-                      onClick={() => handleRemove(fav)}
-                      className="inline-flex items-center rounded-md bg-destructive/15 px-2 py-1.5 text-xs font-medium text-destructive hover:bg-destructive/25 disabled:opacity-50"
-                    >
-                      Remove
-                    </button>
+                    {isAdmin ? (
+                      <button
+                        type="button"
+                        disabled={removingId === fav.id}
+                        onClick={() => handleRemove(fav)}
+                        className="inline-flex items-center rounded-md bg-destructive/15 px-2 py-1.5 text-xs font-medium text-destructive hover:bg-destructive/25 disabled:opacity-50"
+                      >
+                        Remove
+                      </button>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">—</span>
+                    )}
                   </td>
                 </tr>
               ))}

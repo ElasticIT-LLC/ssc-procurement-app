@@ -82,7 +82,7 @@ export function RequestsList({ onNew, onSelect }: RequestsListProps) {
     if (existing) {
       if (!isAdmin) {
         showToast({
-          message: 'Already in favorites — an admin can remove it in Purchasing → Favorites',
+          message: 'Already in favorites — an admin can remove it in the Favorite Items tab',
           type: 'info',
         })
         return
@@ -209,7 +209,7 @@ export function RequestsList({ onNew, onSelect }: RequestsListProps) {
                           handleHeartCard(req)
                         }}
                         disabled={heartBusyId === req.id}
-                        title={isHeartFav ? 'Remove from favorites' : `Add "${heartName}" to favorites`}
+                        title={isHeartFav ? 'In the shared favorites list' : `Add "${heartName}" to the shared favorites list`}
                         aria-label={isHeartFav ? 'Remove from favorites' : 'Add to favorites'}
                         className={`text-base leading-none rounded-md border px-2 py-1 transition-colors disabled:opacity-50 ${
                           isHeartFav
