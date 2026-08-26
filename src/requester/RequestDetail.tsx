@@ -5,6 +5,7 @@ import { useAppPermissions } from '../lib/useAppPermissions'
 import { StatusBadge } from './StatusBadge'
 import { ReplacementBadge } from './ReplacementBadge'
 import { ReturnForm } from './ReturnForm'
+import { HeartIcon } from '../components/HeartIcon'
 import { PERMS, formatDate } from '../lib/constants'
 import { formatItemRef } from '../lib/itemRef'
 
@@ -195,7 +196,7 @@ export function RequestDetail({ requestId, onBack }: RequestDetailProps) {
                         : 'text-muted-foreground border-border hover:text-foreground hover:border-foreground/40 hover:bg-muted'
                     }`}
                   >
-                    {isFavorite(item) ? '♥' : '♡'}
+                    <HeartIcon filled={isFavorite(item)} />
                   </button>
                 )}
                 <StatusBadge status={item.status} />

@@ -4,6 +4,7 @@ import { useProcurementApi, PurchaseOrderRow, FavoriteItem, LineItemWithRequest 
 import { useAppPermissions } from '../lib/useAppPermissions'
 import { StatusBadge } from '../requester/StatusBadge'
 import { ReplacementBadge } from '../requester/ReplacementBadge'
+import { HeartIcon } from '../components/HeartIcon'
 import { PERMS, formatDate } from '../lib/constants'
 import { formatItemRef } from '../lib/itemRef'
 
@@ -120,7 +121,7 @@ export function ClosedOrders() {
                           : 'text-muted-foreground border-border hover:text-foreground hover:border-foreground/40 hover:bg-muted'
                       }`}
                     >
-                      {isFavorite(item) ? '♥' : '♡'}
+                      <HeartIcon filled={isFavorite(item)} />
                     </button>
                   )}
                   <ReplacementBadge item={item} />

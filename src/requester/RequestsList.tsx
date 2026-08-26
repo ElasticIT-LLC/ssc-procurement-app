@@ -7,6 +7,7 @@ import { formatRequestNo } from '../lib/itemRef'
 import { countByStatus, filterByStatus } from '../lib/requestFilter'
 import { StatusBadge } from './StatusBadge'
 import { FavoritesLink } from '../components/FavoritesModal'
+import { HeartIcon } from '../components/HeartIcon'
 import { useFormattingRules } from '../formatting/useFormattingRules'
 
 interface RequestsListProps {
@@ -217,7 +218,7 @@ export function RequestsList({ onNew, onSelect }: RequestsListProps) {
                             : 'text-muted-foreground border-border hover:text-foreground hover:border-foreground/40 hover:bg-muted'
                         }`}
                       >
-                        {isHeartFav ? '♥' : '♡'}
+                        <HeartIcon filled={isHeartFav} />
                       </button>
                     )}
                     <StatusBadge status={req.status} />

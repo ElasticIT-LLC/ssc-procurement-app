@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useProcurementApi, FavoriteItem } from '../data/db'
 import { formatDate } from '../lib/constants'
 import { Modal } from './Modal'
+import { HeartIcon } from './HeartIcon'
 
 interface FavoritesModalProps {
   open: boolean
@@ -45,7 +46,7 @@ export function FavoritesModal({ open, onClose }: FavoritesModalProps) {
   return (
     <Modal title="Favorite Items" onClose={onClose}>
       <p className="text-xs text-muted-foreground mb-3">
-        The shared reorder list — items marked with ♥ in requests and orders. Approvers, purchasers, and admins can add items.
+        The shared reorder list — items marked with <HeartIcon filled /> in requests and orders. Approvers, purchasers, and admins can add items.
       </p>
       {loading ? (
         <div className="py-8 text-center text-muted-foreground text-sm">Loading…</div>
@@ -100,7 +101,7 @@ export function FavoritesLink() {
         onClick={() => setOpen(true)}
         className="self-start justify-self-start text-xs text-muted-foreground underline hover:text-foreground"
       >
-        ♡ Favorite items — see the shared list
+        <HeartIcon /> Favorite items — see the shared list
       </button>
       <FavoritesModal open={open} onClose={() => setOpen(false)} />
     </>
