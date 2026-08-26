@@ -4,6 +4,7 @@ import { useToast } from '@elasticit-llc/app-bridge'
 import { useProcurementApi, Location, Department } from '../data/db'
 import { NewRequestForm } from '../requester/NewRequestForm'
 import { DateInput } from '../components/DateInput'
+import { FavoritesLink } from '../components/FavoritesModal'
 
 interface AnonLineItemDraft {
   ship_to_name: string
@@ -415,6 +416,7 @@ function AuthenticatedRequestForm({ api, userEmail, userName }: AuthenticatedReq
     <div className="max-w-3xl mx-auto py-6 px-4">
       <h1 className="text-2xl font-bold text-foreground">Purchase Request</h1>
       <p className="text-sm text-muted-foreground mt-1">Submit a new purchase request.</p>
+      <FavoritesLink />
       <div className="mt-6">
         <NewRequestForm
           onSuccess={() => setSuccess(true)}

@@ -18,6 +18,8 @@ export function RequestDetail({ requestId, onBack }: RequestDetailProps) {
   const { showToast } = useToast()
   const { hasAppPermission } = useAppPermissions()
   const isAdmin = hasAppPermission(PERMS.admin)
+  // Only approvers, purchasers, and admins can curate the shared favorites list.
+  const canCurate = isAdmin || hasAppPermission(PERMS.approve) || hasAppPermission(PERMS.purchase)
 
   const [request, setRequest] = useState<RequestRow | null>(null)
   const [lineItems, setLineItems] = useState<LineItemRow[]>([])
@@ -73,7 +75,7 @@ export function RequestDetail({ requestId, onBack }: RequestDetailProps) {
     try {
       await api.addFavorite(name, item.item_url ?? undefined)
       setFavorites(await api.listFavorites())
-      showToast({ message: 'Added to favorites — visible in Purchasing → Favorites', type: 'success' })
+        showToast({ message: 'Added to favorites — now visible to everyone', type: 'success' })
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : ''
       if (/unique|23505/i.test(msg)) {
@@ -180,7 +182,7 @@ export function RequestDetail({ requestId, onBack }: RequestDetailProps) {
                 <p className="text-xs text-muted-foreground">Substitution: {item.substitution_ok ? 'Yes' : 'No'}</p>
               </div>
               <div className="flex items-center gap-2 shrink-0">
-                {item.item_description?.trim() && (
+                {item.item_description?.trim() && canCurate && (
                   <button
                     type="button"
                     onClick={() => handleHeart(item)}

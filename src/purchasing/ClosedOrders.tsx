@@ -73,7 +73,7 @@ export function ClosedOrders() {
     try {
       await api.addFavorite(name, item.item_url ?? undefined)
       setFavorites(await api.listFavorites())
-      showToast({ message: 'Added to favorites — visible in Purchasing → Favorites', type: 'success' })
+        showToast({ message: 'Added to favorites — now visible to everyone', type: 'success' })
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : ''
       if (/unique|23505/i.test(msg)) {

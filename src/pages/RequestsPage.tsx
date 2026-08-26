@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { RequestsList } from '../requester/RequestsList'
 import { NewRequestForm } from '../requester/NewRequestForm'
 import { RequestDetail } from '../requester/RequestDetail'
+import { FavoritesLink } from '../components/FavoritesModal'
 
 type View = { type: 'list' } | { type: 'new' } | { type: 'detail'; id: string }
 
@@ -33,6 +34,7 @@ export function RequestsPage() {
               ← Back
             </button>
             <h2 className="text-lg font-semibold text-foreground">New Request</h2>
+            <FavoritesLink />
           </div>
           <NewRequestForm
             onCancel={() => setView({ type: 'list' })}

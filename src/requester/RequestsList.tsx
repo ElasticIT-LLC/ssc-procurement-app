@@ -6,6 +6,7 @@ import { PERMS, formatDate, REQUEST_STATUS, FULL_ACCESS } from '../lib/constants
 import { formatRequestNo } from '../lib/itemRef'
 import { countByStatus, filterByStatus } from '../lib/requestFilter'
 import { StatusBadge } from './StatusBadge'
+import { FavoritesLink } from '../components/FavoritesModal'
 import { useFormattingRules } from '../formatting/useFormattingRules'
 
 interface RequestsListProps {
@@ -23,6 +24,8 @@ export function RequestsList({ onNew, onSelect }: RequestsListProps) {
   const canCreate = hasAppPermission(PERMS.create)
   const canSeeAll = hasAppPermission(FULL_ACCESS)
   const isAdmin = hasAppPermission(PERMS.admin)
+  // Only approvers, purchasers, and admins can curate the shared favorites list.
+  const canCurate = isAdmin || hasAppPermission(PERMS.approve) || hasAppPermission(PERMS.purchase)
 
   const [requests, setRequests] = useState<RequestRow[]>([])
   const [loading, setLoading] = useState(true)
@@ -103,7 +106,7 @@ export function RequestsList({ onNew, onSelect }: RequestsListProps) {
     try {
       await api.addFavorite(name, item.item_url ?? undefined)
       setFavorites(await api.listFavorites())
-      showToast({ message: 'Added to favorites — visible in Purchasing → Favorites', type: 'success' })
+        showToast({ message: 'Added to favorites — now visible to everyone', type: 'success' })
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : ''
       if (/unique|23505/i.test(msg)) {
@@ -143,6 +146,8 @@ export function RequestsList({ onNew, onSelect }: RequestsListProps) {
           </button>
         )}
       </div>
+
+      <FavoritesLink />
 
       <div className="flex overflow-x-auto gap-1 border-b border-border">
         {TABS.map((t) => (
@@ -196,7 +201,7 @@ export function RequestsList({ onNew, onSelect }: RequestsListProps) {
                     })()}
                   </span>
                   <div className="flex items-center gap-2 shrink-0">
-                    {heartName && (
+                    {heartName && canCurate && (
                       <button
                         type="button"
                         onClick={(e) => {
