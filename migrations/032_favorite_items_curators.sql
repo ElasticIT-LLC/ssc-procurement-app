@@ -4,8 +4,11 @@
 --    authenticated users (029); UPDATE/DELETE stay admin-only (030).
 -- 2) BEFORE INSERT trigger stamps created_by with the inserting user so the
 --    "Added by" column is populated going forward (legacy rows stay NULL).
+-- Idempotent: publish-app re-applies from the last saved version, so every
+-- object is dropped/recreated safely.
 
 DROP POLICY IF EXISTS favorite_items_heart_insert ON app_procurement.favorite_items;
+DROP POLICY IF EXISTS favorite_items_curator_insert ON app_procurement.favorite_items;
 CREATE POLICY favorite_items_curator_insert ON app_procurement.favorite_items
   FOR INSERT TO authenticated
   WITH CHECK (
