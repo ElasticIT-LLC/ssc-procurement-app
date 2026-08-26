@@ -41,7 +41,7 @@ export function ClosedOrders() {
         (item.item_description ?? '').trim().toLowerCase(),
     )
 
-  const isFavorite = (item: { item_description: string | null }) => favoriteOf(item) !== null
+  const isFavorite = (item: { item_description: string | null }) => favoriteOf(item) !== undefined
 
   async function handleHeart(item: LineItemWithRequest) {
     const name = item.item_description?.trim()

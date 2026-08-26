@@ -43,7 +43,7 @@ export function RequestDetail({ requestId, onBack }: RequestDetailProps) {
         (item.item_description ?? '').trim().toLowerCase(),
     )
 
-  const isFavorite = (item: LineItemRow) => favoriteOf(item) !== null
+  const isFavorite = (item: LineItemRow) => favoriteOf(item) !== undefined
 
   async function handleHeart(item: LineItemRow) {
     const name = item.item_description?.trim()
