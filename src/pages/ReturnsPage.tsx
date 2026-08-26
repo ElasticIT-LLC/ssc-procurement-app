@@ -4,7 +4,6 @@ import { useAppPermissions } from '../lib/useAppPermissions'
 import { useProcurementApi, LineItemWithRequest } from '../data/db'
 import { StatusBadge } from '../requester/StatusBadge'
 import { PERMS, formatDate } from '../lib/constants'
-import { useFormattingRules } from '../formatting/useFormattingRules'
 import { formatItemRef } from '../lib/itemRef'
 
 function humanizeReason(reason: string): string {
@@ -22,12 +21,11 @@ function ReturnCard({
   busy: boolean
   onProcess?: (item: LineItemWithRequest) => void
 }) {
-  const { toneClassFor } = useFormattingRules()
   const processed = item.return_processed_at != null
   const wantsReplacement = item.wants_replacement ?? false
 
   return (
-    <div className={`rounded-lg border border-border bg-card p-4 grid gap-3 ${toneClassFor(item as unknown as Record<string, unknown>)}`}>
+    <div className="rounded-lg border border-border bg-card p-4 grid gap-3">
       {/* Header */}
       <div className="flex items-start justify-between gap-2">
         <div>

@@ -4,14 +4,12 @@ import { useAppPermissions } from '../lib/useAppPermissions'
 import { useProcurementApi, LineItemWithRequest } from '../data/db'
 import { StatusBadge } from '../requester/StatusBadge'
 import { PERMS, formatDate } from '../lib/constants'
-import { useFormattingRules } from '../formatting/useFormattingRules'
 import { formatItemRef } from '../lib/itemRef'
 
 export function ApprovalsPage() {
   const api = useProcurementApi()
   const { showToast } = useToast()
   const { hasAppPermission } = useAppPermissions()
-  const { toneClassFor } = useFormattingRules()
 
   const [items, setItems] = useState<LineItemWithRequest[]>([])
   const [loading, setLoading] = useState(true)
@@ -94,7 +92,7 @@ export function ApprovalsPage() {
       )}
 
       {!loading && !error && items.map(item => (
-        <div key={item.id} className={`rounded-lg border border-border bg-card p-4 grid gap-3 ${toneClassFor(item as unknown as Record<string, unknown>)}`}>
+        <div key={item.id} className="rounded-lg border border-border bg-card p-4 grid gap-3">
           {/* Header: description + status */}
           <div className="flex items-start justify-between gap-2">
             <div>

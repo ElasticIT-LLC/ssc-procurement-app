@@ -5,7 +5,6 @@ import { DateInput, todayIso } from '../components/DateInput'
 import { StatusBadge } from '../requester/StatusBadge'
 import { ReplacementBadge } from '../requester/ReplacementBadge'
 import { formatDate } from '../lib/constants'
-import { useFormattingRules } from '../formatting/useFormattingRules'
 import { formatItemRef } from '../lib/itemRef'
 import { CreatePurchaseOrderForm } from './CreatePurchaseOrderForm'
 
@@ -24,7 +23,6 @@ function emptyForm(): OrderForm {
 export function ReadyForPurchasing() {
   const api = useProcurementApi()
   const { showToast } = useToast()
-  const { toneClassFor } = useFormattingRules()
 
   const [items, setItems] = useState<LineItemWithRequest[]>([])
   const [locations, setLocations] = useState<Location[]>([])
@@ -138,7 +136,7 @@ export function ReadyForPurchasing() {
         const busy = submittingId === item.id
 
         return (
-          <div key={item.id} className={`rounded-lg border border-border bg-card p-4 grid gap-3 ${toneClassFor(item as unknown as Record<string, unknown>)}`}>
+          <div key={item.id} className="rounded-lg border border-border bg-card p-4 grid gap-3">
             {/* Header */}
             <div className="flex items-start justify-between gap-2">
               <div>
