@@ -189,8 +189,8 @@ export function RequestDetail({ requestId, onBack }: RequestDetailProps) {
                     aria-label={isFavorite(item) ? 'Remove from favorites' : 'Add to favorites'}
                     className={`text-base leading-none rounded-md border px-2 py-1 transition-colors disabled:opacity-50 ${
                       isFavorite(item)
-                        ? 'text-rose-500 border-rose-300 bg-rose-500/10'
-                        : 'text-muted-foreground border-border hover:text-rose-500 hover:border-rose-300 hover:bg-rose-500/5'
+                        ? 'text-destructive border-destructive/40 bg-destructive/10'
+                        : 'text-muted-foreground border-border hover:text-destructive hover:border-destructive/40 hover:bg-destructive/5'
                     }`}
                   >
                     {isFavorite(item) ? '♥' : '♡'}
