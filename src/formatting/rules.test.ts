@@ -34,4 +34,27 @@ describe('evalRowFormat', () => {
     const f = evalRowFormat({ status: 'received' }, [base])
     expect(f).toEqual({ tone: 'neutral', bold: false, italic: false, underline: false })
   })
+
+  it('keeps first match for tone but accumulates font flags across all matches', () => {
+    // Row matches overdue (red, no fonts) AND approved (green, bold+italic):
+    // tone must come from the first match (overdue/red), fonts from both.
+    const f = evalRowFormat(
+      { status: 'approved', date_needed: '2020-01-01' },
+      DEFAULT_RULES.map((r) =>
+        r.id === 'approved' ? { ...r, bold: true, italic: true } : r,
+      ),
+    )
+    expect(f).toEqual({ tone: 'red', bold: true, italic: true, underline: false })
+  })
+
+  it('font flags from a non-matching rule do not leak', () => {
+    const f = evalRowFormat(
+      { status: 'approved' },
+      [
+        { id: 'a', field: 'status', operator: 'equals', value: 'approved', tone: 'green', enabled: true },
+        { id: 'b', field: 'status', operator: 'equals', value: 'ordered', tone: 'blue', bold: true, enabled: true },
+      ],
+    )
+    expect(f).toEqual({ tone: 'green', bold: false, italic: false, underline: false })
+  })
 })

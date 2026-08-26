@@ -1,10 +1,11 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useToast } from '@elasticit-llc/app-bridge'
-import { useProcurementApi, RequestRow, LineItemRow } from '../data/db'
+import { useProcurementApi, RequestRow, LineItemRow, FavoriteItem } from '../data/db'
+import { useAppPermissions } from '../lib/useAppPermissions'
 import { StatusBadge } from './StatusBadge'
 import { ReplacementBadge } from './ReplacementBadge'
 import { ReturnForm } from './ReturnForm'
-import { formatDate } from '../lib/constants'
+import { PERMS, formatDate } from '../lib/constants'
 import { formatItemRef } from '../lib/itemRef'
 
 interface RequestDetailProps {
@@ -15,6 +16,8 @@ interface RequestDetailProps {
 export function RequestDetail({ requestId, onBack }: RequestDetailProps) {
   const api = useProcurementApi()
   const { showToast } = useToast()
+  const { hasAppPermission } = useAppPermissions()
+  const isAdmin = hasAppPermission(PERMS.admin)
 
   const [request, setRequest] = useState<RequestRow | null>(null)
   const [lineItems, setLineItems] = useState<LineItemRow[]>([])
@@ -22,6 +25,70 @@ export function RequestDetail({ requestId, onBack }: RequestDetailProps) {
   const [error, setError] = useState<string | null>(null)
   const [returnOpenId, setReturnOpenId] = useState<string | null>(null)
   const [receivingId, setReceivingId] = useState<string | null>(null)
+  const [favorites, setFavorites] = useState<FavoriteItem[]>([])
+  const [heartBusyId, setHeartBusyId] = useState<string | null>(null)
+
+  useEffect(() => {
+    // Best-effort: a failed favorites fetch never blocks the request view.
+    api.listFavorites().then(setFavorites).catch(() => {})
+  }, [requestId])
+
+  const favoriteOf = (item: LineItemRow) =>
+    favorites.find(
+      (f) =>
+        f.name.trim().toLowerCase() ===
+        (item.item_description ?? '').trim().toLowerCase(),
+    )
+
+  const isFavorite = (item: LineItemRow) => favoriteOf(item) !== null
+
+  async function handleHeart(item: LineItemRow) {
+    const name = item.item_description?.trim()
+    if (!name) return
+    const existing = favoriteOf(item)
+    if (existing) {
+      if (!isAdmin) {
+        showToast({
+          message: 'Already in favorites — an admin can remove it in Purchasing → Favorites',
+          type: 'info',
+        })
+        return
+      }
+      setHeartBusyId(item.id)
+      try {
+        await api.removeFavorite(existing.id)
+        setFavorites(await api.listFavorites())
+        showToast({ message: 'Removed from favorites', type: 'success' })
+      } catch (err: unknown) {
+        showToast({
+          message: err instanceof Error ? err.message : 'Failed to remove from favorites',
+          type: 'error',
+        })
+      } finally {
+        setHeartBusyId(null)
+      }
+      return
+    }
+    setHeartBusyId(item.id)
+    try {
+      await api.addFavorite(name, item.item_url ?? undefined)
+      setFavorites(await api.listFavorites())
+      showToast({ message: 'Added to favorites — visible in Purchasing → Favorites', type: 'success' })
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : ''
+      if (/unique|23505/i.test(msg)) {
+        setFavorites(await api.listFavorites().catch(() => favorites))
+        showToast({ message: 'Already in favorites', type: 'info' })
+      } else {
+        showToast({
+          message: msg || 'Failed to add to favorites',
+          type: 'error',
+        })
+      }
+    } finally {
+      setHeartBusyId(null)
+    }
+  }
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -112,7 +179,25 @@ export function RequestDetail({ requestId, onBack }: RequestDetailProps) {
                 <p className="text-xs text-muted-foreground">Qty: {item.quantity}</p>
                 <p className="text-xs text-muted-foreground">Substitution: {item.substitution_ok ? 'Yes' : 'No'}</p>
               </div>
-              <StatusBadge status={item.status} />
+              <div className="flex items-center gap-2 shrink-0">
+                {item.item_description?.trim() && (
+                  <button
+                    type="button"
+                    onClick={() => handleHeart(item)}
+                    disabled={heartBusyId === item.id}
+                    title={isFavorite(item) ? 'Remove from favorites' : 'Add to favorites'}
+                    aria-label={isFavorite(item) ? 'Remove from favorites' : 'Add to favorites'}
+                    className={`text-base leading-none rounded-md border px-2 py-1 transition-colors disabled:opacity-50 ${
+                      isFavorite(item)
+                        ? 'text-rose-500 border-rose-300 bg-rose-500/10'
+                        : 'text-muted-foreground border-border hover:text-rose-500 hover:border-rose-300 hover:bg-rose-500/5'
+                    }`}
+                  >
+                    {isFavorite(item) ? '♥' : '♡'}
+                  </button>
+                )}
+                <StatusBadge status={item.status} />
+              </div>
             </div>
 
             {item.item_url && (

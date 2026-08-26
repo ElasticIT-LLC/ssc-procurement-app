@@ -3,7 +3,7 @@
   "slug": "procurement",
   "name": "Procurement",
   "icon": "Package",
-  "version": "0.18.0",
+  "version": "0.19.0",
   "permissions": [
     { "key": "apps/procurement/*", "label": "Full Access", "description": "Full access to Procurement", "group": "Administration" },
     { "key": "apps/procurement/requests/create", "label": "Create requests", "description": "Create and submit purchase requests; mark items received; initiate returns", "group": "Requests" },
@@ -61,7 +61,8 @@
       { "version": 27, "description": "NULLIF empty JWT email claim (SSO issues \"email\":\"\"), COALESCE missed the profile fallback", "up": "migrations/027_nullif_jwt_email_rls.sql" },
       { "version": 28, "description": "Records archive: line_items.archived_at + archive_line_item RPC (soft delete replaces UI delete)", "up": "migrations/028_archive_line_item.sql" },
       { "version": 29, "description": "Favorite items catalog (admin-curated, form auto-suggestions) + RLS", "up": "migrations/029_favorite_items.sql" },
-      { "version": 30, "description": "Converge favorite_items RLS: drop loose per-action policies, canonical read-all / admin-write only", "up": "migrations/030_favorite_items_rls_convergence.sql" }
+      { "version": 30, "description": "Converge favorite_items RLS: drop loose per-action policies, canonical read-all / admin-write only", "up": "migrations/030_favorite_items_rls_convergence.sql" },
+      { "version": 31, "description": "Heart button: any signed-in user can INSERT favorites from the Requests page (update/delete stay admin)", "up": "migrations/031_favorite_items_heart_insert.sql" }
     ],
     "tables": [
       { "name": "locations",         "rls": { "read": "authenticated", "write": "admin" } },
@@ -74,7 +75,7 @@
     ]
   },
   "notifications": [
-    { "key": "request_submitted", "label": "New request to approve", "description": "A new purchase request was submitted and needs approval.", "sort_order": 1 },
+    { "key": "request_submitted", "label": "New request to approve", "description": "A new purchase request was submitted and needs approval.", "sort_order": 1, "requires_permission": "apps/procurement/approvals/act" },
     { "key": "item_approved", "label": "Item approved", "description": "A requested item was approved.", "sort_order": 2 },
     { "key": "item_declined", "label": "Item declined", "description": "A requested item was declined.", "sort_order": 3 },
     { "key": "item_ordered", "label": "Item ordered", "description": "An approved item was ordered.", "sort_order": 4 },

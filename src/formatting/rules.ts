@@ -68,15 +68,30 @@ function matchRule(row: Record<string, unknown>, r: FormatRule, now: Date): bool
     default: return false
   }
 }
-// Presentation of the first enabled matching rule: background tone plus any
-// font flags. Total: never throws. Legacy rules without font flags render none.
+// Presentation of the enabled matching rules. Background tone comes from the
+// FIRST match (so the overdue rule keeps its priority over status tints), but
+// font flags ACCUMULATE across every match — otherwise a row matching both
+// "overdue" (no font) and "approved" (bold/italic) would lose the font flags.
+// Total: never throws. Legacy rules without font flags render none.
 export interface RowFormat { tone: Tone; bold: boolean; italic: boolean; underline: boolean }
 export function evalRowFormat(row: Record<string, unknown>, rules: FormatRule[], now: Date = new Date()): RowFormat {
+  let matched = false
+  let tone: Tone = 'neutral'
+  let bold = false
+  let italic = false
+  let underline = false
   for (const r of rules) {
     if (!r.enabled) continue
     try {
-      if (matchRule(row, r, now)) return { tone: r.tone, bold: !!r.bold, italic: !!r.italic, underline: !!r.underline }
+      if (!matchRule(row, r, now)) continue
+      if (!matched) {
+        tone = r.tone
+        matched = true
+      }
+      bold = bold || !!r.bold
+      italic = italic || !!r.italic
+      underline = underline || !!r.underline
     } catch { /* skip bad rule */ }
   }
-  return { tone: 'neutral', bold: false, italic: false, underline: false }
+  return { tone, bold, italic, underline }
 }
