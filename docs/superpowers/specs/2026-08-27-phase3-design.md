@@ -58,7 +58,7 @@ Label change only: "Items" → **"For Approval"**. (Tab key `items` stays — no
 Drop the `{key:'favorites', label:'Favorite Items'}` entry from `PurchasingPage`'s TABS array and delete `src/purchasing/FavoritesTab.tsx` (verify no other references first). Keep: `favorite_items` table + RLS, the heart on Closed Orders rows, the Approvals "Favorite Items" tab, `FavoritesModal`/`FavoritesLink` (used by Requests "New" title and public form).
 
 ### A4. Records search (item 2)
-Single keyword input above the records table, placeholder e.g. "Search items, requesters, request #, PO #, status, location…". Client-side filter over the already-loaded rows (`listAllLineItemsDetailed`) — no schema or query change. Case-insensitive substring match across: `item_description`, `requester_name`, `requester_email`, `request_number`, `po_number`, `status`, location name, department name. Empty query = unfiltered. Composes with the existing "Show archived" checkbox. Show result count ("N of M items"). Pure helper `filterRecords(rows, keyword)` in `src/lib/` + vitest.
+Single keyword input above the records table, placeholder e.g. "Search items, requesters, request #, PO #, status, location…". Client-side filter over the already-loaded rows (`listAllLineItemsDetailed`) — no schema change; the query gains a `purchase_orders!po_id(po_number)` join so PO # is searchable. Case-insensitive substring match across: `item_description`, `requester_name`, `requester_email`, `request_number`, `po_number`, `status`, location name, department name. Empty query = unfiltered. Composes with the existing "Show archived" checkbox. Show result count ("N of M items"). Pure helper `filterRecords(rows, keyword)` in `src/lib/` + vitest.
 
 ---
 
