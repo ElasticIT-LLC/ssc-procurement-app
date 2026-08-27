@@ -302,7 +302,31 @@ In `src/records/RecordsPage.tsx`:
 
 - [ ] **Step 2: Add the search input to the header**
 
-In the header controls div (currently lines 140–158), insert the search input before the "Show archived" label:
+In `src/records/RecordsPage.tsx`, replace the header controls block (lines 140–158):
+
+```tsx
+        <div className="flex items-center gap-4">
+          <label className="inline-flex items-center gap-2 text-sm text-muted-foreground select-none">
+            <input
+              type="checkbox"
+              checked={showArchived}
+              onChange={e => setShowArchived(e.target.checked)}
+              className="h-4 w-4 rounded border-border accent-primary"
+            />
+            Show archived
+          </label>
+          <button
+            type="button"
+            onClick={() => exportCsv(items)}
+            disabled={items.length === 0}
+            className="inline-flex items-center rounded-md border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted disabled:opacity-50"
+          >
+            Export CSV
+          </button>
+        </div>
+```
+
+with:
 
 ```tsx
         <div className="flex items-center gap-4">
@@ -314,12 +338,30 @@ In the header controls div (currently lines 140–158), insert the search input 
             className="w-72 rounded-md border border-border bg-input px-2.5 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
           />
           <label className="inline-flex items-center gap-2 text-sm text-muted-foreground select-none">
-            ...
+            <input
+              type="checkbox"
+              checked={showArchived}
+              onChange={e => setShowArchived(e.target.checked)}
+              className="h-4 w-4 rounded border-border accent-primary"
+            />
+            Show archived
+          </label>
+          <button
+            type="button"
+            onClick={() => exportCsv(items)}
+            disabled={items.length === 0}
+            className="inline-flex items-center rounded-md border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted disabled:opacity-50"
+          >
+            Export CSV
+          </button>
+        </div>
 ```
+
+(Only change: the new `<input type="search">` as first child; the "Show archived" label and Export CSV button are byte-identical — Export is fixed in Step 4.)
 
 - [ ] **Step 3: Render filtered rows + result count**
 
-- Change the table render guard from `items.length > 0` to keep it (table renders when loaded data exists).
+- Keep the table wrapper guard `!loading && !error && items.length > 0` unchanged.
 - Inside `<tbody>`, change `{items.map(item => (` to `{visible.map(item => (`.
 - Change the empty state (line 171) to distinguish "no data" from "no matches":
   ```tsx
