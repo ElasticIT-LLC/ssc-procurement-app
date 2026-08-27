@@ -39,6 +39,7 @@ export interface LineItemDetailed extends LineItemRow {
   request: { id: string; request_number: number | null; requester_name: string | null; requester_email: string | null; notes: string | null; submitted_at: string; status: RequestStatus }
   location: { name: string } | null
   department: { name: string } | null
+  po: { po_number: string } | null
 }
 export interface Location { id: string; name: string; is_active: boolean }
 export interface Department { id: string; name: string; is_active: boolean }
@@ -143,17 +144,18 @@ export function useProcurementApi() {
 
   async function listAllLineItemsDetailed(includeArchived = false): Promise<LineItemDetailed[]> {
     let query = db().from(TABLES.lineItems)
-      .select('*, purchase_requests!request_id(id, request_number, requester_name, requester_email, notes, submitted_at, status), locations!location_id(name), departments!department_id(name)')
+      .select('*, purchase_requests!request_id(id, request_number, requester_name, requester_email, notes, submitted_at, status), purchase_orders!po_id(po_number), locations!location_id(name), departments!department_id(name)')
       .order('created_at', { ascending: false })
     if (!includeArchived) query = query.is('archived_at', null)
     const rows = ok(await query) ?? []
     return (rows as unknown as (LineItemRow & {
       purchase_requests: { id: string; request_number: number | null; requester_name: string | null; requester_email: string | null; notes: string | null; submitted_at: string; status: RequestStatus }
+      purchase_orders: { po_number: string } | null
       locations: { name: string } | null
       departments: { name: string } | null
     })[]).map(row => {
-      const { purchase_requests, locations, departments, ...item } = row
-      return { ...item, request: purchase_requests, location: locations, department: departments } as LineItemDetailed
+      const { purchase_requests, purchase_orders, locations, departments, ...item } = row
+      return { ...item, request: purchase_requests, po: purchase_orders, location: locations, department: departments } as LineItemDetailed
     })
   }
   // Count-only query (head:true returns no rows, just the exact count). RLS scopes it to

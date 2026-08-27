@@ -26,6 +26,7 @@ const item = (over: Partial<LineItemDetailed>): LineItemDetailed => ({
   substitution_ok: true,
   request: { id: 'r1', request_number: 1, requester_name: 'Jane', requester_email: 'jane@x.com', notes: null, submitted_at: '2026-08-01T10:00:00.000Z', status: 'pending' },
   location: null, department: null,
+  po: null,
   ...over,
 })
 
