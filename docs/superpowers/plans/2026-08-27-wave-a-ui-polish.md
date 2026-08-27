@@ -192,8 +192,8 @@ describe('recordSearchText', () => {
 describe('filterRecords', () => {
   const rows = [
     makeRow({ id: 'li-1', item_description: 'Widget' }),
-    makeRow({ id: 'li-2', item_description: 'Widget Pro', request: { ...makeRow().request, request_number: 55 } }),
-    makeRow({ id: 'li-3', item_description: 'Gadget', po: { po_number: 'PO-2026-0009' } }),
+    makeRow({ id: 'li-2', item_description: 'Widget Pro', item_url: 'https://example.com/widget-pro', request: { ...makeRow().request, request_number: 55, requester_email: 'jane2@example.com' } }),
+    makeRow({ id: 'li-3', item_description: 'Gadget', item_url: 'https://example.com/gadget', po: { po_number: 'PO-2026-0009' }, request: { ...makeRow().request, requester_email: 'jane3@example.com' } }),
   ]
 
   it('returns all rows for empty or whitespace keyword', () => {
