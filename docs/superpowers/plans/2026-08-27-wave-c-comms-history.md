@@ -980,15 +980,15 @@ git commit -m "feat(db): daily 08:00 keyless pg_cron overdue-reminder job + _con
 
 ---
 
-### Task 8: Pure libs + components — `timeline.ts`, `mentions.ts`, `RequestActivity`, `RequestThread` (+ vitest)
+### Task 8: Pure libs — `timeline.ts`, `mentions.ts` (+ vitest)
 
 **Files:**
 - `src/lib/timeline.ts` (CREATE)
 - `src/lib/mentions.ts` (CREATE)
 - `src/lib/timeline.test.ts` (CREATE)
 - `src/lib/mentions.test.ts` (CREATE)
-- `src/components/RequestActivity.tsx` (CREATE)
-- `src/components/RequestThread.tsx` (CREATE)
+
+(The `RequestActivity.tsx` / `RequestThread.tsx` components are created in Task 8b.)
 
 **Interfaces (produced):**
 - `buildTimeline(input: { request: Pick<RequestRow,'request_number'|'submitted_at'|'status'>; items: LineItemRow[]; comments: RequestCommentRow[]; itemName: (li: LineItemRow) => string; nameOf: (id: string) => string }): TimelineEvent[]`
