@@ -109,6 +109,7 @@ export function ReturnsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
+  const [tab, setTab] = useState<'pending' | 'processed'>('pending')
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -168,38 +169,55 @@ export function ReturnsPage() {
 
       {!loading && !error && (
         <>
-          {/* Pending returns */}
-          <div className="grid gap-4">
-            <h2 className="text-sm font-semibold text-foreground">Pending Returns ({pending.length})</h2>
-            {pending.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No items awaiting return processing.</p>
-            ) : (
-              <div className="grid gap-3">
-                {pending.map((item) => (
-                  <ReturnCard
-                    key={item.id}
-                    item={item}
-                    busy={busyId === item.id}
-                    onProcess={handleProcess}
-                  />
-                ))}
-              </div>
-            )}
+          <div className="flex gap-1 border-b border-border">
+            <button
+              type="button"
+              onClick={() => setTab('pending')}
+              className={`px-3 py-2 text-sm font-medium -mb-px border-b-2 ${tab === 'pending' ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
+            >
+              Pending Returns ({pending.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setTab('processed')}
+              className={`px-3 py-2 text-sm font-medium -mb-px border-b-2 ${tab === 'processed' ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
+            >
+              Processed Returns ({processed.length})
+            </button>
           </div>
 
-          {/* Processed returns */}
-          <div className="grid gap-4">
-            <h2 className="text-sm font-semibold text-foreground">Processed Returns ({processed.length})</h2>
-            {processed.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No processed returns yet.</p>
-            ) : (
-              <div className="grid gap-3">
-                {processed.map((item) => (
-                  <ReturnCard key={item.id} item={item} busy={false} />
-                ))}
-              </div>
-            )}
-          </div>
+          {tab === 'pending' && (
+            <div className="grid gap-4">
+              {pending.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No items awaiting return processing.</p>
+              ) : (
+                <div className="grid gap-3">
+                  {pending.map((item) => (
+                    <ReturnCard
+                      key={item.id}
+                      item={item}
+                      busy={busyId === item.id}
+                      onProcess={handleProcess}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {tab === 'processed' && (
+            <div className="grid gap-4">
+              {processed.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No processed returns yet.</p>
+              ) : (
+                <div className="grid gap-3">
+                  {processed.map((item) => (
+                    <ReturnCard key={item.id} item={item} busy={false} />
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </>
       )}
     </div>
