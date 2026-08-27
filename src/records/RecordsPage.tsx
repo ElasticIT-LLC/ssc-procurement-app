@@ -1,4 +1,4 @@
-import { Fragment, useState, useEffect, useCallback } from 'react'
+import { Fragment, useState, useEffect, useCallback, useMemo } from 'react'
 import { useToast } from '@elasticit-llc/app-bridge'
 import { useAppPermissions } from '../lib/useAppPermissions'
 import { useProcurementApi, LineItemDetailed, LineItemWithRequest } from '../data/db'
@@ -7,6 +7,7 @@ import { ReplacementBadge } from '../requester/ReplacementBadge'
 import { ReturnForm } from '../requester/ReturnForm'
 import { FULL_ACCESS, PERMS, formatDate } from '../lib/constants'
 import { useFormattingRules } from '../formatting/useFormattingRules'
+import { filterRecords } from '../lib/recordsFilter'
 
 function locationName(item: LineItemDetailed): string {
   return item.location?.name ?? item.custom_location ?? '—'
@@ -68,6 +69,8 @@ export function RecordsPage() {
   const [busyId, setBusyId] = useState<string | null>(null)
   const [returnOpenId, setReturnOpenId] = useState<string | null>(null)
   const [showArchived, setShowArchived] = useState(false)
+  const [query, setQuery] = useState('')
+  const visible = useMemo(() => filterRecords(items, query), [items, query])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -138,6 +141,13 @@ export function RecordsPage() {
           <p className="text-muted-foreground text-sm">Every requested item, one row each.</p>
         </div>
         <div className="flex items-center gap-4">
+          <input
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search item, requester, request #, PO #, status, location…"
+            className="w-72 rounded-md border border-border bg-input px-2.5 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+          />
           <label className="inline-flex items-center gap-2 text-sm text-muted-foreground select-none">
             <input
               type="checkbox"
@@ -149,7 +159,7 @@ export function RecordsPage() {
           </label>
           <button
             type="button"
-            onClick={() => exportCsv(items)}
+            onClick={() => exportCsv(visible)}
             disabled={items.length === 0}
             className="inline-flex items-center rounded-md border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted disabled:opacity-50"
           >
@@ -172,8 +182,15 @@ export function RecordsPage() {
         <p className="text-sm text-muted-foreground">No records yet.</p>
       )}
 
+      {!loading && !error && items.length > 0 && visible.length === 0 && (
+        <p className="text-sm text-muted-foreground">No items match your search.</p>
+      )}
+
       {!loading && !error && items.length > 0 && (
         <div className="overflow-x-auto rounded-lg border border-border">
+          <p className="text-xs text-muted-foreground">
+            {visible.length} of {items.length} items
+          </p>
           <table className="w-full border-collapse text-sm">
             <thead className="bg-muted/50">
               <tr>
@@ -193,7 +210,7 @@ export function RecordsPage() {
               </tr>
             </thead>
             <tbody>
-              {items.map(item => (
+              {visible.map(item => (
                 <Fragment key={item.id}>
                   <tr className={`border-t border-border hover:bg-muted/30 ${toneClassFor(item as unknown as Record<string, unknown>)}`}>
                   <td className={`${cell} whitespace-nowrap`}>{formatDate(item.request.submitted_at)}</td>
