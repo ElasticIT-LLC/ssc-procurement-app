@@ -1,6 +1,6 @@
 import { createClient } from 'npm:@supabase/supabase-js@2'
 import { sendSmtp } from './smtp.ts'
-import { buildApprovedEmail, buildSummaryEmail, buildRequesterConfirmation, buildItemOrderedEmail, buildReturnNotificationEmail, buildItemCancelledEmail, buildNotificationEmail } from './emails.ts'
+import { buildApprovedEmail, buildSummaryEmail, buildRequesterConfirmation, buildItemOrderedEmail, buildReturnNotificationEmail, buildItemCancelledEmail, buildNotificationEmail, buildCommentEmail, buildOverdueReminderEmail } from './emails.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
@@ -56,11 +56,11 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: cors })
   if (req.method !== 'POST') return json({ error: 'POST only' }, 405)
 
-  let body: { request_id?: string; only_line_item_id?: string; event?: string; line_item_ids?: string[]; notification_key?: string; details?: string }
+  let body: { request_id?: string; only_line_item_id?: string; event?: string; line_item_ids?: string[]; notification_key?: string; details?: string; comment_id?: string }
   try { body = await req.json() } catch { return json({ error: 'invalid JSON' }, 400) }
   const event = body.event ?? 'submitted'
   const requestId = body.request_id
-  if (!requestId && event !== 'notification') return json({ error: 'request_id required' }, 400)
+  if (!requestId && event !== 'notification' && event !== 'comment_added' && event !== 'overdue_reminder') return json({ error: 'request_id required' }, 400)
 
   const db = createClient(SUPABASE_URL, SERVICE_KEY)
 
@@ -198,6 +198,157 @@ Deno.serve(async (req) => {
       }
     }
     return json({ event: 'item_cancelled', done: true })
+  }
+
+  // ── Comment thread notification (Wave C) ──────────────────────────────────
+  if (event === 'comment_added') {
+    const commentId = body.comment_id
+    if (!commentId) return json({ event: 'comment_added', skipped: true, reason: 'no comment_id' })
+    const { data: c } = await db.schema('app_procurement').from('request_comments').select('id, request_id, parent_id, line_item_id, source, author_id, author_name, author_email, author_role, body, mentioned_user_ids, created_at').eq('id', commentId).maybeSingle()
+    if (!c) return json({ event: 'comment_added', skipped: true, reason: 'comment not found' }, 404)
+    const comment = c as { id: string; request_id: string; parent_id: string | null; line_item_id: string | null; source: string; author_id: string | null; author_name: string; author_email: string | null; author_role: 'requester' | 'staff'; body: string; mentioned_user_ids: string[]; created_at: string }
+    const { data: req } = await db.schema('app_procurement').from('purchase_requests').select('id, request_number, requester_id, requester_name, requester_email').eq('id', comment.request_id).maybeSingle()
+    const requestRow = req as { id: string; request_number: number | null; requester_id: string | null; requester_name: string | null; requester_email: string | null } | null
+    if (!requestRow) return json({ event: 'comment_added', skipped: true, reason: 'request not found' }, 404)
+    const reqUrl = requestsUrl ? `${requestsUrl}?request=${comment.request_id}` : ''
+
+    // Thread = this comment's root + its direct replies (threads are 1 level deep).
+    let rootId = comment.id
+    if (comment.parent_id) {
+      const { data: parent } = await db.schema('app_procurement').from('request_comments').select('id, parent_id').eq('id', comment.parent_id).maybeSingle()
+      const p = parent as { id: string; parent_id: string | null } | null
+      rootId = p ? (p.parent_id ?? p.id) : comment.parent_id
+    }
+    const { data: threadRows } = await db.schema('app_procurement').from('request_comments').select('id, author_id, author_role, created_at').or(`id.eq.${rootId},parent_id.eq.${rootId}`)
+    const thread = (threadRows ?? []) as Array<{ id: string; author_id: string | null; author_role: 'requester' | 'staff'; created_at: string }>
+
+    // Bell target (counterpart): staff comment → requester (if portal user);
+    // requester comment → newest prior staff commenter in the thread.
+    let bellTarget: string | null = null
+    if (comment.author_role === 'staff') {
+      bellTarget = requestRow.requester_id
+    } else {
+      const prior = thread
+        .filter((t) => t.id !== comment.id && t.author_role === 'staff' && t.author_id)
+        .sort((a, b) => a.created_at.localeCompare(b.created_at))
+      bellTarget = prior.length ? (prior[prior.length - 1]!.author_id as string) : null
+    }
+
+    // Email: staff-started thread → requester; requester-started → nobody; reply → mentioned users only.
+    let emailRecipients: string[] = []
+    if (comment.parent_id === null) {
+      if (comment.author_role === 'staff' && requestRow.requester_email) emailRecipients = [requestRow.requester_email]
+    } else {
+      const mids = (comment.mentioned_user_ids ?? []).filter(Boolean)
+      if (mids.length) {
+        const { data: mentioned } = await db.from('user_profiles').select('id, email').in('id', mids)
+        emailRecipients = ((mentioned ?? []) as Array<{ email: string | null }>).map((m) => m.email).filter((e): e is string => !!e)
+      }
+    }
+
+    // Bell rows: counterpart + (for replies) mentioned portal users. Dedupe by user_id.
+    const bellUsers = new Set<string>()
+    if (bellTarget) bellUsers.add(bellTarget)
+    if (comment.parent_id !== null) for (const m of (comment.mentioned_user_ids ?? []).filter(Boolean)) bellUsers.add(m)
+    const snippet = comment.body.length > 140 ? comment.body.slice(0, 140) + '…' : comment.body
+    const title = `${clientName ? `${clientName} Procurement` : 'Procurement'}: ${comment.author_name} commented on your request`
+    const bellRows = [...bellUsers].map((uid) => ({ user_id: uid, event_type: 'procurement:comment_added', title, body: snippet, link: reqUrl, app_slug: 'procurement' }))
+    if (bellRows.length) {
+      const { error: bellErr } = await db.from('notifications').insert(bellRows)
+      if (bellErr) console.error('comment bell insert failed:', bellErr)
+    }
+
+    let emailSent = false
+    if (emailRecipients.length && sender && HVE_PASSWORD) {
+      let itemName: string | null = null
+      if (comment.line_item_id) {
+        const { data: li } = await db.schema('app_procurement').from('line_items').select('item_description').eq('id', comment.line_item_id).maybeSingle()
+        itemName = (li as { item_description: string | null } | null)?.item_description ?? null
+      }
+      const html = buildCommentEmail({
+        authorName: comment.author_name,
+        authorRole: comment.author_role,
+        requestNumber: requestRow.request_number != null ? `#${requestRow.request_number}` : null,
+        itemName,
+        body: comment.body,
+        linkUrl: reqUrl,
+        clientName,
+        brandColor,
+      })
+      try {
+        await sendSmtp(
+          { host: HVE_HOST, port: HVE_PORT, fromAddress: sender, useTls: true, auth: { type: 'login', username: sender, password: HVE_PASSWORD } },
+          { recipients: emailRecipients, subject: title, htmlBody: html, fromDisplayName: clientName ? `${clientName} Procurement` : 'Procurement', highPriority: false },
+        )
+        emailSent = true
+      } catch (e) { console.error('comment email failed:', e instanceof Error ? e.message : e) }
+    }
+    return json({ event: 'comment_added', bell_rows: bellRows.length, email_sent: emailSent, email_recipients: emailRecipients.length })
+  }
+
+  // ── 14-day overdue reminder (Wave C) — fired by pg_cron daily at 08:00 ─────
+  if (event === 'overdue_reminder') {
+    const { data: approvers } = await db.schema('app_procurement').rpc('get_permission_holders', { p_permission: APPROVE_PERMISSION })
+    const approverIds = new Set(((approvers ?? []) as Array<{ user_id: string }>).map((h) => h.user_id))
+    let recipients = await resolveNotificationRecipients(db, 'procurement:request_overdue_reminder')
+    recipients = recipients.filter((r) => r.user_id !== null && approverIds.has(r.user_id))
+    if (recipients.length === 0) return json({ event: 'overdue_reminder', skipped: true, reason: 'no recipients' })
+
+    // status IN ('pending','on_hold','partially_approved') AND submitted_at <= now()-14d;
+    // the 14-day re-fire window on last_overdue_reminder_at is filtered in JS (nullable column).
+    const cutoff = new Date(Date.now() - 14 * 24 * 3600 * 1000).toISOString()
+    const { data: rows } = await db.schema('app_procurement').from('purchase_requests')
+      .select('id, request_number, requester_name, requester_email, status, submitted_at, last_overdue_reminder_at, line_items(id)')
+      .in('status', ['pending', 'on_hold', 'partially_approved'])
+      .lte('submitted_at', cutoff)
+    const nowIso = new Date().toISOString()
+    const due = ((rows ?? []) as Array<{ id: string; request_number: number | null; requester_name: string | null; submitted_at: string; last_overdue_reminder_at: string | null; line_items: { id: string }[] }>)
+      .filter((r) => !r.last_overdue_reminder_at || r.last_overdue_reminder_at <= cutoff)
+
+    let emails = 0
+    let bells = 0
+    for (const r of due) {
+      const days = Math.floor((Date.now() - new Date(r.submitted_at).getTime()) / 86400000)
+      const reqUrl = requestsUrl ? `${requestsUrl}?request=${r.id}` : ''
+      const title = `${clientName ? `${clientName} Procurement` : 'Procurement'}: request pending ${days} days`
+      const bellRows = recipients.filter((x) => x.user_id).map((x) => ({
+        user_id: x.user_id as string,
+        event_type: 'procurement:request_overdue_reminder',
+        title,
+        body: `Request ${r.request_number != null ? '#' + r.request_number : ''} from ${r.requester_name ?? 'a requester'} is pending ${days} days.`,
+        link: reqUrl,
+        app_slug: 'procurement',
+      }))
+      if (bellRows.length) {
+        const { error: bellErr } = await db.from('notifications').insert(bellRows)
+        if (bellErr) console.error('overdue bell insert failed:', bellErr)
+        else bells += bellRows.length
+      }
+      if (sender && HVE_PASSWORD) {
+        const html = buildOverdueReminderEmail({
+          requestNumber: r.request_number != null ? `#${r.request_number}` : null,
+          requesterName: r.requester_name ?? 'A requester',
+          days,
+          itemCount: r.line_items?.length ?? 0,
+          linkUrl: reqUrl,
+          clientName,
+          brandColor,
+        })
+        try {
+          await sendSmtp(
+            { host: HVE_HOST, port: HVE_PORT, fromAddress: sender, useTls: true, auth: { type: 'login', username: sender, password: HVE_PASSWORD } },
+            { recipients: recipients.map((x) => x.email), subject: title, htmlBody: html, fromDisplayName: clientName ? `${clientName} Procurement` : 'Procurement', highPriority: false },
+          )
+          emails++
+        } catch (e) { console.error('overdue email failed:', e instanceof Error ? e.message : e) }
+      }
+    }
+    if (due.length) {
+      const { error: stampErr } = await db.schema('app_procurement').from('purchase_requests')
+        .update({ last_overdue_reminder_at: nowIso }).in('id', due.map((r) => r.id))
+      if (stampErr) console.error('overdue stamp update failed:', stampErr)
+    }
+    return json({ event: 'overdue_reminder', requests: due.length, email_per_request: emails, bell_rows: bells })
   }
 
   // ── Generic shell notification (replaces send-notification for this app) ─
