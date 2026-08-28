@@ -26,6 +26,7 @@ export function PreApprovedTab() {
   const [orderFor, setOrderFor] = useState<PreApprovedItem | null>(null)
   const [form, setForm] = useState<PreApprovedOrderDraft | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const [removingId, setRemovingId] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -45,7 +46,8 @@ export function PreApprovedTab() {
     } finally {
       setLoading(false)
     }
-  }, [api])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   useEffect(() => { load() }, [load])
 
@@ -92,12 +94,15 @@ export function PreApprovedTab() {
 
   async function handleRemove(item: PreApprovedItem) {
     if (!window.confirm(`Remove "${item.name}" from the pre-approved catalog?`)) return
+    setRemovingId(item.id)
     try {
       await api.deletePreApprovedItem(item.id)
       showToast({ message: 'Removed from catalog', type: 'success' })
       await load()
     } catch (err: unknown) {
       showToast({ message: err instanceof Error ? err.message : 'Failed to remove item', type: 'error' })
+    } finally {
+      setRemovingId(null)
     }
   }
 
@@ -120,7 +125,7 @@ export function PreApprovedTab() {
               <tr className="border-b border-border bg-muted/40 text-left text-xs text-muted-foreground">
                 <th className="px-3 py-2 font-medium">Item</th>
                 <th className="px-3 py-2 font-medium">Qty</th>
-                <th className="px-3 py-2 font-medium">Ship-to</th>
+                <th className="px-3 py-2 font-medium">Location</th>
                 <th className="px-3 py-2 font-medium">Department</th>
                 <th className="px-3 py-2 font-medium">Added by</th>
                 <th className="px-3 py-2 font-medium">Added</th>
@@ -157,8 +162,9 @@ export function PreApprovedTab() {
                       {isAdmin && (
                         <button
                           type="button"
+                          disabled={removingId === item.id}
                           onClick={() => handleRemove(item)}
-                          className="inline-flex items-center rounded-md border border-destructive/40 bg-destructive/15 px-2.5 py-1 text-xs font-medium text-destructive hover:bg-destructive/25"
+                          className="inline-flex items-center rounded-md border border-destructive/40 bg-destructive/15 px-2.5 py-1 text-xs font-medium text-destructive hover:bg-destructive/25 disabled:opacity-50"
                         >
                           Remove
                         </button>
