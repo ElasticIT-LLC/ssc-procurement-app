@@ -472,11 +472,13 @@ Expected: exactly 5 rows:
 - `pre_approve_line_item | {uuid} | uuid`
 - `receive_line_item | {uuid} | void`
 
-2. Grants — each of the 5 functions executable by `authenticated` and `service_role` (10 rows):
+2. Grants — each of the 5 functions executable by `authenticated` and `service_role` (15 rows: 5 functions × {authenticated, service_role, postgres owner entry}):
 
 ```
-supabase db query "SELECT p.proname, a.rolname FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace CROSS JOIN LATERAL aclexplode(p.proacl) a WHERE n.nspname = 'app_procurement' AND p.proname IN ('pre_approve_line_item','order_pre_approved_item','delete_pre_approved_item','receive_line_item','cancel_line_item') AND a.privilege_type = 'EXECUTE' ORDER BY p.proname, a.rolname" --linked
+supabase db query "SELECT p.proname, r.rolname FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace CROSS JOIN LATERAL aclexplode(p.proacl) a JOIN pg_roles r ON r.oid = a.grantee WHERE n.nspname = 'app_procurement' AND p.proname IN ('pre_approve_line_item','order_pre_approved_item','delete_pre_approved_item','receive_line_item','cancel_line_item') AND a.privilege_type = 'EXECUTE' ORDER BY p.proname, r.rolname" --linked
 ```
+
+Note: `aclexplode()` exposes `grantee` (regrole), not a role name — join `pg_roles` to resolve it.
 
 3. Permission gate fires for unauthenticated callers (the CLI session has no JWT, so `auth.uid()` is NULL and `check_user_permission` returns false — expect the permission exception, proving the gate runs before any row access):
 
