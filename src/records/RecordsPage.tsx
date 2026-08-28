@@ -1,7 +1,7 @@
 import { Fragment, useState, useEffect, useCallback, useMemo } from 'react'
 import { useToast } from '@elasticit-llc/app-bridge'
 import { useAppPermissions } from '../lib/useAppPermissions'
-import { useProcurementApi, LineItemDetailed, LineItemWithRequest } from '../data/db'
+import { useProcurementApi, LineItemDetailed, LineItemWithRequest, PreApprovedItem } from '../data/db'
 import { StatusBadge } from '../requester/StatusBadge'
 import { ReplacementBadge } from '../requester/ReplacementBadge'
 import { ReturnForm } from '../requester/ReturnForm'
@@ -21,10 +21,12 @@ function csvCell(value: string): string {
   return /[",\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value
 }
 
-function exportCsv(rows: LineItemDetailed[]) {
-  const headers = ['Submitted', 'Requester', 'Email', 'Item', 'Qty', 'Location', 'Department', 'Status', 'Date Needed', 'ETA', 'Request Notes', 'Admin Comment']
+function exportCsv(rows: LineItemDetailed[], catalog: Record<string, PreApprovedItem>, sourceRef: Record<string, string>) {
+  const headers = ['Submitted', 'Requester', 'Email', 'Item', 'Qty', 'Location', 'Department', 'Status', 'Date Needed', 'ETA', 'Request Notes', 'Admin Comment', 'Received', 'Cancelled', 'Pre-approved Item', 'Source Item']
   const lines = [headers.join(',')]
   for (const item of rows) {
+    const cat = item.pre_approved_item_id ? catalog[item.pre_approved_item_id] : undefined
+    const sourceRefValue = cat?.source_line_item_id ? sourceRef[cat.source_line_item_id] ?? '' : ''
     lines.push([
       formatDate(item.request.submitted_at),
       item.request.requester_name ?? '',
@@ -38,6 +40,10 @@ function exportCsv(rows: LineItemDetailed[]) {
       formatDate(item.eta),
       item.request.notes ?? '',
       item.admin_comment ?? '',
+      formatDate(item.received_at),
+      formatDate(item.cancelled_at),
+      item.preApproved?.name ?? '',
+      sourceRefValue,
     ].map(c => csvCell(c)).join(','))
   }
   const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' })
@@ -69,6 +75,8 @@ export function RecordsPage() {
   const [busyId, setBusyId] = useState<string | null>(null)
   const [returnOpenId, setReturnOpenId] = useState<string | null>(null)
   const [showArchived, setShowArchived] = useState(false)
+  const [catalog, setCatalog] = useState<Record<string, PreApprovedItem>>({})
+  const [sourceRef, setSourceRef] = useState<Record<string, string>>({})
   const [query, setQuery] = useState('')
   const visible = useMemo(() => filterRecords(items, query), [items, query])
 
@@ -81,6 +89,9 @@ export function RecordsPage() {
       setDrafts(Object.fromEntries(data.map(i => [i.id, i.admin_comment ?? ''])))
       const map = await api.resolveUserNames(data.map((r) => r.commented_by).filter((x): x is string => !!x))
       setNames(map)
+      const list = await api.listPreApprovedItems()
+      setCatalog(Object.fromEntries(list.map(i => [i.id, i])))
+      setSourceRef(await api.lookupItemRefs(list.map(i => i.source_line_item_id).filter((x): x is string => !!x)))
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to load records')
     } finally {
@@ -159,7 +170,7 @@ export function RecordsPage() {
           </label>
           <button
             type="button"
-            onClick={() => exportCsv(visible)}
+            onClick={() => exportCsv(visible, catalog, sourceRef)}
             disabled={items.length === 0}
             className="inline-flex items-center rounded-md border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted disabled:opacity-50"
           >
