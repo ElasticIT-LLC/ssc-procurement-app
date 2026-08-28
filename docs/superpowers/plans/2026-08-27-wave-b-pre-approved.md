@@ -97,8 +97,7 @@ CREATE POLICY pre_approved_items_read_all ON app_procurement.pre_approved_items
   FOR SELECT TO authenticated USING (true);
 CREATE POLICY pre_approved_items_delete_admin ON app_procurement.pre_approved_items
   FOR DELETE TO authenticated
-  USING (public.check_user_permission(auth.uid(), 'apps/procurement/admin/manage'))
-  WITH CHECK (public.check_user_permission(auth.uid(), 'apps/procurement/admin/manage'));
+  USING (public.check_user_permission(auth.uid(), 'apps/procurement/admin/manage'));
 
 -- Stamp created_by on insert (pattern: favorite_items 032).
 CREATE OR REPLACE FUNCTION app_procurement.set_pre_approved_item_creator()
