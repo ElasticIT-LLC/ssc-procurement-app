@@ -35,6 +35,10 @@ function makeRow(overrides: Partial<LineItemDetailed> = {}): LineItemDetailed {
     received_at: null,
     cancelled_at: null,
     pre_approved_item_id: null,
+    approved_by: null,
+    approval_date: null,
+    date_purchased: null,
+    updated_at: '2026-08-27T00:00:00Z',
     request: {
       id: 'req-1',
       request_number: 34,

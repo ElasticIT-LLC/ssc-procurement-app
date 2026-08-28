@@ -24,6 +24,8 @@ const item = (over: Partial<LineItemDetailed>): LineItemDetailed => ({
   created_at: '2026-08-01T10:00:00.000Z', line_no: 1, return_processed_at: null, po_id: null,
   archived_at: null,
   received_at: null, cancelled_at: null, pre_approved_item_id: null,
+  approved_by: null, approval_date: null, date_purchased: null,
+  updated_at: '2026-08-01T10:00:00.000Z',
   substitution_ok: true,
   request: { id: 'r1', request_number: 1, requester_name: 'Jane', requester_email: 'jane@x.com', notes: null, submitted_at: '2026-08-01T10:00:00.000Z', status: 'pending' },
   location: null, department: null,

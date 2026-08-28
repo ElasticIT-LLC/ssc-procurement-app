@@ -4,11 +4,11 @@ import { DEFAULT_RULES, type FormatRule } from '../formatting/rules'
 import { formatItemRef } from '../lib/itemRef'
 
 const SCHEMA = 'app_procurement'
-const TABLES = { requests: 'purchase_requests', lineItems: 'line_items', locations: 'locations', departments: 'departments', config: '_config', purchaseOrders: 'purchase_orders', favoriteItems: 'favorite_items', preApprovedItems: 'pre_approved_items' } as const
-const RPCS = { submit: 'submit_request', submitAnon: 'submit_request_anon', decide: 'decide_line_item', order: 'order_line_item', receive: 'receive_line_item', initiateReturn: 'initiate_return', processReturn: 'process_return', setComment: 'set_line_item_comment', deleteItem: 'delete_line_item', archiveItem: 'archive_line_item', cancel: 'cancel_line_item', getUserNames: 'get_user_names', getFormattingRules: 'get_formatting_rules', createPO: 'create_purchase_order', closePO: 'close_purchase_order', preApprove: 'pre_approve_line_item', orderPreApproved: 'order_pre_approved_item', deletePreApproved: 'delete_pre_approved_item' } as const
+const TABLES = { requests: 'purchase_requests', lineItems: 'line_items', locations: 'locations', departments: 'departments', config: '_config', purchaseOrders: 'purchase_orders', favoriteItems: 'favorite_items', preApprovedItems: 'pre_approved_items', comments: 'request_comments' } as const
+const RPCS = { submit: 'submit_request', submitAnon: 'submit_request_anon', decide: 'decide_line_item', order: 'order_line_item', receive: 'receive_line_item', initiateReturn: 'initiate_return', processReturn: 'process_return', setComment: 'set_line_item_comment', deleteItem: 'delete_line_item', archiveItem: 'archive_line_item', cancel: 'cancel_line_item', getUserNames: 'get_user_names', getFormattingRules: 'get_formatting_rules', createPO: 'create_purchase_order', closePO: 'close_purchase_order', preApprove: 'pre_approve_line_item', orderPreApproved: 'order_pre_approved_item', deletePreApproved: 'delete_pre_approved_item', postComment: 'post_request_comment', mentionCandidates: 'get_mention_candidates' } as const
 
 export interface RequestRow { id: string; requester_id: string | null; requester_name: string | null; requester_email: string | null; requester_type: string; status: RequestStatus; notes: string | null; submitted_at: string; updated_at: string; request_number: number | null; line_items?: { item_description: string | null; item_url: string | null }[] }
-export interface LineItemRow { id: string; request_id: string; item_description: string | null; item_url: string | null; memo: string | null; quantity: number; substitution_ok: boolean; status: LineItemStatus; location_id: string | null; custom_location: string | null; department_id: string | null; custom_department: string | null; date_needed: string | null; eta: string | null; admin_comment: string | null; commented_by: string | null; commented_at: string | null; product_image_path: string | null; return_reason: string | null; return_quantity: number | null; wants_replacement: boolean | null; return_notes: string | null; return_date: string | null; created_at: string; line_no: number | null; return_processed_at: string | null; po_id: string | null; archived_at: string | null; received_at: string | null; cancelled_at: string | null; pre_approved_item_id: string | null }
+export interface LineItemRow { id: string; request_id: string; item_description: string | null; item_url: string | null; memo: string | null; quantity: number; substitution_ok: boolean; status: LineItemStatus; location_id: string | null; custom_location: string | null; department_id: string | null; custom_department: string | null; date_needed: string | null; eta: string | null; admin_comment: string | null; commented_by: string | null; commented_at: string | null; product_image_path: string | null; return_reason: string | null; return_quantity: number | null; wants_replacement: boolean | null; return_notes: string | null; return_date: string | null; created_at: string; line_no: number | null; return_processed_at: string | null; po_id: string | null; archived_at: string | null; received_at: string | null; cancelled_at: string | null; pre_approved_item_id: string | null; approved_by: string | null; approval_date: string | null; date_purchased: string | null; updated_at: string }
 export interface LineItemWithRequest extends LineItemRow {
   request: {
     id: string
@@ -48,6 +48,21 @@ export interface Department { id: string; name: string; is_active: boolean }
 export interface ShipToWorker { id: string; name: string; location: string | null; label: string }
 export interface FavoriteItem { id: string; name: string; item_url: string | null; created_by: string | null; created_at: string }
 export interface PreApprovedItem { id: string; name: string; item_url: string | null; quantity: number; substitution_ok: boolean; location_id: string | null; custom_location: string | null; department_id: string | null; custom_department: string | null; date_needed: string | null; memo: string | null; created_by: string | null; created_at: string; source_line_item_id: string | null }
+export interface RequestCommentRow {
+  id: string
+  request_id: string
+  parent_id: string | null
+  line_item_id: string | null
+  source: 'request' | 'approvals' | 'purchasing' | 'request_notes'
+  author_id: string | null
+  author_name: string
+  author_email: string | null
+  author_role: 'requester' | 'staff'
+  body: string
+  mentioned_user_ids: string[]
+  created_at: string
+}
+export interface MentionCandidate { user_id: string; display_name: string | null; email: string | null }
 
 export function useProcurementApi() {
   const supabase = useSupabase()
@@ -131,6 +146,61 @@ export function useProcurementApi() {
       })
     } catch (e) {
       console.error('fireNotification failed:', e)
+    }
+  }
+
+  async function postRequestComment(f: { request_id: string; parent_id?: string | null; line_item_id?: string | null; source: 'request' | 'approvals' | 'purchasing' | 'request_notes'; body: string; mentions?: string[] }): Promise<RequestCommentRow> {
+    const row = ok(await db().rpc(RPCS.postComment, {
+      p_request_id: f.request_id,
+      p_parent_id: f.parent_id ?? null,
+      p_line_item_id: f.line_item_id ?? null,
+      p_source: f.source,
+      p_body: f.body,
+      p_mentions: f.mentions ?? [],
+    })) as RequestCommentRow
+    return row
+  }
+
+  async function listRequestComments(requestId: string): Promise<RequestCommentRow[]> {
+    return (ok(await db().from(TABLES.comments).select('*').eq('request_id', requestId).order('created_at', { ascending: true })) ?? []) as RequestCommentRow[]
+  }
+
+  async function listRequestCommentsMany(requestIds: string[]): Promise<RequestCommentRow[]> {
+    if (!requestIds.length) return []
+    return (ok(await db().from(TABLES.comments).select('*').in('request_id', requestIds).order('created_at', { ascending: true })) ?? []) as RequestCommentRow[]
+  }
+
+  async function listMentionCandidates(requestId: string): Promise<MentionCandidate[]> {
+    return (ok(await db().rpc(RPCS.mentionCandidates, { p_request_id: requestId })) ?? []) as MentionCandidate[]
+  }
+
+  // Live INSERT updates for an open request (C2 realtime). Supabase realtime delivers
+  // INSERT payloads for tables in the supabase_realtime publication. If the channel
+  // errors (entitlement/plan differences), onUnhealthy is called so the caller can
+  // fall back to 30 s polling (spec C2 line 200 / Risk 1).
+  function subscribeRequestComments(requestId: string, onInsert: (row: RequestCommentRow) => void, onUnhealthy: () => void): () => void {
+    const channel = supabase
+      .channel(`request_comments:${requestId}`)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: SCHEMA, table: TABLES.comments, filter: `request_id=eq.${requestId}` },
+        (payload: { new: RequestCommentRow }) => { onInsert(payload.new) },
+      )
+      .subscribe((status: string) => {
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CHANNEL_UNAVAILABLE') onUnhealthy()
+      })
+    return () => { supabase.removeChannel(channel) }
+  }
+
+  // Fire the thread email/bell via the app's edge function. Best-effort (same contract
+  // as fireNotification): never throws into the caller.
+  async function fireCommentNotification(commentId: string): Promise<void> {
+    try {
+      await supabase.functions.invoke('procurement-capture-and-notify', {
+        body: { event: 'comment_added', comment_id: commentId },
+      })
+    } catch (e) {
+      console.error('fireCommentNotification failed:', e)
     }
   }
 
@@ -307,5 +377,5 @@ export function useProcurementApi() {
     return map
   }
 
-  return { listRequests, getRequest, listLineItems, listLocations, listDepartments, listAllLocations, listAllDepartments, listFavorites, addFavorite, removeFavorite, submitRequest, submitRequestAnon, decideLineItem, orderLineItem, receiveLineItem, initiateReturn, processReturn, cancelLineItem, listLineItemsByStatus, listLineItemFacets, listAllLineItemsDetailed, countLineItems, setLineItemComment, deleteLineItem, archiveLineItem, createLocation, createDepartment, updateLocation, updateDepartment, fireNotification, captureAndNotify, getProductImageUrl, notifyApproved, notifyStatusUpdate, resolveUserNames, getFormattingRules, setFormattingRules, listShipToWorkers, createPurchaseOrder, listPurchaseOrders, closePurchaseOrder, listPreApprovedItems, preApproveLineItem, orderPreApprovedItem, deletePreApprovedItem, lookupItemRefs }
+  return { listRequests, getRequest, listLineItems, listLocations, listDepartments, listAllLocations, listAllDepartments, listFavorites, addFavorite, removeFavorite, submitRequest, submitRequestAnon, decideLineItem, orderLineItem, receiveLineItem, initiateReturn, processReturn, cancelLineItem, listLineItemsByStatus, listLineItemFacets, listAllLineItemsDetailed, countLineItems, setLineItemComment, deleteLineItem, archiveLineItem, createLocation, createDepartment, updateLocation, updateDepartment, fireNotification, captureAndNotify, getProductImageUrl, notifyApproved, notifyStatusUpdate, resolveUserNames, getFormattingRules, setFormattingRules, listShipToWorkers, createPurchaseOrder, listPurchaseOrders, closePurchaseOrder, listPreApprovedItems, preApproveLineItem, orderPreApprovedItem, deletePreApprovedItem, lookupItemRefs, postRequestComment, listRequestComments, listRequestCommentsMany, listMentionCandidates, subscribeRequestComments, fireCommentNotification }
 }
