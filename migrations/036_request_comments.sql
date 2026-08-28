@@ -230,3 +230,81 @@ LANGUAGE sql SECURITY DEFINER SET search_path = app_procurement, public AS $fn$
 $fn$;
 REVOKE ALL ON FUNCTION app_procurement.get_mention_candidates(uuid) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION app_procurement.get_mention_candidates(uuid) TO authenticated, service_role;
+
+-- submit_request (v5): Wave C — non-empty notes are also posted as the first thread
+-- comment (source='request_notes'), atomic with the request insert. Signature unchanged
+-- from v4 (018), so no client changes required.
+CREATE OR REPLACE FUNCTION app_procurement.submit_request(p_notes text, p_line_items jsonb) RETURNS uuid
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = app_procurement, public AS $fn$
+DECLARE
+  v_id uuid;
+  v_name text;
+  v_email text;
+  li jsonb;
+  v_notes text;
+BEGIN
+  IF NOT public.check_user_permission(auth.uid(), 'apps/procurement/requests/create') THEN
+    RAISE EXCEPTION 'Not permitted to create requests';
+  END IF;
+  SELECT COALESCE(up.display_name, au.email), COALESCE(up.email, au.email)
+    INTO v_name, v_email
+    FROM auth.users au
+    LEFT JOIN public.user_profiles up ON up.id = au.id
+    WHERE au.id = auth.uid();
+  INSERT INTO purchase_requests
+    (requester_id, requester_name, requester_email, requester_type, submission_source, status, notes, submitted_at)
+  VALUES (auth.uid(), v_name, v_email, 'portal_user', 'in_portal', 'pending', p_notes, now())
+  RETURNING id INTO v_id;
+  FOR li IN SELECT * FROM jsonb_array_elements(coalesce(p_line_items, '[]'::jsonb)) LOOP
+    INSERT INTO line_items
+      (request_id, ship_to_name, location_id, custom_location, department_id, custom_department,
+       item_url, item_description, memo, quantity, substitution_ok, date_needed, status)
+    VALUES (v_id, li->>'ship_to_name', nullif(li->>'location_id','')::uuid, li->>'custom_location',
+            nullif(li->>'department_id','')::uuid, li->>'custom_department', li->>'item_url',
+            li->>'item_description', li->>'memo', coalesce((li->>'quantity')::int, 1),
+            coalesce((li->>'substitution_ok')::boolean, false), nullif(li->>'date_needed','')::date, 'pending');
+  END LOOP;
+  v_notes := trim(coalesce(p_notes, ''));
+  IF char_length(v_notes) BETWEEN 1 AND 1000 THEN
+    INSERT INTO request_comments
+      (request_id, parent_id, line_item_id, source, author_id, author_name, author_email, author_role, body, mentioned_user_ids)
+    VALUES (v_id, NULL, NULL, 'request_notes', auth.uid(), v_name, v_email, 'requester', v_notes, '{}'::uuid[]);
+  END IF;
+  RETURN v_id;
+END;
+$fn$;
+
+-- submit_request_anon (v6): public/private form submissions — same notes→comment behavior,
+-- anonymous author (author_id NULL). Signature unchanged from 024 (v5).
+CREATE OR REPLACE FUNCTION app_procurement.submit_request_anon(p_line_items jsonb, p_notes text, p_requester_email text, p_requester_name text DEFAULT NULL) RETURNS uuid
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = app_procurement, public AS $fn$
+DECLARE
+  v_id uuid;
+  li jsonb;
+  v_notes text;
+BEGIN
+  INSERT INTO purchase_requests
+    (requester_id, requester_name, requester_email, requester_type, submission_source, status, notes, submitted_at)
+  VALUES (null, p_requester_name, p_requester_email, 'anonymous', 'public_form', 'pending', p_notes, now())
+  RETURNING id INTO v_id;
+  FOR li IN SELECT * FROM jsonb_array_elements(coalesce(p_line_items, '[]'::jsonb)) LOOP
+    INSERT INTO line_items
+      (request_id, ship_to_name, location_id, custom_location, department_id, custom_department,
+       item_url, item_description, memo, quantity, substitution_ok, date_needed, status)
+    VALUES (v_id, li->>'ship_to_name', nullif(li->>'location_id','')::uuid, li->>'custom_location',
+            nullif(li->>'department_id','')::uuid, li->>'custom_department', li->>'item_url',
+            li->>'item_description', li->>'memo', coalesce((li->>'quantity')::int, 1),
+            coalesce((li->>'substitution_ok')::boolean, false), nullif(li->>'date_needed','')::date, 'pending');
+  END LOOP;
+  v_notes := trim(coalesce(p_notes, ''));
+  IF char_length(v_notes) BETWEEN 1 AND 1000 THEN
+    INSERT INTO request_comments
+      (request_id, parent_id, line_item_id, source, author_id, author_name, author_email, author_role, body, mentioned_user_ids)
+    VALUES (v_id, NULL, NULL, 'request_notes', NULL, coalesce(nullif(p_requester_name,''), p_requester_email), p_requester_email, 'requester', v_notes, '{}'::uuid[]);
+  END IF;
+  PERFORM internal.proc_recompute_request_status(v_id);
+  RETURN v_id;
+END;
+$fn$;
+REVOKE ALL ON FUNCTION app_procurement.submit_request_anon(jsonb, text, text, text) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION app_procurement.submit_request_anon(jsonb, text, text, text) TO anon, authenticated, service_role;
