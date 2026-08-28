@@ -201,12 +201,12 @@ Expected: 2 rows — `idx_line_items_pre_approved`, `uq_pre_approved_name`.
 supabase db query "SELECT conname, confdeltype FROM pg_constraint WHERE conrelid='app_procurement.line_items'::regclass AND contype='f' AND confrelid='app_procurement.pre_approved_items'::regclass" --linked
 ```
 
-Expected: 1 row with `confdeltype = s` (SET NULL).
+Expected: 1 row with `confdeltype = n` (SET NULL; `n` is Postgres's SET NULL code in pg_constraint.confdeltype).
 
 5. Exactly the two canonical policies, nothing else:
 
 ```
-supabase db query "SELECT polname, cmd FROM pg_policies WHERE schemaname='app_procurement' AND tablename='pre_approved_items' ORDER BY polname" --linked
+supabase db query "SELECT policyname, cmd FROM pg_policies WHERE schemaname='app_procurement' AND tablename='pre_approved_items' ORDER BY policyname" --linked
 ```
 
 Expected: exactly 2 rows — `pre_approved_items_delete_admin | DELETE` and `pre_approved_items_read_all | SELECT`.
