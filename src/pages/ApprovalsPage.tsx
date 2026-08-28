@@ -20,6 +20,7 @@ export function ApprovalsPage() {
   const [imageUrls, setImageUrls] = useState<Record<string, string>>({})
   const [names, setNames] = useState<Record<string, string>>({})
   const [drafts, setDrafts] = useState<Record<string, string>>({})
+  const [preApprovedNames, setPreApprovedNames] = useState<Set<string>>(new Set())
   const [tab, setTab] = useState<'items' | 'preapproved' | 'favorites'>('items')
 
   const load = useCallback(async () => {
@@ -28,6 +29,8 @@ export function ApprovalsPage() {
     try {
       const data = await api.listLineItemsByStatus(['pending', 'on_hold'])
       setItems(data)
+      const catalog = await api.listPreApprovedItems()
+      setPreApprovedNames(new Set(catalog.map((c) => c.name.toLowerCase())))
       setNames(await api.resolveUserNames(data.map((i) => i.commented_by).filter((x): x is string => !!x)))
       const urls: Record<string, string> = {}
       await Promise.all(data.filter((i) => i.product_image_path).map(async (i) => { const u = await api.getProductImageUrl(i.product_image_path as string); if (u) urls[i.id] = u }))
@@ -64,16 +67,12 @@ export function ApprovalsPage() {
   }
 
   async function handlePreApprove(item: LineItemWithRequest) {
-    if (!window.confirm(`Pre-approve "${item.item_description || 'this item'}"?\nIt will be approved and added to the pre-approved catalog.`)) return
-    const reqId = item.request?.id
+    if (!window.confirm(`Pre-approve "${item.item_description || 'this item'}"?\nIt will be added to the pre-approved catalog. The item stays in For Approval until approved.`)) return
     setBusyId(item.id)
     try {
       await api.preApproveLineItem(item.id)
-      showToast({ message: 'Item pre-approved', type: 'success' })
-      api.fireNotification('item_approved', reqId, [item.id])
-      const remaining = await api.listLineItemsByStatus(['pending', 'on_hold'])
-      setItems(remaining)
-      if (reqId && !remaining.some((it) => it.request.id === reqId)) await api.notifyApproved(reqId)
+      showToast({ message: 'Added to pre-approved catalog', type: 'success' })
+      await load()
     } catch (err: unknown) {
       showToast({ message: err instanceof Error ? err.message : 'Pre-approve failed', type: 'error' })
     } finally {
@@ -147,7 +146,12 @@ export function ApprovalsPage() {
               <p className="text-xs text-muted-foreground">Qty: {item.quantity}</p>
               <p className="text-xs text-muted-foreground">Substitution: {item.substitution_ok ? 'Yes' : 'No'}</p>
             </div>
-            <StatusBadge status={item.status} />
+            <div className="flex items-center gap-1.5">
+              {preApprovedNames.has((item.item_description ?? '').toLowerCase()) && (
+                <span className="rounded bg-primary/15 px-1.5 py-0.5 text-[10px] font-medium text-primary">Pre-approved</span>
+              )}
+              <StatusBadge status={item.status} />
+            </div>
           </div>
 
           {/* Product image or retry capture */}
