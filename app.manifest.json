@@ -3,7 +3,7 @@
   "slug": "procurement",
   "name": "Procurement",
   "icon": "Package",
-  "version": "0.24.0",
+  "version": "0.24.1",
   "permissions": [
     { "key": "apps/procurement/*", "label": "Full Access", "description": "Full access to Procurement", "group": "Administration" },
     { "key": "apps/procurement/requests/create", "label": "Create requests", "description": "Create and submit purchase requests; mark items received; initiate returns", "group": "Requests" },
