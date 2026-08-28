@@ -14,9 +14,9 @@ Ship Phase 3 Wave C of the procurement app as **v0.26.0**:
 ## Architecture
 
 - **Schema mode** Supabase, schema `app_procurement`. New table `request_comments` (immutable threads: no authenticated UPDATE/DELETE policies; INSERT only via SECURITY DEFINER RPC).
-- **Authoritative base state (verified on QA 2026-08-27):** repo at v0.23.4, migrations 001-032 applied (Wave A/B NOT yet applied — no `pre_approved_items`, no `last_overdue_reminder_at`). `line_items` has NO `received_at`/`cancelled_at` columns (spec C1 line 138 lists them; they do not exist — see Decisions D3). `submit_request` final = migration 018 (v4, `(p_notes text, p_line_items jsonb) RETURNS uuid`). `submit_request_anon` final = 024 (v5, `(p_line_items jsonb, p_notes text, p_requester_email text, p_requester_name text DEFAULT NULL) RETURNS uuid`). `order_line_item` final = 021 (`(p_line_item_id, p_date_purchased, p_eta, p_shipping_location_id, p_custom_shipping_location, p_purchase_notes) RETURNS void`). RLS email fallback = 027 pattern `COALESCE(NULLIF(auth.jwt()->>'email',''), up.email)`.
+- **Authoritative base state (verified on QA 2026-08-28):** repo at v0.25.1, migrations 001-035 applied on QA (Wave B included: `pre_approved_items` + `line_items.received_at`/`cancelled_at`/`pre_approved_item_id`). No `last_overdue_reminder_at` yet. `submit_request` final = migration 018 (v4, `(p_notes text, p_line_items jsonb) RETURNS uuid`). `submit_request_anon` final = 024 (v5, `(p_line_items jsonb, p_notes text, p_requester_email text, p_requester_name text DEFAULT NULL) RETURNS uuid`). `order_line_item` final = 021 (`(p_line_item_id, p_date_purchased, p_eta, p_shipping_location_id, p_custom_shipping_location, p_purchase_notes) RETURNS void`). RLS email fallback = 027 pattern `COALESCE(NULLIF(auth.jwt()->>'email',''), up.email)`.
 - **Edge function** `procurement-capture-and-notify` (verify_jwt: false, holds service-role key in edge runtime env) gains two events: `comment_added` (bell + email per spec email-rules table) and `overdue_reminder` (fired by pg_cron).
-- **Shell realtime** already publishes `public.notifications`; migration 035 adds `app_procurement.request_comments` to the `supabase_realtime` publication (DO-block guarded).
+- **Shell realtime** already publishes `public.notifications`; migration 036 adds `app_procurement.request_comments` to the `supabase_realtime` publication (DO-block guarded).
 - **Client:** React/TS via app-bridge `useSupabase()`; new `RequestThread` + `RequestActivity` components; pure `timeline.ts`/`mentions.ts` libs with vitest tests.
 - **No elasticit-shell changes. No inbound email. Threads immutable (v1).**
 
@@ -24,15 +24,17 @@ Ship Phase 3 Wave C of the procurement app as **v0.26.0**:
 
 Supabase Postgres 15 + pg_cron 1.6.4 + pg_net 0.20.3 (all present on QA) · Deno edge functions (supabase-js v2) · React 19 + TypeScript 6 + Vite 8 · vitest 4 · HVE SMTP (smtp-hve.office365.com:587, sender from `client_settings.hve_sender_address`).
 
+> **Revision (2026-08-28):** Wave B shipped (migrations 033–035 on QA, v0.25.1). Migration numbers renumbered throughout this plan: 035→036 (`request_comments`), 036→037 (`last_overdue_reminder_at`), 037→038 (overdue cron). Pre-approve is now catalog-only (see Wave B revision note) — Wave C's order flow is unaffected.
+
 ## Global Constraints
 
 - Branch `for-qa`; every commit ends with `; v0.26.0` and follows repo Conventional Commit style (`type(scope): msg; vX.Y.Z`).
-- Version: `0.23.4` → `0.26.0` in BOTH `app.manifest.json` (authoritative per CLAUDE.md) and `package.json`.
-- Migrations are appended, NEVER edited. New files: `migrations/035_request_comments.sql`, `migrations/036_last_overdue_reminder_at.sql`, `migrations/037_overdue_cron.sql` (numbers 033/034 are reserved for Wave B).
+- Version: `0.25.1` → `0.26.0` in BOTH `app.manifest.json` (authoritative per CLAUDE.md) and `package.json`.
+- Migrations are appended, NEVER edited. New files: `migrations/036_request_comments.sql`, `migrations/037_last_overdue_reminder_at.sql`, `migrations/038_overdue_cron.sql` (numbers 033/034/035 are reserved for Wave B).
 - **Every DDL statement must be idempotent** (`IF NOT EXISTS` / `DROP IF EXISTS` / DO-block guards / NOT-EXISTS backfill guard) because each migration runs once via CLI on QA AND again via publish-app at `.eitapp` upload.
 - SECURITY DEFINER functions: `SET search_path = app_procurement, public`, permission checks via `public.check_user_permission(auth.uid(), '<perm>')`, then `REVOKE ALL ... FROM PUBLIC[, anon]` + `GRANT EXECUTE ... TO authenticated, service_role` (repo pattern per 005/007/018/021/024 — NOT the internal-wrapper pattern; advisor lints 0028/0029 don't fire because anon cannot execute).
 - RLS: `DROP POLICY IF EXISTS` + `CREATE POLICY` (no `CREATE OR REPLACE POLICY` exists).
-- The shell's `auto_enable_app_rls` event trigger (elasticit-shell 011) fires on `CREATE TABLE` in `app_*` schemas and creates 5 permissive policies `app_procurement_<table>_{service,read,insert,update,delete}`. Migration 035 MUST drop and replace them after the CREATE TABLE.
+- The shell's `auto_enable_app_rls` event trigger (elasticit-shell 011) fires on `CREATE TABLE` in `app_*` schemas and creates 5 permissive policies `app_procurement_<table>_{service,read,insert,update,delete}`. Migration 036 MUST drop and replace them after the CREATE TABLE.
 - `request_comments` is NOT added to manifest `database.tables[]` (publish-app would then generate authenticated write policies, breaking immutability + insert-only-via-RPC).
 - Comment bodies: 1-1000 chars (DB CHECK enforces).
 - Notification keys fired to the bell use `event_type = 'procurement:<key>'`, `app_slug = 'procurement'`, rows inserted into `public.notifications (user_id, event_type, title, body, link, app_slug)`.
@@ -45,8 +47,8 @@ Supabase Postgres 15 + pg_cron 1.6.4 + pg_net 0.20.3 (all present on QA) · Deno
 
 ## Decisions & Spec Deviations (read before executing)
 
-- **D1 — Cron auth is KEYLESS (deviation from spec C3 line 217).** Spec says "service-role JWT (stored in `supabase_vault`)". This repo's CLAUDE.md explicitly forbids storing service-role JWTs in a client-visible vault, and the overtime app dropped that exact pattern in v14 (security violation) in favor of keyless `net.http_post` to a `verify_jwt:false` function (v17). The function already holds its own service-role key in the edge runtime env, so a JWT on the cron POST adds no real authorization (the endpoint is open regardless); the triggered event is bounded, idempotent (14-day dedupe column) and best-effort. Decision: keyless POST, URL built at runtime from `app_procurement._config.supabase_url` (seeded by manifest `config[]` with `source: "project_url"` — environment-agnostic, works on QA and prod). If the team prefers the literal spec variant, swap the 037 command for a `vault.decrypted_secrets` lookup of a `service_role`-sourced manifest `vault_secrets[]` entry — but the deviation is recommended.
-- **D2 — Auto-RLS survival.** Migration 035 drops the 5 trigger-created policies right after `CREATE TABLE` and creates: `..._service` (FOR ALL TO service_role) + `..._read` (FOR SELECT TO authenticated, request-scoped). No INSERT/UPDATE/DELETE policies for authenticated → thread immutability + RPC-only writes enforced at RLS.
+- **D1 — Cron auth is KEYLESS (deviation from spec C3 line 217).** Spec says "service-role JWT (stored in `supabase_vault`)". This repo's CLAUDE.md explicitly forbids storing service-role JWTs in a client-visible vault, and the overtime app dropped that exact pattern in v14 (security violation) in favor of keyless `net.http_post` to a `verify_jwt:false` function (v17). The function already holds its own service-role key in the edge runtime env, so a JWT on the cron POST adds no real authorization (the endpoint is open regardless); the triggered event is bounded, idempotent (14-day dedupe column) and best-effort. Decision: keyless POST, URL built at runtime from `app_procurement._config.supabase_url` (seeded by manifest `config[]` with `source: "project_url"` — environment-agnostic, works on QA and prod). If the team prefers the literal spec variant, swap the 038 command for a `vault.decrypted_secrets` lookup of a `service_role`-sourced manifest `vault_secrets[]` entry — but the deviation is recommended.
+- **D2 — Auto-RLS survival.** Migration 036 drops the 5 trigger-created policies right after `CREATE TABLE` and creates: `..._service` (FOR ALL TO service_role) + `..._read` (FOR SELECT TO authenticated, request-scoped). No INSERT/UPDATE/DELETE policies for authenticated → thread immutability + RPC-only writes enforced at RLS.
 - **D3 — `received_at` / `cancelled_at` do not exist** (spec C1 line 138 assumes them; spec Risk #3 admits receipts were never stamped). Timeline derives: "Marked received" ← `line_items.updated_at` when `status='received'` (stamped by `receive_line_item`); "Item cancelled" ← `line_items.updated_at` when `status='cancelled'`. Approximate timestamps; document in report docs.
 - **D4 — `submit_request_anon` also posts notes as a thread comment** (spec names only `submit_request` v5, but the public form is the other "Request form" surface; author row: `author_id NULL`, `author_name = COALESCE(p_requester_name, p_requester_email)`, `author_role='requester'`, atomic in the same transaction).
 - **D5 — Purchase-note threads are posted CLIENT-SIDE after the order RPC succeeds** (spec C2 surfaces table: "posted after the order RPC succeeds"). Bulk POs may span multiple requests → one `purchasing` comment per distinct request, `line_item_id NULL`, body includes the PO number. Only posted when notes are non-empty (empty notes → nothing to post; the timeline already shows the ordered event from `date_purchased`).
@@ -58,9 +60,9 @@ Supabase Postgres 15 + pg_cron 1.6.4 + pg_net 0.20.3 (all present on QA) · Deno
 
 | File | Action | Task |
 |---|---|---|
-| `migrations/035_request_comments.sql` | CREATE | 1, 2, 3 |
-| `migrations/036_last_overdue_reminder_at.sql` | CREATE | 6 |
-| `migrations/037_overdue_cron.sql` | CREATE | 7 |
+| `migrations/036_request_comments.sql` | CREATE | 1, 2, 3 |
+| `migrations/037_last_overdue_reminder_at.sql` | CREATE | 6 |
+| `migrations/038_overdue_cron.sql` | CREATE | 7 |
 | `supabase/functions/procurement-capture-and-notify/index.ts` | MODIFY | 5 |
 | `supabase/functions/procurement-capture-and-notify/emails.ts` | MODIFY | 5 |
 | `src/data/db.ts` | MODIFY | 4 |
@@ -82,10 +84,10 @@ Supabase Postgres 15 + pg_cron 1.6.4 + pg_net 0.20.3 (all present on QA) · Deno
 
 ## Tasks
 
-### Task 1: Migration 035 — `request_comments` table, thread RLS, realtime, admin_comment backfill
+### Task 1: Migration 036 — `request_comments` table, thread RLS, realtime, admin_comment backfill
 
 **Files:**
-- `migrations/035_request_comments.sql` (CREATE, new file — Task 2 and Task 3 append to it)
+- `migrations/036_request_comments.sql` (CREATE, new file — Task 2 and Task 3 append to it)
 
 **Interfaces (produced):**
 - Table `app_procurement.request_comments (id uuid PK, request_id uuid FK NOT NULL, parent_id uuid FK NULL, line_item_id uuid FK NULL, source text NOT NULL CHECK IN ('request','approvals','purchasing','request_notes'), author_id uuid NULL, author_name text NOT NULL, author_email text NULL, author_role text NOT NULL CHECK IN ('requester','staff'), body text NOT NULL CHECK char_length 1..1000, mentioned_user_ids uuid[] NOT NULL DEFAULT '{}', created_at timestamptz NOT NULL DEFAULT now())`
@@ -95,7 +97,7 @@ Supabase Postgres 15 + pg_cron 1.6.4 + pg_net 0.20.3 (all present on QA) · Deno
 **Code** (write the file with exactly this content; Tasks 2-3 append below the backfill):
 
 ```sql
--- 035: Wave C (C2) — request comment threads.
+-- 036: Wave C (C2) — request comment threads.
 -- New table request_comments (immutable threads: requesters + staff comment per request,
 -- 1 level of replies). Thread-scoped RLS mirroring request visibility, realtime publication
 -- entry, and one-time backfill of legacy line_items.admin_comment as 'approvals' roots.
@@ -192,7 +194,7 @@ WHERE li.admin_comment IS NOT NULL
 **Apply to QA** (CLI-linked to `jkbqaxpfvqbeepwhunhl`; agent sessions may use the Supabase MCP `supabase_apply_migration` instead — same effect):
 
 ```
-supabase psql -f migrations/035_request_comments.sql
+supabase psql -f migrations/036_request_comments.sql
 ```
 
 Expected: no errors. (If the installed CLI deprecated `psql`, the equivalent is `supabase db execute` against the linked project.)
@@ -210,22 +212,22 @@ SELECT count(*) AS realtime_rows FROM pg_publication_tables WHERE pubname = 'sup
 
 **Commit:**
 ```
-git add migrations/035_request_comments.sql
+git add migrations/036_request_comments.sql
 git commit -m "feat(db): request_comments table + thread RLS + realtime + admin_comment backfill; v0.26.0"
 ```
 
 ---
 
-### Task 2: Migration 035 (cont.) — `post_request_comment` + `get_mention_candidates` RPCs
+### Task 2: Migration 036 (cont.) — `post_request_comment` + `get_mention_candidates` RPCs
 
 **Files:**
-- `migrations/035_request_comments.sql` (APPEND at end of file)
+- `migrations/036_request_comments.sql` (APPEND at end of file)
 
 **Interfaces (produced):**
 - `app_procurement.post_request_comment(p_request_id uuid, p_parent_id uuid, p_line_item_id uuid, p_source text, p_body text, p_mentions text[]) RETURNS app_procurement.request_comments` — SECURITY DEFINER; EXECUTE: authenticated, service_role.
 - `app_procurement.get_mention_candidates(p_request_id uuid) RETURNS TABLE (user_id uuid, display_name text, email text)` — SECURITY DEFINER; EXECUTE: authenticated, service_role.
 
-**Code** (append to `migrations/035_request_comments.sql`):
+**Code** (append to `migrations/036_request_comments.sql`):
 
 ```sql
 -- post_request_comment: create a thread root or a 1-level reply.
@@ -370,7 +372,7 @@ GRANT EXECUTE ON FUNCTION app_procurement.get_mention_candidates(uuid) TO authen
 **Apply + verify** (re-run the whole file — idempotent):
 
 ```
-supabase psql -f migrations/035_request_comments.sql
+supabase psql -f migrations/036_request_comments.sql
 ```
 
 ```sql
@@ -382,22 +384,22 @@ WHERE n.nspname = 'app_procurement' AND p.proname IN ('post_request_comment','ge
 
 **Commit:**
 ```
-git add migrations/035_request_comments.sql
+git add migrations/036_request_comments.sql
 git commit -m "feat(db): post_request_comment + get_mention_candidates RPCs; v0.26.0"
 ```
 
 ---
 
-### Task 3: Migration 035 (cont.) — `submit_request` v5 + `submit_request_anon` v6 (notes → first thread comment)
+### Task 3: Migration 036 (cont.) — `submit_request` v5 + `submit_request_anon` v6 (notes → first thread comment)
 
 **Files:**
-- `migrations/035_request_comments.sql` (APPEND at end of file)
+- `migrations/036_request_comments.sql` (APPEND at end of file)
 
 **Interfaces (changed):**
 - `app_procurement.submit_request(p_notes text, p_line_items jsonb) RETURNS uuid` — same signature as v4 (018); when `trim(p_notes)` is 1-1000 chars, additionally inserts a `request_comments` root row with `source='request_notes'` in the same transaction.
 - `app_procurement.submit_request_anon(p_line_items jsonb, p_notes text, p_requester_email text, p_requester_name text DEFAULT NULL) RETURNS uuid` — same signature as v5 (024); same notes→comment insert, with `author_id NULL`, `author_name = COALESCE(p_requester_name, p_requester_email)` (D4).
 
-**Code** (append to `migrations/035_request_comments.sql`):
+**Code** (append to `migrations/036_request_comments.sql`):
 
 ```sql
 -- submit_request (v5): Wave C — non-empty notes are also posted as the first thread
@@ -482,7 +484,7 @@ GRANT EXECUTE ON FUNCTION app_procurement.submit_request_anon(jsonb, text, text,
 **Apply + verify:**
 
 ```
-supabase psql -f migrations/035_request_comments.sql
+supabase psql -f migrations/036_request_comments.sql
 ```
 
 ```sql
@@ -493,7 +495,7 @@ SELECT proname FROM pg_proc WHERE pronamespace = 'app_procurement'::regnamespace
 
 **Commit:**
 ```
-git add migrations/035_request_comments.sql
+git add migrations/036_request_comments.sql
 git commit -m "feat(db): submit_request v5 + submit_request_anon v6 post notes as first thread comment; v0.26.0"
 ```
 
@@ -872,15 +874,15 @@ git commit -m "feat(notify): comment_added + overdue_reminder events with brande
 
 ---
 
-### Task 6: Migration 036 — `last_overdue_reminder_at` dedupe column
+### Task 6: Migration 037 — `last_overdue_reminder_at` dedupe column
 
 **Files:**
-- `migrations/036_last_overdue_reminder_at.sql` (CREATE)
+- `migrations/037_last_overdue_reminder_at.sql` (CREATE)
 
 **Code** (full file):
 
 ```sql
--- 036: Wave C (C3) — dedupe column for the 14-day overdue reminder.
+-- 037: Wave C (C3) — dedupe column for the 14-day overdue reminder.
 -- A pending request re-fires the reminder only when this stamp is older than 14 days.
 ALTER TABLE app_procurement.purchase_requests ADD COLUMN IF NOT EXISTS last_overdue_reminder_at timestamptz;
 ```
@@ -888,7 +890,7 @@ ALTER TABLE app_procurement.purchase_requests ADD COLUMN IF NOT EXISTS last_over
 **Apply + verify:**
 
 ```
-supabase psql -f migrations/036_last_overdue_reminder_at.sql
+supabase psql -f migrations/037_last_overdue_reminder_at.sql
 ```
 
 ```sql
@@ -899,26 +901,26 @@ WHERE table_schema = 'app_procurement' AND table_name = 'purchase_requests' AND 
 
 **Commit:**
 ```
-git add migrations/036_last_overdue_reminder_at.sql
+git add migrations/037_last_overdue_reminder_at.sql
 git commit -m "feat(db): last_overdue_reminder_at dedupe column for 14-day reminder; v0.26.0"
 ```
 
 ---
 
-### Task 7: Migration 037 — pg_cron daily 08:00 keyless reminder job + manifest `config` seed
+### Task 7: Migration 038 — pg_cron daily 08:00 keyless reminder job + manifest `config` seed
 
 **Files:**
-- `migrations/037_overdue_cron.sql` (CREATE)
+- `migrations/038_overdue_cron.sql` (CREATE)
 - `app.manifest.json` (MODIFY — add `database.config` so publish-app seeds `_config.supabase_url` per environment; see code)
 
 **Interfaces:**
 - `cron.job` row `procurement-overdue-reminders`, schedule `0 8 * * *` (DB timezone).
 - `app_procurement._config` row `supabase_url = https://<ref>.supabase.co` (seeded by publish-app from manifest `config[]` with `source: "project_url"` — the same migration file then works on both QA and prod).
 
-**Code — `migrations/037_overdue_cron.sql`** (full file):
+**Code — `migrations/038_overdue_cron.sql`** (full file):
 
 ```sql
--- 037: Wave C (C3) — daily 08:00 (DB timezone) overdue-reminder schedule.
+-- 038: Wave C (C3) — daily 08:00 (DB timezone) overdue-reminder schedule.
 -- pg_cron -> net.http_post -> procurement-capture-and-notify, body {"event":"overdue_reminder"}.
 -- KEYLESS by decision D1 (CLAUDE.md: never store a service-role JWT in a client-visible vault;
 -- msr-overtime-dashboard-app v14 dropped the vault-JWT cron pattern; this function is
@@ -948,14 +950,14 @@ INSERT INTO cron.job (schedule, command) VALUES (
 
 ```json
     "config": [
-      { "key": "supabase_url", "source": "project_url", "description": "Project base URL; read by the pg_cron overdue-reminder job (migration 037) to call the edge function." }
+      { "key": "supabase_url", "source": "project_url", "description": "Project base URL; read by the pg_cron overdue-reminder job (migration 038) to call the edge function." }
     ],
 ```
 
 **Apply + verify** (on QA; the manual `_config` seed stands in for the publish-app seed until the v0.26.0 `.eitapp` is uploaded):
 
 ```
-supabase psql -f migrations/037_overdue_cron.sql
+supabase psql -f migrations/038_overdue_cron.sql
 ```
 
 ```sql
@@ -974,7 +976,7 @@ SELECT value FROM app_procurement._config WHERE key = 'supabase_url';
 
 **Commit:**
 ```
-git add migrations/037_overdue_cron.sql app.manifest.json
+git add migrations/038_overdue_cron.sql app.manifest.json
 git commit -m "feat(db): daily 08:00 keyless pg_cron overdue-reminder job + _config.supabase_url seed; v0.26.0"
 ```
 
@@ -1728,7 +1730,7 @@ with:
           )}
 ```
 
-Note: the legacy `line_items.admin_comment` editor is retired on this surface — existing `admin_comment` values stay readable (Records fallback, backfilled into the thread by migration 035), and `setLineItemComment` remains in `db.ts` for compatibility (Records no longer calls it — see Task 10).
+Note: the legacy `line_items.admin_comment` editor is retired on this surface — existing `admin_comment` values stay readable (Records fallback, backfilled into the thread by migration 036), and `setLineItemComment` remains in `db.ts` for compatibility (Records no longer calls it — see Task 10).
 
 **Verify:** `npm run build` — tsc passes. Manual: open a request → "Activity" (submitted event + backfilled comment) and "Comments" render; post a comment as staff → success toast, thread updates; "View full thread" on Approvals deep-links to the request.
 
@@ -1996,9 +1998,9 @@ git commit -m "feat(ui): records latest-comment column + per-item history modal;
 2. `app.manifest.json` — `database.migrations[]`: after the version-32 entry (`:66`), add (versions match the file-number prefixes; 33/34 are reserved for the not-yet-merged Waves A/B — the gap is intentional and harmless, ordering is by version number):
 ```json
       { "version": 32, "description": "Favorites: only approvers/purchasers/admins may insert; trigger stamps created_by for Added-by attribution", "up": "migrations/032_favorite_items_curators.sql" },
-      { "version": 35, "description": "Phase 3: request_comments thread table (auto-RLS policies dropped; explicit _service/_read policies) + realtime publication + post_request_comment/get_mention_candidates RPCs + submit_request v5 / submit_request_anon v6 notes-as-comment + legacy admin_comment backfill", "up": "migrations/035_request_comments.sql" },
-      { "version": 36, "description": "Phase 3: line_items.last_overdue_reminder_at (14-day overdue-reminder stamp, idempotent ADD COLUMN IF NOT EXISTS)", "up": "migrations/036_last_overdue_reminder_at.sql" },
-      { "version": 37, "description": "Phase 3: pg_cron 08:00 keyless overdue-reminder job (pg_net -> edge function; unschedule guard makes re-runs idempotent)", "up": "migrations/037_overdue_cron.sql" }
+      { "version": 36, "description": "Phase 3: request_comments thread table (auto-RLS policies dropped; explicit _service/_read policies) + realtime publication + post_request_comment/get_mention_candidates RPCs + submit_request v5 / submit_request_anon v6 notes-as-comment + legacy admin_comment backfill", "up": "migrations/036_request_comments.sql" },
+      { "version": 37, "description": "Phase 3: line_items.last_overdue_reminder_at (14-day overdue-reminder stamp, idempotent ADD COLUMN IF NOT EXISTS)", "up": "migrations/037_last_overdue_reminder_at.sql" },
+      { "version": 38, "description": "Phase 3: pg_cron 08:00 keyless overdue-reminder job (pg_net -> edge function; unschedule guard makes re-runs idempotent)", "up": "migrations/038_overdue_cron.sql" }
 ```
 
 3. `app.manifest.json` — `notifications[]`: after `item_cancelled` (`:84`), add (bell event type `procurement:request_overdue_reminder` is cataloged; the `procurement:comment_added` bell event is intentionally NOT cataloged — comments always bell, no opt-in per spec C2):
@@ -2007,7 +2009,7 @@ git commit -m "feat(ui): records latest-comment column + per-item history modal;
       { "key": "request_overdue_reminder", "label": "Request overdue", "description": "A pending or on-hold request has been waiting 14+ days and needs a decision.", "sort_order": 7, "requires_permission": "apps/procurement/approvals/act" }
 ```
 
-4. **Do NOT** add `request_comments` to `database.tables[]` — the shell's auto-RLS generator would emit conflicting `app_procurement_request_comments_*` policies; migration 035 owns all RLS for that table (decision D2).
+4. **Do NOT** add `request_comments` to `database.tables[]` — the shell's auto-RLS generator would emit conflicting `app_procurement_request_comments_*` policies; migration 036 owns all RLS for that table (decision D2).
 
 5. `package.json:3` — version:
 ```json
@@ -2019,7 +2021,7 @@ git commit -m "feat(ui): records latest-comment column + per-item history modal;
 **Commit:**
 ```
 git add app.manifest.json package.json
-git commit -m "chore(release): v0.26.0 manifest — migrations 035-037, request_overdue_reminder notification, version bump; v0.26.0"
+git commit -m "chore(release): v0.26.0 manifest — migrations 036-038, request_overdue_reminder notification, version bump; v0.26.0"
 ```
 
 ---
@@ -2055,7 +2057,7 @@ Remove-Item -LiteralPath "dist\procurement-*.eitapp" -Exclude "procurement-0.26.
 git push origin for-qa
 ```
 
-5. Upload `dist/procurement-0.26.0.eitapp` via Admin UI → App Management → Publish App (QA portal). publish-app re-applies migrations 1-37 idempotently (035's DROP-policy DO block + CREATE TABLE IF NOT EXISTS guard, 036's ADD COLUMN IF NOT EXISTS, 037's unschedule guard) and upserts `database.config` → `_config.supabase_url` from the project URL (Task 7). If the manifest `config` upsert is not yet supported by the shell version in QA, the manual `_config` seed from Task 7 already covers it.
+5. Upload `dist/procurement-0.26.0.eitapp` via Admin UI → App Management → Publish App (QA portal). publish-app re-applies migrations 1-38 idempotently (036's DROP-policy DO block + CREATE TABLE IF NOT EXISTS guard, 037's ADD COLUMN IF NOT EXISTS, 038's unschedule guard) and upserts `database.config` → `_config.supabase_url` from the project URL (Task 7). If the manifest `config` upsert is not yet supported by the shell version in QA, the manual `_config` seed from Task 7 already covers it.
 
 6. **QA checklist (QA Supabase: `jkbqaxpfvqbeepwhunhl`):**
    1. **Backfill:** `SELECT source, body FROM app_procurement.request_comments WHERE source = 'approvals';` → exactly 1 row (the pre-existing legacy `admin_comment`), visible in the request's thread and in Records' "Latest comment".
@@ -2083,7 +2085,7 @@ git push origin for-qa
 
 - [ ] Spec coverage: C1 (timeline + Records history modal + CSV), C2 (threads, email rules, bell, realtime + poll fallback, @mentions, request-notes-as-comment, purchasing/PO note posts, 1000-char cap), C3 (14-day rule, recipients = approvers, email + bell, stamp, best-effort) — every spec C1/C2/C3 requirement maps to a task.
 - [ ] No `TBD`/`TODO`/placeholder code anywhere in the plan.
-- [ ] Name/type consistency: `RequestCommentRow`, `MentionCandidate`, `TimelineEvent`, `buildTimeline`, `parseMentions`, `postRequestComment`, `listRequestCommentsMany`, `subscribeRequestComments`, `fireCommentNotification`, `request_overdue_reminder`, `last_overdue_reminder_at`, `035/036/037` used identically across all tasks.
+- [ ] Name/type consistency: `RequestCommentRow`, `MentionCandidate`, `TimelineEvent`, `buildTimeline`, `parseMentions`, `postRequestComment`, `listRequestCommentsMany`, `subscribeRequestComments`, `fireCommentNotification`, `request_overdue_reminder`, `last_overdue_reminder_at`, `036/037/038` used identically across all tasks.
 - [ ] Every SQL migration is idempotent (IF NOT EXISTS / DROP IF EXISTS / DO-block guards / unschedule guard).
 - [ ] Every commit message ends `; v0.26.0`.
 - [ ] `request_comments` absent from manifest `tables[]`.
