@@ -21,7 +21,7 @@
 ## Confirmed decisions (session 2026-08-27)
 
 1. One spec, built in waves (small shippable versions).
-2. Pre-approve action **approves the current item AND adds it to the catalog**; new requests still land in For Approval normally.
+2. Pre-approve action **adds the item to the catalog ONLY** (revised 2026-08-28, dev sign-off): the item keeps its pending/on_hold status, stays in For Approval, and still needs the normal Approve → purchase flow. No requester notification on pre-approve.
 3. Ordering a pre-approved item **lands in Purchasing → Ready for Purchasing** (approved line item, skips approval queue); the normal Place Order / bulk-PO flow applies from there.
 4. Pre-approve permission: **admin + approver** (holders of `apps/procurement/approvals/act`). Ordering from the catalog: **admin, approver, purchaser**.
 5. Every pre-approved order = a **brand-new request** (new request number). The catalog entry is a standing template, never consumed.
@@ -99,7 +99,7 @@ CREATE INDEX idx_line_items_pre_approved ON app_procurement.line_items (pre_appr
 
 ### B2. RPCs (migration 034)
 
-- `pre_approve_line_item(p_line_item_id)` — requires `approvals/act`. Only from `pending`/`on_hold`. One transaction: apply the `decide_line_item(approved)` logic (status, `approved_by`, `approval_date`, rollup), then upsert `pre_approved_items` from the item's request-form fields (`name = item_description`, `item_url`, `quantity`, `substitution_ok`, `date_needed`, `memo`, location/department), stamping `source_line_item_id`. Returns the catalog row id.
+- `pre_approve_line_item(p_line_item_id)` — requires `approvals/act`. Only from `pending`/`on_hold`. **Catalog-only** (revised 2026-08-28 — migration 035 supersedes 034): does NOT change item status/approval; only upserts `pre_approved_items` from the item's request-form fields (`name = item_description`, `item_url`, `quantity`, `substitution_ok`, `date_needed`, `memo`, location/department), stamping `source_line_item_id`. Returns the catalog row id. No requester notification.
 - `order_pre_approved_item(p_pre_approved_id, p_quantity, p_ship_to_name, p_location_id, p_custom_location, p_department_id, p_custom_department, p_date_needed, p_memo, p_substitution_ok)` — requires `purchasing/manage` OR `approvals/act` OR `admin/manage`. Creates a **new** `purchase_requests` row (requester = actor, `requester_type='portal_user'`, `submission_source='in_portal'`, status computed by rollup, notes = `'Pre-approved order: <name>'`) plus one `line_items` row inserted **directly as `approved`** (`approved_by = auth.uid()`, `approval_date = now()`, `pre_approved_item_id` set), then `proc_recompute_request_status` (→ request status `approved`). The item appears in Purchasing → Ready for Purchasing; the existing Place Order / Create PO flow (date purchased, ETA, shipping location, purchase note, vendor) proceeds unchanged from there. Catalog entry is untouched (re-orderable forever).
 - `delete_pre_approved_item(p_id)` — admin only.
 - `receive_line_item` — recreate (v2) to also stamp `received_at = now()`.
@@ -108,7 +108,7 @@ CREATE INDEX idx_line_items_pre_approved ON app_procurement.line_items (pre_appr
 ### B3. UI (Approvals page)
 
 - New tab **Pre-approved** between For Approval and Favorite Items. Lists catalog: item name, URL, default qty, ship-to/department, added by (name via `get_user_names`), added date. Admin-only **Remove** action.
-- **Pre-approve** button on each For Approval item card, visible to `approvals/act` holders. Click → confirm dialog → `pre_approve_line_item` → toast, card updates (item leaves the queue as approved), catalog upserted.
+- **Pre-approve** button on each For Approval item card, visible to `approvals/act` holders. Click → confirm dialog → `pre_approve_line_item` → toast "Added to pre-approved catalog". The item **stays in For Approval** (no status change, no requester notification); catalog is upserted and a "Pre-approved" badge shows on cards whose item is already in the catalog.
 - **New Purchase** button on each catalog row (admin/approver/purchaser). Dialog **pre-filled from the catalog entry** (name, URL, qty, substitution OK, date needed, memo, ship-to, department — all editable) → `order_pre_approved_item` → toast "Order created — see Ready for Purchasing".
 
 ### B4. Reporting (client requirement)

@@ -8,6 +8,8 @@
 
 **Tech Stack:** React + TypeScript + Supabase Postgres RPCs + Tailwind; vitest for pure TS.
 
+> **Revision (2026-08-28):** Dev sign-off changed the pre-approve behavior mid-wave: pre-approve is now **catalog-only** — it no longer auto-approves the line item (no status / `approved_by` / `approval_date` change, no requester notification). Migration **035** (`035_pre_approve_catalog_only.sql`) recreates `pre_approve_line_item` to match; the Task 2 RPC body for that function is superseded (other Task 2 RPCs unchanged). The item stays in For Approval; a "Pre-approved" badge marks cards already in the catalog. Spec updated (decision #2, B2, B3).
+
 ## Global Constraints
 
 - Branch: `for-qa` in `C:\Users\jbugahon\Code\msr-procurement-app` (already checked out). Prerequisite: Wave A (v0.24.0) is merged into `for-qa` — its rename of the Approvals "Items" tab to "For Approval" is in effect; this plan references the post-Wave-A label.
