@@ -1,13 +1,14 @@
 import { useSupabase } from '@elasticit-llc/app-bridge'
 import type { LineItemStatus, RequestStatus } from '../lib/constants'
 import { DEFAULT_RULES, type FormatRule } from '../formatting/rules'
+import { formatItemRef } from '../lib/itemRef'
 
 const SCHEMA = 'app_procurement'
-const TABLES = { requests: 'purchase_requests', lineItems: 'line_items', locations: 'locations', departments: 'departments', config: '_config', purchaseOrders: 'purchase_orders', favoriteItems: 'favorite_items' } as const
-const RPCS = { submit: 'submit_request', submitAnon: 'submit_request_anon', decide: 'decide_line_item', order: 'order_line_item', receive: 'receive_line_item', initiateReturn: 'initiate_return', processReturn: 'process_return', setComment: 'set_line_item_comment', deleteItem: 'delete_line_item', archiveItem: 'archive_line_item', cancel: 'cancel_line_item', getUserNames: 'get_user_names', getFormattingRules: 'get_formatting_rules', createPO: 'create_purchase_order', closePO: 'close_purchase_order' } as const
+const TABLES = { requests: 'purchase_requests', lineItems: 'line_items', locations: 'locations', departments: 'departments', config: '_config', purchaseOrders: 'purchase_orders', favoriteItems: 'favorite_items', preApprovedItems: 'pre_approved_items' } as const
+const RPCS = { submit: 'submit_request', submitAnon: 'submit_request_anon', decide: 'decide_line_item', order: 'order_line_item', receive: 'receive_line_item', initiateReturn: 'initiate_return', processReturn: 'process_return', setComment: 'set_line_item_comment', deleteItem: 'delete_line_item', archiveItem: 'archive_line_item', cancel: 'cancel_line_item', getUserNames: 'get_user_names', getFormattingRules: 'get_formatting_rules', createPO: 'create_purchase_order', closePO: 'close_purchase_order', preApprove: 'pre_approve_line_item', orderPreApproved: 'order_pre_approved_item', deletePreApproved: 'delete_pre_approved_item' } as const
 
 export interface RequestRow { id: string; requester_id: string | null; requester_name: string | null; requester_email: string | null; requester_type: string; status: RequestStatus; notes: string | null; submitted_at: string; updated_at: string; request_number: number | null; line_items?: { item_description: string | null; item_url: string | null }[] }
-export interface LineItemRow { id: string; request_id: string; item_description: string | null; item_url: string | null; memo: string | null; quantity: number; substitution_ok: boolean; status: LineItemStatus; location_id: string | null; custom_location: string | null; department_id: string | null; custom_department: string | null; date_needed: string | null; eta: string | null; admin_comment: string | null; commented_by: string | null; commented_at: string | null; product_image_path: string | null; return_reason: string | null; return_quantity: number | null; wants_replacement: boolean | null; return_notes: string | null; return_date: string | null; created_at: string; line_no: number | null; return_processed_at: string | null; po_id: string | null; archived_at: string | null }
+export interface LineItemRow { id: string; request_id: string; item_description: string | null; item_url: string | null; memo: string | null; quantity: number; substitution_ok: boolean; status: LineItemStatus; location_id: string | null; custom_location: string | null; department_id: string | null; custom_department: string | null; date_needed: string | null; eta: string | null; admin_comment: string | null; commented_by: string | null; commented_at: string | null; product_image_path: string | null; return_reason: string | null; return_quantity: number | null; wants_replacement: boolean | null; return_notes: string | null; return_date: string | null; created_at: string; line_no: number | null; return_processed_at: string | null; po_id: string | null; archived_at: string | null; received_at: string | null; cancelled_at: string | null; pre_approved_item_id: string | null }
 export interface LineItemWithRequest extends LineItemRow {
   request: {
     id: string
@@ -40,11 +41,13 @@ export interface LineItemDetailed extends LineItemRow {
   location: { name: string } | null
   department: { name: string } | null
   po: { po_number: string } | null
+  preApproved: { name: string } | null
 }
 export interface Location { id: string; name: string; is_active: boolean }
 export interface Department { id: string; name: string; is_active: boolean }
 export interface ShipToWorker { id: string; name: string; location: string | null; label: string }
 export interface FavoriteItem { id: string; name: string; item_url: string | null; created_by: string | null; created_at: string }
+export interface PreApprovedItem { id: string; name: string; item_url: string | null; quantity: number; substitution_ok: boolean; location_id: string | null; custom_location: string | null; department_id: string | null; custom_department: string | null; date_needed: string | null; memo: string | null; created_by: string | null; created_at: string; source_line_item_id: string | null }
 
 export function useProcurementApi() {
   const supabase = useSupabase()
@@ -144,7 +147,7 @@ export function useProcurementApi() {
 
   async function listAllLineItemsDetailed(includeArchived = false): Promise<LineItemDetailed[]> {
     let query = db().from(TABLES.lineItems)
-      .select('*, purchase_requests!request_id(id, request_number, requester_name, requester_email, notes, submitted_at, status), purchase_orders!po_id(po_number), locations!location_id(name), departments!department_id(name)')
+      .select('*, purchase_requests!request_id(id, request_number, requester_name, requester_email, notes, submitted_at, status), purchase_orders!po_id(po_number), locations!location_id(name), departments!department_id(name), pre_approved_items!pre_approved_item_id(name)')
       .order('created_at', { ascending: false })
     if (!includeArchived) query = query.is('archived_at', null)
     const rows = ok(await query) ?? []
@@ -153,9 +156,10 @@ export function useProcurementApi() {
       purchase_orders: { po_number: string } | null
       locations: { name: string } | null
       departments: { name: string } | null
+      pre_approved_items: { name: string } | null
     })[]).map(row => {
-      const { purchase_requests, purchase_orders, locations, departments, ...item } = row
-      return { ...item, request: purchase_requests, po: purchase_orders, location: locations, department: departments } as LineItemDetailed
+      const { purchase_requests, purchase_orders, locations, departments, pre_approved_items, ...item } = row
+      return { ...item, request: purchase_requests, po: purchase_orders, location: locations, department: departments, preApproved: pre_approved_items } as LineItemDetailed
     })
   }
   // Count-only query (head:true returns no rows, just the exact count). RLS scopes it to
@@ -268,5 +272,40 @@ export function useProcurementApi() {
     ok(await db().from(TABLES.favoriteItems).delete().eq('id', id))
   }
 
-  return { listRequests, getRequest, listLineItems, listLocations, listDepartments, listAllLocations, listAllDepartments, listFavorites, addFavorite, removeFavorite, submitRequest, submitRequestAnon, decideLineItem, orderLineItem, receiveLineItem, initiateReturn, processReturn, cancelLineItem, listLineItemsByStatus, listLineItemFacets, listAllLineItemsDetailed, countLineItems, setLineItemComment, deleteLineItem, archiveLineItem, createLocation, createDepartment, updateLocation, updateDepartment, fireNotification, captureAndNotify, getProductImageUrl, notifyApproved, notifyStatusUpdate, resolveUserNames, getFormattingRules, setFormattingRules, listShipToWorkers, createPurchaseOrder, listPurchaseOrders, closePurchaseOrder }
+  // Pre-approved items catalog (table from migration 033, RPCs from 034). created_by is
+  // populated by the set_pre_approved_item_creator trigger; all writes go through the RPCs
+  // so permission checks stay server-side.
+  async function listPreApprovedItems(): Promise<PreApprovedItem[]> {
+    return (ok(await db().from(TABLES.preApprovedItems).select('*').order('created_at', { ascending: false })) ?? []) as PreApprovedItem[]
+  }
+  // Approve a pending/on_hold line item AND upsert it into the catalog (keyed by lower(name)).
+  // Returns the catalog row id.
+  async function preApproveLineItem(lineItemId: string): Promise<string> {
+    return ok(await db().rpc(RPCS.preApprove, { p_line_item_id: lineItemId })) as string
+  }
+  // Create a purchase request + line item directly from a catalog row (status 'approved',
+  // pre_approved_item_id linked). `f` holds p_*-named order fields from draftToRpcPayload.
+  async function orderPreApprovedItem(preApprovedItemId: string, f: Record<string, unknown>): Promise<string> {
+    return ok(await db().rpc(RPCS.orderPreApproved, { p_pre_approved_id: preApprovedItemId, ...f })) as string
+  }
+  async function deletePreApprovedItem(id: string): Promise<void> {
+    ok(await db().rpc(RPCS.deletePreApproved, { p_id: id }))
+  }
+  // Resolve line item ids -> "#<requestNo>-<lineNo>" refs (itemRef format) for the Records CSV
+  // "Source Item" column. pre_approved_items.source_line_item_id has no FK, so it can't be
+  // embedded in the query — read the rows directly (admin-only page, so full visibility is fine).
+  async function lookupItemRefs(ids: string[]): Promise<Record<string, string>> {
+    const unique = [...new Set(ids.filter(Boolean))]
+    if (!unique.length) return {}
+    const rows = ok(await db().from(TABLES.lineItems)
+      .select('id, line_no, purchase_requests!request_id(request_number)')
+      .in('id', unique)) ?? []
+    const map: Record<string, string> = {}
+    for (const r of rows as { id: string; line_no: number | null; purchase_requests: { request_number: number | null } | null }[]) {
+      if (r.purchase_requests?.request_number != null) map[r.id] = formatItemRef(r.purchase_requests.request_number, r.line_no)
+    }
+    return map
+  }
+
+  return { listRequests, getRequest, listLineItems, listLocations, listDepartments, listAllLocations, listAllDepartments, listFavorites, addFavorite, removeFavorite, submitRequest, submitRequestAnon, decideLineItem, orderLineItem, receiveLineItem, initiateReturn, processReturn, cancelLineItem, listLineItemsByStatus, listLineItemFacets, listAllLineItemsDetailed, countLineItems, setLineItemComment, deleteLineItem, archiveLineItem, createLocation, createDepartment, updateLocation, updateDepartment, fireNotification, captureAndNotify, getProductImageUrl, notifyApproved, notifyStatusUpdate, resolveUserNames, getFormattingRules, setFormattingRules, listShipToWorkers, createPurchaseOrder, listPurchaseOrders, closePurchaseOrder, listPreApprovedItems, preApproveLineItem, orderPreApprovedItem, deletePreApprovedItem, lookupItemRefs }
 }
