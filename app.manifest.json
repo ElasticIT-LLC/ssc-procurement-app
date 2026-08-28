@@ -64,7 +64,8 @@
       { "version": 30, "description": "Converge favorite_items RLS: drop loose per-action policies, canonical read-all / admin-write only", "up": "migrations/030_favorite_items_rls_convergence.sql" },
       { "version": 31, "description": "Heart button: any signed-in user can INSERT favorites from the Requests page (update/delete stay admin)", "up": "migrations/031_favorite_items_heart_insert.sql" },
       { "version": 32, "description": "Favorites: only approvers/purchasers/admins may insert; trigger stamps created_by for Added-by attribution", "up": "migrations/032_favorite_items_curators.sql" },
-      { "version": 33, "description": "Pre-approved items catalog (table + RLS + created_by trigger) + line_items reporting columns (received_at, cancelled_at, pre_approved_item_id)", "up": "migrations/033_pre_approved_items.sql" }
+      { "version": 33, "description": "Pre-approved items catalog (table + RLS + created_by trigger) + line_items reporting columns (received_at, cancelled_at, pre_approved_item_id)", "up": "migrations/033_pre_approved_items.sql" },
+      { "version": 34, "description": "Pre-approved RPCs (pre_approve_line_item, order_pre_approved_item, delete_pre_approved_item) + receive_line_item v2 / cancel_line_item v3 with received_at/cancelled_at stamps", "up": "migrations/034_pre_approved_rpcs.sql" }
     ],
     "tables": [
       { "name": "locations",         "rls": { "read": "authenticated", "write": "admin" } },
