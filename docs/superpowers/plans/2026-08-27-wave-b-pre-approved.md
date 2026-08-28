@@ -92,7 +92,7 @@ CREATE INDEX IF NOT EXISTS idx_line_items_pre_approved ON app_procurement.line_i
 -- table (including platform auto-generated permissive ones) so every
 -- environment converges on exactly the two canonical policies.
 ALTER TABLE app_procurement.pre_approved_items ENABLE ROW LEVEL SECURITY;
-DO $$ DECLARE r record; BEGIN FOR r IN SELECT policypname FROM pg_policies WHERE schemaname = 'app_procurement' AND tablename = 'pre_approved_items' LOOP EXECUTE format('DROP POLICY %I ON app_procurement.pre_approved_items', r.policypname); END LOOP; END; $$;
+DO $$ DECLARE r record; BEGIN FOR r IN SELECT policyname FROM pg_policies WHERE schemaname = 'app_procurement' AND tablename = 'pre_approved_items' LOOP EXECUTE format('DROP POLICY %I ON app_procurement.pre_approved_items', r.policyname); END LOOP; END; $$;
 CREATE POLICY pre_approved_items_read_all ON app_procurement.pre_approved_items
   FOR SELECT TO authenticated USING (true);
 CREATE POLICY pre_approved_items_delete_admin ON app_procurement.pre_approved_items
