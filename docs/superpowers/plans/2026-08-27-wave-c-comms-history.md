@@ -166,8 +166,10 @@ BEGIN
       END IF;
     EXCEPTION WHEN duplicate_object THEN
       NULL;
+    END;
   END IF;
-END $$;
+END;
+$$;
 
 -- Backfill (decision 10): each legacy line_items.admin_comment becomes one thread root.
 -- Idempotent: skips items that already have an 'approvals' comment with the same body.
@@ -693,6 +695,12 @@ export function buildOverdueReminderEmail(o: OverdueReminderParams): string {
   const body = `<p style="margin:0 0 16px 0">The following procurement request has been pending for more than 14 days and still needs approval action:</p><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;border:1px solid #e4e7ea;margin:0 0 20px 0"><tr><th style="${td}">Request</th><th style="${td}">Requester</th><th style="${td};text-align:center">Days Pending</th><th style="${td};text-align:center">Items</th></tr>${rows}</table>${o.linkUrl ? vmlButton(o.linkUrl, 'Review Request', '220px', o.brandColor) : ''}<p style="margin:14px 0 0 0;font-size:12px;color:#555">This reminder repeats every 14 days while the request stays pending.</p>`
   return shell('Request pending 14+ days', 'Overdue procurement reminder', body, o.clientName, o.brandColor)
 }
+```
+
+**Code — `index.ts` edit 0** (2026-08-28 revision — the original plan omitted this and the two new events would have 400'd) — line 63, the request_id guard must also allow the two new request-less events:
+
+```ts
+  if (!requestId && event !== 'notification' && event !== 'comment_added' && event !== 'overdue_reminder') return json({ error: 'request_id required' }, 400)
 ```
 
 **Code — `index.ts` edit 1** — line 59, extend the body type to include `comment_id`:
