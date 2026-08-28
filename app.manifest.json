@@ -63,7 +63,8 @@
       { "version": 29, "description": "Favorite items catalog (admin-curated, form auto-suggestions) + RLS", "up": "migrations/029_favorite_items.sql" },
       { "version": 30, "description": "Converge favorite_items RLS: drop loose per-action policies, canonical read-all / admin-write only", "up": "migrations/030_favorite_items_rls_convergence.sql" },
       { "version": 31, "description": "Heart button: any signed-in user can INSERT favorites from the Requests page (update/delete stay admin)", "up": "migrations/031_favorite_items_heart_insert.sql" },
-      { "version": 32, "description": "Favorites: only approvers/purchasers/admins may insert; trigger stamps created_by for Added-by attribution", "up": "migrations/032_favorite_items_curators.sql" }
+      { "version": 32, "description": "Favorites: only approvers/purchasers/admins may insert; trigger stamps created_by for Added-by attribution", "up": "migrations/032_favorite_items_curators.sql" },
+      { "version": 33, "description": "Pre-approved items catalog (table + RLS + created_by trigger) + line_items reporting columns (received_at, cancelled_at, pre_approved_item_id)", "up": "migrations/033_pre_approved_items.sql" }
     ],
     "tables": [
       { "name": "locations",         "rls": { "read": "authenticated", "write": "admin" } },
@@ -72,7 +73,8 @@
       { "name": "line_items",        "rls": { "read": "authenticated", "write": "authenticated" } },
       { "name": "_config",           "rls": { "read": "admin", "write": "admin" } },
       { "name": "purchase_orders",   "rls": { "read": "authenticated", "write": "admin" } },
-      { "name": "favorite_items",    "rls": { "read": "authenticated", "write": "admin" } }
+      { "name": "favorite_items",    "rls": { "read": "authenticated", "write": "admin" } },
+      { "name": "pre_approved_items","rls": { "read": "authenticated", "write": "admin" } }
     ]
   },
   "notifications": [
