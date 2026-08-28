@@ -90,5 +90,143 @@ LEFT JOIN public.user_profiles up ON up.id = li.commented_by
 WHERE li.admin_comment IS NOT NULL
   AND NOT EXISTS (
     SELECT 1 FROM app_procurement.request_comments rc
-    WHERE rc.request_id = li.request_id AND rc.line_item_id = li.id AND rc.source = 'approvals' AND rc.body = li.admin_comment
-  );
+     WHERE rc.request_id = li.request_id AND rc.line_item_id = li.id AND rc.source = 'approvals' AND rc.body = li.admin_comment
+   );
+
+-- post_request_comment: create a thread root or a 1-level reply.
+-- Auth: requester of the request (portal user by uid, or email match for email-submission
+-- requesters) OR staff holding approvals/act | purchasing/manage | admin/manage.
+-- parent_id, when given, must be a ROOT (parent_id NULL) of the same request; replies may not
+-- change line_item_id. Mentions are resolved case-insensitively against user_profiles
+-- (display name, or email / email local part). Author snapshot from JWT + user_profiles
+-- (same pattern as 007/018). Returns the inserted row.
+CREATE OR REPLACE FUNCTION app_procurement.post_request_comment(
+  p_request_id uuid,
+  p_parent_id uuid,
+  p_line_item_id uuid,
+  p_source text,
+  p_body text,
+  p_mentions text[]
+) RETURNS app_procurement.request_comments
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = app_procurement, public AS $fn$
+DECLARE
+  v_pr purchase_requests;
+  v_parent request_comments;
+  v_name text;
+  v_email text;
+  v_role text;
+  v_mentions uuid[] := '{}';
+  v_tok text;
+  v_uid uuid;
+  v_row request_comments;
+BEGIN
+  IF auth.uid() IS NULL THEN RAISE EXCEPTION 'Sign in to comment'; END IF;
+  IF p_source NOT IN ('request','approvals','purchasing','request_notes') THEN
+    RAISE EXCEPTION 'Invalid source';
+  END IF;
+  SELECT * INTO v_pr FROM purchase_requests WHERE id = p_request_id;
+  IF NOT FOUND THEN RAISE EXCEPTION 'Request not found'; END IF;
+
+  IF NOT (
+    public.check_user_permission(auth.uid(), 'apps/procurement/approvals/act')
+    OR public.check_user_permission(auth.uid(), 'apps/procurement/purchasing/manage')
+    OR public.check_user_permission(auth.uid(), 'apps/procurement/admin/manage')
+    OR v_pr.requester_id = auth.uid()
+    OR (v_pr.requester_id IS NULL
+        AND v_pr.requester_email = (SELECT COALESCE(NULLIF(auth.jwt()->>'email',''), up.email)
+                                    FROM public.user_profiles up WHERE up.id = auth.uid()))
+  ) THEN
+    RAISE EXCEPTION 'Not permitted to comment';
+  END IF;
+
+  p_body := trim(coalesce(p_body, ''));
+  IF char_length(p_body) NOT BETWEEN 1 AND 1000 THEN
+    RAISE EXCEPTION 'Comment must be 1-1000 characters';
+  END IF;
+
+  IF p_parent_id IS NOT NULL THEN
+    SELECT * INTO v_parent FROM request_comments WHERE id = p_parent_id;
+    IF NOT FOUND THEN RAISE EXCEPTION 'Parent comment not found'; END IF;
+    IF v_parent.request_id <> p_request_id THEN RAISE EXCEPTION 'Parent comment is in another request'; END IF;
+    IF v_parent.parent_id IS NOT NULL THEN RAISE EXCEPTION 'Replies must point at a thread root'; END IF;
+    IF p_line_item_id IS NOT NULL AND v_parent.line_item_id IS DISTINCT FROM p_line_item_id THEN
+      RAISE EXCEPTION 'Reply must stay on the same item as its thread';
+    END IF;
+  END IF;
+
+  IF p_line_item_id IS NOT NULL THEN
+    IF NOT EXISTS (SELECT 1 FROM line_items WHERE id = p_line_item_id AND request_id = p_request_id) THEN
+      RAISE EXCEPTION 'Line item does not belong to this request';
+    END IF;
+  END IF;
+
+  SELECT COALESCE(up.display_name, au.email, 'User'), COALESCE(up.email, au.email)
+    INTO v_name, v_email
+    FROM auth.users au
+    LEFT JOIN public.user_profiles up ON up.id = au.id
+    WHERE au.id = auth.uid();
+  v_role := CASE
+    WHEN public.check_user_permission(auth.uid(), 'apps/procurement/approvals/act')
+      OR public.check_user_permission(auth.uid(), 'apps/procurement/purchasing/manage')
+      OR public.check_user_permission(auth.uid(), 'apps/procurement/admin/manage') THEN 'staff'
+    ELSE 'requester'
+  END;
+
+  IF p_mentions IS NOT NULL THEN
+    FOR v_tok IN SELECT u FROM unnest(p_mentions) AS u
+    LOOP
+      SELECT up.id INTO v_uid
+        FROM public.user_profiles up
+        WHERE up.email IS NOT NULL
+          AND (lower(up.email) = lower(trim(v_tok))
+               OR lower(regexp_replace(up.email, '@.*$', '')) = lower(regexp_replace(trim(v_tok), '@.*$', '')))
+        OR lower(coalesce(up.display_name, '')) = lower(trim(v_tok))
+        ORDER BY (lower(up.email) = lower(trim(v_tok))) DESC
+        LIMIT 1;
+      IF v_uid IS NOT NULL AND NOT (v_uid = ANY(v_mentions)) THEN
+        v_mentions := array_append(v_mentions, v_uid);
+      END IF;
+    END LOOP;
+  END IF;
+
+  INSERT INTO request_comments
+    (request_id, parent_id, line_item_id, source, author_id, author_name, author_email, author_role, body, mentioned_user_ids)
+  VALUES
+    (p_request_id, p_parent_id, p_line_item_id, p_source, auth.uid(), v_name, v_email, v_role, p_body, v_mentions)
+  RETURNING * INTO v_row;
+  RETURN v_row;
+END;
+$fn$;
+REVOKE ALL ON FUNCTION app_procurement.post_request_comment(uuid, uuid, uuid, text, text, text[]) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION app_procurement.post_request_comment(uuid, uuid, uuid, text, text, text[]) TO authenticated, service_role;
+
+-- get_mention_candidates: picker list = requester of this request + this request's comment
+-- authors + staff holding any procurement act permission. get_permission_holders (005) is
+-- service_role-only, so the permission query is inlined here (same body as 005).
+CREATE OR REPLACE FUNCTION app_procurement.get_mention_candidates(p_request_id uuid)
+RETURNS TABLE (user_id uuid, display_name text, email text)
+LANGUAGE sql SECURITY DEFINER SET search_path = app_procurement, public AS $fn$
+  SELECT DISTINCT x.user_id, x.display_name, x.email
+  FROM (
+    SELECT pr.requester_id AS user_id, up.display_name, up.email
+      FROM purchase_requests pr
+      LEFT JOIN public.user_profiles up ON up.id = pr.requester_id
+     WHERE pr.id = p_request_id AND pr.requester_id IS NOT NULL
+    UNION
+    SELECT rc.author_id, up.display_name, up.email
+      FROM request_comments rc
+      LEFT JOIN public.user_profiles up ON up.id = rc.author_id
+     WHERE rc.request_id = p_request_id AND rc.author_id IS NOT NULL
+    UNION
+    SELECT up.id, up.display_name, up.email
+      FROM public.user_profiles up
+     WHERE up.email IS NOT NULL AND up.email <> ''
+       AND (public.check_user_permission(up.id, 'apps/procurement/approvals/act')
+            OR public.check_user_permission(up.id, 'apps/procurement/purchasing/manage')
+            OR public.check_user_permission(up.id, 'apps/procurement/admin/manage'))
+  ) x
+  WHERE x.user_id IS NOT NULL
+  ORDER BY x.email
+$fn$;
+REVOKE ALL ON FUNCTION app_procurement.get_mention_candidates(uuid) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION app_procurement.get_mention_candidates(uuid) TO authenticated, service_role;
