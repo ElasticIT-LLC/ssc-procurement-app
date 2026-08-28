@@ -4,6 +4,7 @@ import { useAppPermissions } from '../lib/useAppPermissions'
 import { useProcurementApi, LineItemWithRequest } from '../data/db'
 import { StatusBadge } from '../requester/StatusBadge'
 import { FavoritesTab } from '../purchasing/FavoritesTab'
+import { PreApprovedTab } from '../approvals/PreApprovedTab'
 import { PERMS, formatDate } from '../lib/constants'
 import { formatItemRef } from '../lib/itemRef'
 
@@ -19,7 +20,7 @@ export function ApprovalsPage() {
   const [imageUrls, setImageUrls] = useState<Record<string, string>>({})
   const [names, setNames] = useState<Record<string, string>>({})
   const [drafts, setDrafts] = useState<Record<string, string>>({})
-  const [tab, setTab] = useState<'items' | 'favorites'>('items')
+  const [tab, setTab] = useState<'items' | 'preapproved' | 'favorites'>('items')
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -62,6 +63,24 @@ export function ApprovalsPage() {
     }
   }
 
+  async function handlePreApprove(item: LineItemWithRequest) {
+    if (!window.confirm(`Pre-approve "${item.item_description || 'this item'}"?\nIt will be approved and added to the pre-approved catalog.`)) return
+    const reqId = item.request?.id
+    setBusyId(item.id)
+    try {
+      await api.preApproveLineItem(item.id)
+      showToast({ message: 'Item pre-approved', type: 'success' })
+      api.fireNotification('item_approved', reqId, [item.id])
+      const remaining = await api.listLineItemsByStatus(['pending', 'on_hold'])
+      setItems(remaining)
+      if (reqId && !remaining.some((it) => it.request.id === reqId)) await api.notifyApproved(reqId)
+    } catch (err: unknown) {
+      showToast({ message: err instanceof Error ? err.message : 'Pre-approve failed', type: 'error' })
+    } finally {
+      setBusyId(null)
+    }
+  }
+
   const canComment = hasAppPermission(PERMS.approve) || hasAppPermission(PERMS.purchase) || hasAppPermission(PERMS.admin)
 
   if (!hasAppPermission(PERMS.approve)) {
@@ -86,6 +105,13 @@ export function ApprovalsPage() {
           className={`px-3 py-2 text-sm font-medium -mb-px border-b-2 ${tab === 'items' ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
         >
           For Approval
+        </button>
+        <button
+          type="button"
+          onClick={() => setTab('preapproved')}
+          className={`px-3 py-2 text-sm font-medium -mb-px border-b-2 ${tab === 'preapproved' ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
+        >
+          Pre-approved
         </button>
         <button
           type="button"
@@ -213,6 +239,14 @@ export function ApprovalsPage() {
             <button
               type="button"
               disabled={busyId === item.id}
+              onClick={() => handlePreApprove(item)}
+              className="inline-flex items-center rounded-md border border-primary/40 bg-primary/15 px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary/25 disabled:opacity-50"
+            >
+              Pre-approve
+            </button>
+            <button
+              type="button"
+              disabled={busyId === item.id}
               onClick={() => handleAction(item.id, 'declined')}
               className="inline-flex items-center rounded-md border border-destructive/40 bg-destructive/15 px-3 py-1.5 text-xs font-medium text-destructive hover:bg-destructive/25 disabled:opacity-50"
             >
@@ -229,6 +263,8 @@ export function ApprovalsPage() {
           </div>
         </div>
         ))}
+
+      {tab === 'preapproved' && <PreApprovedTab />}
 
       {tab === 'favorites' && <FavoritesTab />}
     </div>
