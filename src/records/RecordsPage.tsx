@@ -86,7 +86,7 @@ export function RecordsPage() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [showArchived])
 
   useEffect(() => { load() }, [load])
 
