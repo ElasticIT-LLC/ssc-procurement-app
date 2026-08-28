@@ -90,8 +90,8 @@ LEFT JOIN public.user_profiles up ON up.id = li.commented_by
 WHERE li.admin_comment IS NOT NULL
   AND NOT EXISTS (
     SELECT 1 FROM app_procurement.request_comments rc
-     WHERE rc.request_id = li.request_id AND rc.line_item_id = li.id AND rc.source = 'approvals' AND rc.body = li.admin_comment
-   );
+    WHERE rc.request_id = li.request_id AND rc.line_item_id = li.id AND rc.source = 'approvals' AND rc.body = li.admin_comment
+  );
 
 -- post_request_comment: create a thread root or a 1-level reply.
 -- Auth: requester of the request (portal user by uid, or email match for email-submission
