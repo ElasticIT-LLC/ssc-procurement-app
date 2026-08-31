@@ -234,22 +234,24 @@ Deno.serve(async (req) => {
       bellTarget = prior.length ? (prior[prior.length - 1]!.author_id as string) : null
     }
 
-    // Email: staff-started thread → requester; requester-started → nobody; reply → mentioned users only.
-    let emailRecipients: string[] = []
-    if (comment.parent_id === null) {
-      if (comment.author_role === 'staff' && requestRow.requester_email) emailRecipients = [requestRow.requester_email]
-    } else {
-      const mids = (comment.mentioned_user_ids ?? []).filter(Boolean)
-      if (mids.length) {
-        const { data: mentioned } = await db.from('user_profiles').select('id, email').in('id', mids)
-        emailRecipients = ((mentioned ?? []) as Array<{ email: string | null }>).map((m) => m.email).filter((e): e is string => !!e)
-      }
+    // Mentions (any comment, root or reply — spec C2: each matched portal user gets email + bell).
+    const mids = (comment.mentioned_user_ids ?? []).filter(Boolean)
+    const mentionedEmails: string[] = []
+    if (mids.length) {
+      const { data: mentioned } = await db.from('user_profiles').select('id, email').in('id', mids)
+      mentionedEmails = ((mentioned ?? []) as Array<{ email: string | null }>).map((m) => m.email).filter((e): e is string => !!e)
     }
 
-    // Bell rows: counterpart + (for replies) mentioned portal users. Dedupe by user_id.
+    // Email: staff-started thread → requester; mentions → mentioned users (any comment). Dedupe.
+    const emailSet = new Set<string>()
+    if (comment.parent_id === null && comment.author_role === 'staff' && requestRow.requester_email) emailSet.add(requestRow.requester_email)
+    for (const e of mentionedEmails) emailSet.add(e)
+    const emailRecipients = [...emailSet]
+
+    // Bell rows: counterpart + mentioned portal users (any comment). Dedupe by user_id.
     const bellUsers = new Set<string>()
     if (bellTarget) bellUsers.add(bellTarget)
-    if (comment.parent_id !== null) for (const m of (comment.mentioned_user_ids ?? []).filter(Boolean)) bellUsers.add(m)
+    for (const m of mids) bellUsers.add(m)
     const snippet = comment.body.length > 140 ? comment.body.slice(0, 140) + '…' : comment.body
     const title = `${clientName ? `${clientName} Procurement` : 'Procurement'}: ${comment.author_name} commented on your request`
     const bellRows = [...bellUsers].map((uid) => ({ user_id: uid, event_type: 'procurement:comment_added', title, body: snippet, link: reqUrl, app_slug: 'procurement' }))

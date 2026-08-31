@@ -49,12 +49,29 @@ export function ApprovalsPage() {
     setBusyId(id)
     try {
       await api.decideLineItem(id, action)
+      // C2: a note left on the card ships with the decision as a thread comment
+      // (source 'approvals', item-scoped). Best-effort — a failed comment never undoes the decision.
+      const draft = (drafts[id] ?? '').trim()
+      let notePosted = false
+      let noteFailed = false
+      if (draft && reqId) {
+        try {
+          const row = await api.postRequestComment({ request_id: reqId, line_item_id: id, source: 'approvals', body: draft })
+          api.fireCommentNotification(row.id)
+          setDrafts((d) => ({ ...d, [id]: '' }))
+          notePosted = true
+        } catch (e) {
+          console.error('Failed to post decision note as thread comment:', e)
+          noteFailed = true
+        }
+      }
       const messages: Record<typeof action, string> = {
         approved: 'Item approved',
         declined: 'Item declined',
         on_hold: 'Item placed on hold',
       }
-      showToast({ message: messages[action], type: 'success' })
+      const toastMsg = noteFailed ? `${messages[action]} — note could not be posted` : notePosted ? `${messages[action]} + note posted to thread` : messages[action]
+      showToast({ message: toastMsg, type: noteFailed ? 'error' : 'success' })
       api.fireNotification(action === 'approved' ? 'item_approved' : 'item_declined', reqId, [id])
       const remaining = await api.listLineItemsByStatus(['pending', 'on_hold'])
       setItems(remaining)
@@ -253,7 +270,7 @@ export function ApprovalsPage() {
                 maxLength={1000}
                 value={drafts[item.id] ?? ''}
                 onChange={(e) => setDrafts((d) => ({ ...d, [item.id]: e.target.value }))}
-                placeholder="Add a note for the requester… (max 1000 chars)"
+                placeholder="Add a note for the requester (posts with your decision, max 1000 chars)"
                 className="w-full rounded-md border border-input bg-input px-2 py-1 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring resize-none"
               />
               <div className="flex items-center justify-between gap-2">
