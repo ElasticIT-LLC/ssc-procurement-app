@@ -219,7 +219,14 @@ export function RequestDetail({ requestId, onBack }: RequestDetailProps) {
                   <ReplacementBadge item={item} className="ml-2" />
                 </p>
                 <p className="text-xs text-muted-foreground">Qty: {item.quantity}</p>
-                <p className="text-xs text-muted-foreground">Substitution: {item.substitution_ok ? 'Yes' : 'No'}</p>
+                <p className="text-xs text-muted-foreground">
+                  Substitution:{' '}
+                  {item.substitution_ok ? (
+                    'Yes'
+                  ) : (
+                    <span className="font-bold text-red-600">No</span>
+                  )}
+                </p>
               </div>
               <div className="flex items-center gap-2 shrink-0">
                 {item.item_description?.trim() && canCurate && (

@@ -3,6 +3,7 @@ import { useToast } from '@elasticit-llc/app-bridge'
 import { useAppPermissions } from '../lib/useAppPermissions'
 import { useProcurementApi, LineItemWithRequest, type RequestCommentRow } from '../data/db'
 import { StatusBadge } from '../requester/StatusBadge'
+import { decisionNotificationKey } from '../lib/decisionNotification'
 import { FavoritesTab } from '../purchasing/FavoritesTab'
 import { PreApprovedTab } from '../approvals/PreApprovedTab'
 import { PERMS, formatDate } from '../lib/constants'
@@ -72,7 +73,10 @@ export function ApprovalsPage() {
       }
       const toastMsg = noteFailed ? `${messages[action]} — note could not be posted` : notePosted ? `${messages[action]} + note posted to thread` : messages[action]
       showToast({ message: toastMsg, type: noteFailed ? 'error' : 'success' })
-      api.fireNotification(action === 'approved' ? 'item_approved' : 'item_declined', reqId, [id])
+      // decisionNotificationKey maps each decision to its own catalog key
+      // (regression: on_hold used to fire item_declined, sending a misleading
+      // "Item declined" email).
+      api.fireNotification(decisionNotificationKey(action), reqId, [id])
       const remaining = await api.listLineItemsByStatus(['pending', 'on_hold'])
       setItems(remaining)
       if (reqId && !remaining.some((it) => it.request.id === reqId)) await api.notifyApproved(reqId)

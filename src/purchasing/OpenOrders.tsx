@@ -1,16 +1,18 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useToast } from '@elasticit-llc/app-bridge'
-import { useProcurementApi, PurchaseOrderRow, LineItemWithRequest } from '../data/db'
+import { useProcurementApi, PurchaseOrderRow, LineItemWithRequest, Location } from '../data/db'
 import { StatusBadge } from '../requester/StatusBadge'
 import { ReplacementBadge } from '../requester/ReplacementBadge'
 import { formatDate } from '../lib/constants'
 import { formatItemRef } from '../lib/itemRef'
+import { resolveLocationName } from '../lib/locationLabel'
 import { poReceiveProgress } from './orders'
 
 export function OpenOrders() {
   const api = useProcurementApi()
   const { showToast } = useToast()
   const [pos, setPos] = useState<PurchaseOrderRow[]>([])
+  const [locations, setLocations] = useState<Location[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
@@ -19,14 +21,15 @@ export function OpenOrders() {
     setLoading(true)
     setError(null)
     try {
-      const openPos = await api.listPurchaseOrders('open')
+      const [openPos, locs] = await Promise.all([api.listPurchaseOrders('open'), api.listLocations()])
       setPos(openPos)
+      setLocations(locs)
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to load orders')
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [api])
   useEffect(() => { load() }, [load])
 
   async function receive(id: string) {
@@ -76,24 +79,29 @@ export function OpenOrders() {
               <button type="button" disabled={busyId === po.id} onClick={() => closePo(po.id)} className="inline-flex items-center rounded-md border border-border px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted disabled:opacity-50">Close PO</button>
             </div>
             <div className="grid gap-2">
-              {po.line_items.map(item => (
-                <div key={item.id} className="rounded-md border border-border bg-muted/30 px-3 py-2 flex items-center justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="text-sm text-foreground truncate">{formatItemRef(item.request?.request_number, item.line_no)} — {item.item_description || 'Unnamed item'}</p>
-                    <p className="text-xs text-muted-foreground">Qty: {item.quantity}</p>
+              {po.line_items.map(item => {
+                const locText = resolveLocationName(item, locations)
+                return (
+                  <div key={item.id} className="rounded-md border border-border bg-muted/30 px-3 py-2 flex items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="text-sm text-foreground truncate">{formatItemRef(item.request?.request_number, item.line_no)} — {item.item_description || 'Unnamed item'}</p>
+                      <p className="text-xs text-muted-foreground">Qty: {item.quantity}</p>
+                      {locText && <p className="text-xs text-muted-foreground">Location: {locText}</p>}
+                      {item.ship_to_name && <p className="text-xs text-muted-foreground">Ship to: {item.ship_to_name}</p>}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <ReplacementBadge item={item} />
+                      <StatusBadge status={item.status} />
+                      {item.status === 'ordered' && (
+                        <>
+                          <button type="button" disabled={busyId === item.id} onClick={() => receive(item.id)} className="inline-flex items-center rounded-md bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50">Mark Received</button>
+                          <button type="button" disabled={busyId === item.id} onClick={() => cancel(item)} className="inline-flex items-center rounded-md border border-destructive/40 bg-destructive/15 px-2.5 py-1 text-xs font-medium text-destructive hover:bg-destructive/25 disabled:opacity-50">Cancel Order</button>
+                        </>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <ReplacementBadge item={item} />
-                    <StatusBadge status={item.status} />
-                    {item.status === 'ordered' && (
-                      <>
-                        <button type="button" disabled={busyId === item.id} onClick={() => receive(item.id)} className="inline-flex items-center rounded-md bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50">Mark Received</button>
-                        <button type="button" disabled={busyId === item.id} onClick={() => cancel(item)} className="inline-flex items-center rounded-md border border-destructive/40 px-2.5 py-1 text-xs font-medium text-destructive hover:bg-destructive/10 disabled:opacity-50">Cancel Order</button>
-                      </>
-                    )}
-                  </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           </div>
         )

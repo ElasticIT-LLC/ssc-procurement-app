@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useToast } from '@elasticit-llc/app-bridge'
-import { useProcurementApi, PurchaseOrderRow, FavoriteItem, LineItemWithRequest } from '../data/db'
+import { useProcurementApi, PurchaseOrderRow, FavoriteItem, LineItemWithRequest, Location } from '../data/db'
 import { useAppPermissions } from '../lib/useAppPermissions'
+import { resolveLocationName } from '../lib/locationLabel'
 import { StatusBadge } from '../requester/StatusBadge'
 import { ReplacementBadge } from '../requester/ReplacementBadge'
 import { HeartIcon } from '../components/HeartIcon'
@@ -14,6 +15,7 @@ export function ClosedOrders() {
   const { hasAppPermission } = useAppPermissions()
   const isAdmin = hasAppPermission(PERMS.admin)
   const [pos, setPos] = useState<PurchaseOrderRow[]>([])
+  const [locations, setLocations] = useState<Location[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [favorites, setFavorites] = useState<FavoriteItem[]>([])
@@ -22,7 +24,11 @@ export function ClosedOrders() {
   const load = useCallback(async () => {
     setLoading(true)
     setError(null)
-    try { setPos(await api.listPurchaseOrders('closed')) }
+    try {
+      const [closedPos, locs] = await Promise.all([api.listPurchaseOrders('closed'), api.listLocations()])
+      setPos(closedPos)
+      setLocations(locs)
+    }
     catch (err: unknown) { setError(err instanceof Error ? err.message : 'Failed to load closed orders') }
     finally { setLoading(false) }
   }, [])
@@ -104,10 +110,18 @@ export function ClosedOrders() {
             <p className="text-xs text-muted-foreground">Closed {po.closed_at ? formatDate(po.closed_at) : ''} · {po.line_items.length} item{po.line_items.length === 1 ? '' : 's'}</p>
           </div>
           <div className="grid gap-2">
-            {po.line_items.map(item => (
-              <div key={item.id} className="rounded-md border border-border bg-muted/30 px-3 py-2 flex items-center justify-between gap-2">
-                <p className="text-sm text-foreground truncate">{formatItemRef(item.request?.request_number, item.line_no)} — {item.item_description || 'Unnamed item'}</p>
-                <div className="flex items-center gap-2">
+              {po.line_items.map(item => {
+                const locText = resolveLocationName(item, locations)
+                const sub = [locText ? `Location: ${locText}` : '', item.ship_to_name ? `Ship to: ${item.ship_to_name}` : '']
+                  .filter(Boolean)
+                  .join(' · ')
+                return (
+                <div key={item.id} className="rounded-md border border-border bg-muted/30 px-3 py-2 flex items-center justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="text-sm text-foreground truncate">{formatItemRef(item.request?.request_number, item.line_no)} — {item.item_description || 'Unnamed item'}</p>
+                    {sub && <p className="truncate text-xs text-muted-foreground">{sub}</p>}
+                  </div>
+                  <div className="flex items-center gap-2">
                   {item.item_description?.trim() && (
                     <button
                       type="button"
@@ -128,10 +142,11 @@ export function ClosedOrders() {
                   <StatusBadge status={item.status} />
                 </div>
               </div>
-            ))}
+                )
+              })}
+            </div>
           </div>
-        </div>
-      ))}
+        ))}
     </div>
   )
 }

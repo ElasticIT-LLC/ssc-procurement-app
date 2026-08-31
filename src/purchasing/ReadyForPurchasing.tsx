@@ -6,6 +6,7 @@ import { StatusBadge } from '../requester/StatusBadge'
 import { ReplacementBadge } from '../requester/ReplacementBadge'
 import { formatDate } from '../lib/constants'
 import { formatItemRef } from '../lib/itemRef'
+import { resolveLocationName } from '../lib/locationLabel'
 import { CreatePurchaseOrderForm } from './CreatePurchaseOrderForm'
 
 interface OrderForm {
@@ -151,6 +152,7 @@ export function ReadyForPurchasing() {
         const isOpen = openFormId === item.id
         const isOther = form.shipping_location_id === '__other__'
         const busy = submittingId === item.id
+        const locText = resolveLocationName(item, locations)
 
         return (
           <div key={item.id} className="rounded-lg border border-border bg-card p-4 grid gap-3">
@@ -161,9 +163,11 @@ export function ReadyForPurchasing() {
                   {formatItemRef(item.request?.request_number, item.line_no)} — {item.item_description || 'Unnamed item'}
                   <ReplacementBadge item={item} className="ml-2" />
                 </p>
-                <p className="text-xs text-muted-foreground">Qty: {item.quantity}</p>
-              </div>
-              <div className="flex items-start gap-2">
+                 <p className="text-xs text-muted-foreground">Qty: {item.quantity}</p>
+                 {locText && <p className="text-xs text-muted-foreground">Location: {locText}</p>}
+                 {item.ship_to_name && <p className="text-xs text-muted-foreground">Ship to: {item.ship_to_name}</p>}
+                </div>
+               <div className="flex items-start gap-2">
                 <input type="checkbox" checked={selected.has(item.id)} onChange={() => toggleSelect(item.id)} className="mt-1 h-4 w-4 accent-primary" aria-label="Select for purchase order" />
                 <StatusBadge status={item.status} />
               </div>

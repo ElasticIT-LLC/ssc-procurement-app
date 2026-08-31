@@ -3,7 +3,7 @@
   "slug": "procurement",
   "name": "Procurement",
   "icon": "Package",
-  "version": "0.26.2",
+  "version": "0.27.0",
   "permissions": [
     { "key": "apps/procurement/*", "label": "Full Access", "description": "Full access to Procurement", "group": "Administration" },
     { "key": "apps/procurement/requests/create", "label": "Create requests", "description": "Create and submit purchase requests; mark items received; initiate returns", "group": "Requests" },
@@ -69,7 +69,8 @@
       { "version": 35, "description": "Pre-approve is catalog-only (no auto-approval); item stays in For Approval; catalog upsert unchanged", "up": "migrations/035_pre_approve_catalog_only.sql" },
       { "version": 36, "description": "Wave C: request_comments thread table + RLS + realtime publication + admin_comment backfill", "up": "migrations/036_request_comments.sql" },
       { "version": 37, "description": "Wave C: purchase_requests.last_overdue_reminder_at (14-day reminder dedupe column)", "up": "migrations/037_last_overdue_reminder_at.sql" },
-      { "version": 38, "description": "Wave C: pg_cron job for daily 08:00 overdue reminders (net.http_post -> procurement-capture-and-notify)", "up": "migrations/038_overdue_cron.sql" }
+      { "version": 38, "description": "Wave C: pg_cron job for daily 08:00 overdue reminders (net.http_post -> procurement-capture-and-notify)", "up": "migrations/038_overdue_cron.sql" },
+      { "version": 39, "description": "Phase 4: item_on_hold notification key — backfill opt-in for users already opted into item_declined", "up": "migrations/039_item_on_hold_optin.sql" }
     ],
     "tables": [
       { "name": "locations",         "rls": { "read": "authenticated", "write": "admin" } },
@@ -92,7 +93,8 @@
     { "key": "item_ordered", "label": "Item ordered", "description": "An approved item was ordered.", "sort_order": 4 },
     { "key": "return_initiated", "label": "Return initiated", "description": "A return was initiated for a received item.", "sort_order": 5, "requires_permission": "apps/procurement/returns/manage" },
     { "key": "item_cancelled", "label": "Item cancelled", "description": "An approved item was cancelled; a new request is needed.", "sort_order": 6 },
-    { "key": "request_overdue_reminder", "label": "Request overdue", "description": "A pending or on-hold request has been waiting 14+ days and needs a decision.", "sort_order": 7, "requires_permission": "apps/procurement/approvals/act" }
+    { "key": "request_overdue_reminder", "label": "Request overdue", "description": "A pending or on-hold request has been waiting 14+ days and needs a decision.", "sort_order": 7, "requires_permission": "apps/procurement/approvals/act" },
+    { "key": "item_on_hold", "label": "Item on hold", "description": "A requested item was placed on hold.", "sort_order": 8 }
   ],
   "edge_functions": [
     { "name": "procurement-capture-and-notify", "entrypoint": "supabase/functions/procurement-capture-and-notify/index.ts", "verify_jwt": false },

@@ -418,6 +418,7 @@ async function handleRequest(req: Request) {
       request_submitted: approvalsUrl,
       item_approved: recordsUrl,
       item_declined: recordsUrl,
+      item_on_hold: recordsUrl,
       item_ordered: recordsUrl,
       item_cancelled: recordsUrl,
       return_initiated: returnsUrl,

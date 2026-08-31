@@ -13,6 +13,7 @@ function li(over: Partial<LineItemRow> = {}): LineItemRow {
   return {
     id: 'l1', request_id: 'r1', item_description: 'Monitor', item_url: null, memo: null,
     quantity: 1, substitution_ok: false, status: 'pending', location_id: null, custom_location: null,
+    ship_to_name: null, shipping_location_id: null, custom_shipping_location: null,
     department_id: null, custom_department: null, date_needed: null, eta: null, admin_comment: null,
     commented_by: null, commented_at: null, product_image_path: null, return_reason: null,
     return_quantity: null, wants_replacement: null, return_notes: null, return_date: null,
