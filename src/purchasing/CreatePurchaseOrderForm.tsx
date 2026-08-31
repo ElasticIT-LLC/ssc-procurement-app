@@ -4,12 +4,13 @@ import { DateInput, todayIso } from '../components/DateInput'
 
 interface Props {
   itemIds: string[]
+  requestIds: string[]
   locations: Location[]
   onCancel: () => void
   onCreated: (po: { id: string; po_number: string }) => void | Promise<void>
 }
 
-export function CreatePurchaseOrderForm({ itemIds, locations, onCancel, onCreated }: Props) {
+export function CreatePurchaseOrderForm({ itemIds, requestIds, locations, onCancel, onCreated }: Props) {
   const api = useProcurementApi()
   const [vendor, setVendor] = useState('')
   const [datePurchased, setDatePurchased] = useState(todayIso())
@@ -36,6 +37,24 @@ export function CreatePurchaseOrderForm({ itemIds, locations, onCancel, onCreate
       // Reuse the existing ordered notification, fired once for the whole PO
       // (the items were ordered together — one notification, not one per item).
       await api.fireNotification('item_ordered', undefined, itemIds)
+      // C2/D5: post the PO notes to each distinct request thread (source 'purchasing').
+      // Bulk POs span requests, so one comment per request; body carries the PO number.
+      const note = notes.trim()
+      if (note && requestIds.length) {
+        for (const reqId of requestIds) {
+          try {
+            const row = await api.postRequestComment({
+              request_id: reqId,
+              line_item_id: null,
+              source: 'purchasing',
+              body: `${note} (PO ${po.po_number})`,
+            })
+            api.fireCommentNotification(row.id)
+          } catch (e) {
+            console.error('Failed to post PO thread comment:', e)
+          }
+        }
+      }
       await onCreated(po)
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to create purchase order')

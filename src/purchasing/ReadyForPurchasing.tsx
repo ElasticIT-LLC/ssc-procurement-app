@@ -84,6 +84,22 @@ export function ReadyForPurchasing() {
       })
       await api.notifyStatusUpdate(item.request.id, [item.id], 'item_ordered')
       api.fireNotification('item_ordered', item.request.id, [item.id])
+      // C2/D5: post purchase notes to the request thread (source 'purchasing') after the
+      // order RPC succeeds. Best-effort — a comment failure never fails the order.
+      const note = form.purchase_notes.trim()
+      if (note) {
+        try {
+          const row = await api.postRequestComment({
+            request_id: item.request.id,
+            line_item_id: item.id,
+            source: 'purchasing',
+            body: note,
+          })
+          api.fireCommentNotification(row.id)
+        } catch (e) {
+          console.error('Failed to post purchase-notes thread comment:', e)
+        }
+      }
       showToast({ message: 'Order recorded', type: 'success' })
       setOpenFormId(null)
       await load()
@@ -123,6 +139,7 @@ export function ReadyForPurchasing() {
       {showPoForm && (
         <CreatePurchaseOrderForm
           itemIds={[...selected]}
+          requestIds={Array.from(new Set(items.filter(i => selected.has(i.id)).map(i => i.request.id)))}
           locations={locations}
           onCancel={() => setShowPoForm(false)}
           onCreated={async (po) => { setShowPoForm(false); setSelected(new Set()); showToast({ message: `Created ${po.po_number}`, type: 'success' }); await load() }}

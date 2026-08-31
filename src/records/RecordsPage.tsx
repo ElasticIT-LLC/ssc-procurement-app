@@ -1,13 +1,16 @@
 import { Fragment, useState, useEffect, useCallback, useMemo } from 'react'
 import { useToast } from '@elasticit-llc/app-bridge'
 import { useAppPermissions } from '../lib/useAppPermissions'
-import { useProcurementApi, LineItemDetailed, LineItemWithRequest, PreApprovedItem } from '../data/db'
+import { useProcurementApi, LineItemDetailed, LineItemWithRequest, PreApprovedItem, type RequestCommentRow } from '../data/db'
 import { StatusBadge } from '../requester/StatusBadge'
 import { ReplacementBadge } from '../requester/ReplacementBadge'
 import { ReturnForm } from '../requester/ReturnForm'
 import { FULL_ACCESS, PERMS, formatDate } from '../lib/constants'
 import { useFormattingRules } from '../formatting/useFormattingRules'
 import { filterRecords } from '../lib/recordsFilter'
+import { Modal } from '../components/Modal'
+import { RequestActivity } from '../components/RequestActivity'
+import { buildTimeline } from '../lib/timeline'
 
 function locationName(item: LineItemDetailed): string {
   return item.location?.name ?? item.custom_location ?? '—'
@@ -21,8 +24,8 @@ function csvCell(value: string): string {
   return /[",\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value
 }
 
-function exportCsv(rows: LineItemDetailed[], catalog: Record<string, PreApprovedItem>, sourceRef: Record<string, string>) {
-  const headers = ['Submitted', 'Requester', 'Email', 'Item', 'Qty', 'Location', 'Department', 'Status', 'Date Needed', 'ETA', 'Request Notes', 'Admin Comment', 'Received', 'Cancelled', 'Pre-approved Item', 'Source Item']
+function exportCsv(rows: LineItemDetailed[], catalog: Record<string, PreApprovedItem>, sourceRef: Record<string, string>, latestByItem: Record<string, RequestCommentRow>) {
+  const headers = ['Submitted', 'Requester', 'Email', 'Item', 'Qty', 'Location', 'Department', 'Status', 'Date Needed', 'ETA', 'Request Notes', 'Latest comment', 'Received', 'Cancelled', 'Pre-approved Item', 'Source Item']
   const lines = [headers.join(',')]
   for (const item of rows) {
     const cat = item.pre_approved_item_id ? catalog[item.pre_approved_item_id] : undefined
@@ -39,7 +42,7 @@ function exportCsv(rows: LineItemDetailed[], catalog: Record<string, PreApproved
       formatDate(item.date_needed),
       formatDate(item.eta),
       item.request.notes ?? '',
-      item.admin_comment ?? '',
+      latestByItem[item.id]?.body ?? item.admin_comment ?? '',
       formatDate(item.received_at),
       formatDate(item.cancelled_at),
       item.preApproved?.name ?? '',
@@ -63,7 +66,6 @@ export function RecordsPage() {
   const { hasAppPermission } = useAppPermissions()
   const { toneClassFor } = useFormattingRules()
 
-  const canComment = hasAppPermission(PERMS.approve) || hasAppPermission(PERMS.purchase) || hasAppPermission(PERMS.admin)
   const canArchive = hasAppPermission(FULL_ACCESS)
   const canReturn = hasAppPermission(PERMS.returns) || hasAppPermission(PERMS.admin)
 
@@ -71,7 +73,8 @@ export function RecordsPage() {
   const [names, setNames] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [drafts, setDrafts] = useState<Record<string, string>>({})
+  const [comments, setComments] = useState<RequestCommentRow[]>([])
+  const [historyItem, setHistoryItem] = useState<LineItemDetailed | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [returnOpenId, setReturnOpenId] = useState<string | null>(null)
   const [showArchived, setShowArchived] = useState(false)
@@ -86,9 +89,9 @@ export function RecordsPage() {
     try {
       const data = await api.listAllLineItemsDetailed(showArchived)
       setItems(data)
-      setDrafts(Object.fromEntries(data.map(i => [i.id, i.admin_comment ?? ''])))
-      const map = await api.resolveUserNames(data.map((r) => r.commented_by).filter((x): x is string => !!x))
-      setNames(map)
+      setComments(await api.listRequestCommentsMany(Array.from(new Set(data.map(i => i.request.id)))))
+      const approvers = Array.from(new Set(data.map(r => r.approved_by).filter((x): x is string => !!x)))
+      if (approvers.length) setNames(await api.resolveUserNames(approvers))
       const list = await api.listPreApprovedItems()
       setCatalog(Object.fromEntries(list.map(i => [i.id, i])))
       setSourceRef(await api.lookupItemRefs(list.map(i => i.source_line_item_id).filter((x): x is string => !!x)))
@@ -101,18 +104,38 @@ export function RecordsPage() {
 
   useEffect(() => { load() }, [load])
 
-  async function handleSaveComment(id: string) {
-    setBusyId(id)
-    try {
-      await api.setLineItemComment(id, drafts[id] ?? '')
-      showToast({ message: 'Comment saved', type: 'success' })
-      await load()
-    } catch (err: unknown) {
-      showToast({ message: err instanceof Error ? err.message : 'Failed to save comment', type: 'error' })
-    } finally {
-      setBusyId(null)
+  // Latest thread comment per item (C2). Legacy admin_comment stays as the fallback.
+  const latestByItem = useMemo(() => {
+    const map: Record<string, RequestCommentRow> = {}
+    for (const c of comments) {
+      if (!c.line_item_id) continue
+      const cur = map[c.line_item_id]
+      if (!cur || c.created_at > cur.created_at) map[c.line_item_id] = c
     }
-  }
+    return map
+  }, [comments])
+
+  const commentsByItem = useMemo(() => {
+    const map: Record<string, RequestCommentRow[]> = {}
+    for (const c of comments) {
+      if (!c.line_item_id) continue
+      ;(map[c.line_item_id] ??= []).push(c)
+    }
+    for (const k of Object.keys(map)) map[k]?.sort((a, b) => a.created_at.localeCompare(b.created_at))
+    return map
+  }, [comments])
+
+  // Per-item derived timeline for the History modal (C1 — no event log).
+  const historyEvents = useMemo(() => {
+    if (!historyItem) return []
+    return buildTimeline({
+      request: historyItem.request,
+      items: [historyItem],
+      comments: commentsByItem[historyItem.id] ?? [],
+      itemName: (li) => li.item_description ?? 'Item',
+      nameOf: (id) => names[id] ?? 'Unknown',
+    })
+  }, [historyItem, commentsByItem, names])
 
   async function handleArchive(item: LineItemDetailed) {
     const archiving = !item.archived_at
@@ -170,7 +193,7 @@ export function RecordsPage() {
           </label>
           <button
             type="button"
-            onClick={() => exportCsv(visible, catalog, sourceRef)}
+            onClick={() => exportCsv(visible, catalog, sourceRef, latestByItem)}
             disabled={items.length === 0}
             className="inline-flex items-center rounded-md border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted disabled:opacity-50"
           >
@@ -216,7 +239,7 @@ export function RecordsPage() {
                 <th className={head}>Date Needed</th>
                 <th className={head}>ETA</th>
                 <th className={head}>Request Notes</th>
-                <th className={head}>Admin Comment</th>
+                <th className={head}>Latest comment</th>
                 {showActionsColumn && <th className={head}>Actions</th>}
               </tr>
             </thead>
@@ -250,35 +273,30 @@ export function RecordsPage() {
                   <td className={`${cell} max-w-[14rem] text-muted-foreground`}>
                     <span className="break-words">{item.request.notes ?? '—'}</span>
                   </td>
-                  <td className={`${cell} min-w-[12rem]`}>
-                    {canComment ? (
-                      <div className="flex flex-col gap-1">
-                        <div className="flex items-start gap-1.5">
-                          <input
-                            type="text"
-                            value={drafts[item.id] ?? ''}
-                            onChange={e => setDrafts(prev => ({ ...prev, [item.id]: e.target.value }))}
-                            placeholder="Add comment…"
-                            maxLength={100}
-                            className="h-8 w-full rounded-md border border-border bg-input px-2 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                          />
-                          <button
-                            type="button"
-                            disabled={busyId === item.id || (drafts[item.id] ?? '') === (item.admin_comment ?? '')}
-                            onClick={() => handleSaveComment(item.id)}
-                            className="inline-flex shrink-0 items-center rounded-md bg-primary px-2 py-1.5 text-xs font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
-                          >
-                            Save
-                          </button>
-                        </div>
-                        {item.commented_at && (
-                          <p className="text-[11px] text-muted-foreground mt-0.5">— {names[item.commented_by ?? ''] ?? 'Unknown'} · {formatDate(item.commented_at)}</p>
-                        )}
+                    <td className={`${cell} min-w-[12rem]`}>
+                      <div className="grid gap-1">
+                        {(() => {
+                          const latest = latestByItem[item.id]
+                          const text = latest ? latest.body : (item.admin_comment ?? '')
+                          if (!text) return <span className="text-muted-foreground">—</span>
+                          return (
+                            <span className="break-words">
+                              {text}
+                              {latest && (
+                                <span className="text-[11px] text-muted-foreground"> — {latest.author_name} · {formatDate(latest.created_at)}</span>
+                              )}
+                            </span>
+                          )
+                        })()}
+                        <button
+                          type="button"
+                          onClick={() => setHistoryItem(item)}
+                          className="justify-self-start inline-flex items-center rounded-md border border-border px-2 py-1 text-[11px] font-medium text-foreground hover:bg-muted"
+                        >
+                          History
+                        </button>
                       </div>
-                    ) : (
-                      <span className="text-muted-foreground break-words">{item.admin_comment ?? '—'}</span>
-                    )}
-                  </td>
+                    </td>
                   {showActionsColumn && (
                     <td className={`${cell} whitespace-nowrap`}>
                       <div className="flex flex-wrap gap-1.5">
@@ -320,6 +338,14 @@ export function RecordsPage() {
             </tbody>
           </table>
         </div>
+      )}
+      {historyItem && (
+        <Modal
+          title={`History — ${historyItem.item_description ?? 'Item'}`}
+          onClose={() => setHistoryItem(null)}
+        >
+          <RequestActivity events={historyEvents} />
+        </Modal>
       )}
     </div>
   )
