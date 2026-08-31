@@ -3,7 +3,7 @@
   "slug": "procurement",
   "name": "Procurement",
   "icon": "Package",
-  "version": "0.25.1",
+  "version": "0.26.0",
   "permissions": [
     { "key": "apps/procurement/*", "label": "Full Access", "description": "Full access to Procurement", "group": "Administration" },
     { "key": "apps/procurement/requests/create", "label": "Create requests", "description": "Create and submit purchase requests; mark items received; initiate returns", "group": "Requests" },
@@ -91,7 +91,8 @@
     { "key": "item_declined", "label": "Item declined", "description": "A requested item was declined.", "sort_order": 3 },
     { "key": "item_ordered", "label": "Item ordered", "description": "An approved item was ordered.", "sort_order": 4 },
     { "key": "return_initiated", "label": "Return initiated", "description": "A return was initiated for a received item.", "sort_order": 5, "requires_permission": "apps/procurement/returns/manage" },
-    { "key": "item_cancelled", "label": "Item cancelled", "description": "An approved item was cancelled; a new request is needed.", "sort_order": 6 }
+    { "key": "item_cancelled", "label": "Item cancelled", "description": "An approved item was cancelled; a new request is needed.", "sort_order": 6 },
+    { "key": "request_overdue_reminder", "label": "Request overdue", "description": "A pending or on-hold request has been waiting 14+ days and needs a decision.", "sort_order": 7, "requires_permission": "apps/procurement/approvals/act" }
   ],
   "edge_functions": [
     { "name": "procurement-capture-and-notify", "entrypoint": "supabase/functions/procurement-capture-and-notify/index.ts", "verify_jwt": false },
