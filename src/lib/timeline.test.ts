@@ -69,4 +69,21 @@ describe('buildTimeline', () => {
     expect(kinds).toContain('cancelled')
     expect(kinds[kinds.length - 1]).toBe('submitted')
   })
+
+  it('prefers dedicated received_at/cancelled_at stamps over updated_at', () => {
+    const events = buildTimeline({
+      request: req(),
+      items: [
+        li({ id: 'l1', status: 'received', received_at: '2026-08-21T10:00:00Z', updated_at: '2026-08-25T09:00:00Z' }),
+        li({ id: 'l2', item_description: 'Dock', status: 'cancelled', cancelled_at: '2026-08-13T09:00:00Z', updated_at: '2026-08-26T09:00:00Z' }),
+      ],
+      comments: [],
+      itemName,
+      nameOf,
+    })
+    const byId: Record<string, string | null> = {}
+    for (const e of events) byId[e.id] = e.at
+    expect(byId['li-l1-received']).toBe('2026-08-21T10:00:00Z')
+    expect(byId['li-l2-cancelled']).toBe('2026-08-13T09:00:00Z')
+  })
 })

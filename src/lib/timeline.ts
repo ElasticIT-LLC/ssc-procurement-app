@@ -22,8 +22,9 @@ interface TimelineInput {
 }
 
 // Derived timeline (decision 14: no event log table). Newest first.
-// Caveats (spec Risk 3): "received" and "cancelled" carry no dedicated timestamp column,
-// so their time comes from line_items.updated_at (the RPC that flips the status stamps it).
+// "received" and "cancelled" use their dedicated stamps (received_at/cancelled_at,
+// added in Wave B) when present, falling back to line_items.updated_at for legacy
+// rows stamped before those columns existed (spec Risk 3).
 export function buildTimeline(input: TimelineInput): TimelineEvent[] {
   const { request, items, comments, itemName, nameOf } = input
   const events: TimelineEvent[] = [
@@ -39,7 +40,7 @@ export function buildTimeline(input: TimelineInput): TimelineEvent[] {
       events.push({ id: `li-${li.id}-ordered`, at: `${li.date_purchased}T12:00:00Z`, kind: 'ordered', label: `Ordered ${name}${li.po_id ? ' (PO created)' : ''}` })
     }
     if (li.status === 'received') {
-      events.push({ id: `li-${li.id}-received`, at: li.updated_at, kind: 'received', label: `Marked received — ${name}` })
+      events.push({ id: `li-${li.id}-received`, at: li.received_at ?? li.updated_at, kind: 'received', label: `Marked received — ${name}` })
     }
     if (li.return_date) {
       events.push({ id: `li-${li.id}-returned`, at: li.return_date, kind: 'returned', label: `Return initiated — ${name}` })
@@ -48,7 +49,7 @@ export function buildTimeline(input: TimelineInput): TimelineEvent[] {
       events.push({ id: `li-${li.id}-return_processed`, at: li.return_processed_at, kind: 'return_processed', label: `Return processed — ${name}` })
     }
     if (li.status === 'cancelled') {
-      events.push({ id: `li-${li.id}-cancelled`, at: li.updated_at, kind: 'cancelled', label: `Item cancelled — ${name}` })
+      events.push({ id: `li-${li.id}-cancelled`, at: li.cancelled_at ?? li.updated_at, kind: 'cancelled', label: `Item cancelled — ${name}` })
     }
     if (li.archived_at) {
       events.push({ id: `li-${li.id}-archived`, at: li.archived_at, kind: 'archived', label: `Item archived — ${name}` })
