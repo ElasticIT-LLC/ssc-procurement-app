@@ -53,6 +53,16 @@ async function fetchNotificationMeta(db: any, appSlug: string, key: string): Pro
 }
 
 Deno.serve(async (req) => {
+  try {
+    return await handleRequest(req)
+  } catch (e) {
+    const err = e instanceof Error ? e : new Error(String(e))
+    console.error(`unhandled error: ${err.message}\n${err.stack ?? ''}`)
+    return json({ error: err.message }, 500)
+  }
+})
+
+async function handleRequest(req: Request) {
   if (req.method === 'OPTIONS') return new Response(null, { headers: cors })
   if (req.method !== 'POST') return json({ error: 'POST only' }, 405)
 
@@ -236,7 +246,7 @@ Deno.serve(async (req) => {
 
     // Mentions (any comment, root or reply — spec C2: each matched portal user gets email + bell).
     const mids = (comment.mentioned_user_ids ?? []).filter(Boolean)
-    const mentionedEmails: string[] = []
+    let mentionedEmails: string[] = []
     if (mids.length) {
       const { data: mentioned } = await db.from('user_profiles').select('id, email').in('id', mids)
       mentionedEmails = ((mentioned ?? []) as Array<{ email: string | null }>).map((m) => m.email).filter((e): e is string => !!e)
@@ -521,4 +531,4 @@ Deno.serve(async (req) => {
   }
 
   return json({ request_id: requestId, items: results, email_sent: emailSent, recipients: recipientEmails.length })
-})
+}
