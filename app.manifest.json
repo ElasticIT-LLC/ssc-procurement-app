@@ -79,8 +79,7 @@
       { "name": "_config",           "rls": { "read": "admin", "write": "admin" } },
       { "name": "purchase_orders",   "rls": { "read": "authenticated", "write": "admin" } },
       { "name": "favorite_items",    "rls": { "read": "authenticated", "write": "admin" } },
-      { "name": "pre_approved_items","rls": { "read": "authenticated", "write": "admin" } },
-      { "name": "request_comments",  "rls": { "read": "authenticated", "write": "admin" } }
+      { "name": "pre_approved_items","rls": { "read": "authenticated", "write": "admin" } }
     ]
   },
   "config": [
