@@ -4,6 +4,7 @@ import { useProcurementApi, type LineItemRow, type MentionCandidate, type Reques
 import { useAppPermissions } from '../lib/useAppPermissions'
 import { PERMS, formatDate } from '../lib/constants'
 import { formatItemRef } from '../lib/itemRef'
+import { isThreadCollapsed, toggleThread } from '../lib/threadCollapse'
 import { parseMentions } from '../lib/mentions'
 
 const TIME_FMT: Intl.DateTimeFormatOptions = { month: '2-digit', day: '2-digit', year: 'numeric', hour: 'numeric', minute: '2-digit' }
@@ -84,7 +85,7 @@ export function RequestThread({ request, items, comments, onPosted }: RequestThr
 
   // Collapsed by default; the newest thread auto-expands.
   const newestRootId = roots[0]?.id ?? null
-  const isCollapsed = (rootId: string) => collapseOverride[rootId] ?? rootId !== newestRootId
+  const isCollapsed = (rootId: string) => isThreadCollapsed(collapseOverride, rootId, newestRootId)
 
   const itemRef = (lineItemId: string | null): string | null => {
     if (!lineItemId) return null
@@ -190,7 +191,7 @@ export function RequestThread({ request, items, comments, onPosted }: RequestThr
           <div key={root.id} className="rounded-lg border border-border bg-card">
             <button
               type="button"
-              onClick={() => setCollapseOverride((m) => ({ ...m, [root.id]: !open }))}
+              onClick={() => setCollapseOverride((m) => toggleThread(m, root.id, open))}
               className="flex w-full items-center gap-2 px-3 py-2 text-left"
             >
               <span className="text-xs text-muted-foreground">{open ? '▾' : '▸'}</span>
@@ -202,6 +203,7 @@ export function RequestThread({ request, items, comments, onPosted }: RequestThr
               {itemRef(root.line_item_id) && (
                 <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">{itemRef(root.line_item_id)}</span>
               )}
+              <span className="min-w-0 max-w-[240px] truncate text-xs text-muted-foreground">{root.body.split('\n')[0]}</span>
               <span className="ml-auto whitespace-nowrap text-[11px] text-muted-foreground">
                 {formatDate(root.created_at, TIME_FMT)} · {replies.length} {replies.length === 1 ? 'reply' : 'replies'}
               </span>
