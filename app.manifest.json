@@ -66,7 +66,10 @@
       { "version": 32, "description": "Favorites: only approvers/purchasers/admins may insert; trigger stamps created_by for Added-by attribution", "up": "migrations/032_favorite_items_curators.sql" },
       { "version": 33, "description": "Pre-approved items catalog (table + RLS + created_by trigger) + line_items reporting columns (received_at, cancelled_at, pre_approved_item_id)", "up": "migrations/033_pre_approved_items.sql" },
       { "version": 34, "description": "Pre-approved RPCs (pre_approve_line_item, order_pre_approved_item, delete_pre_approved_item) + receive_line_item v2 / cancel_line_item v3 with received_at/cancelled_at stamps", "up": "migrations/034_pre_approved_rpcs.sql" },
-      { "version": 35, "description": "Pre-approve is catalog-only (no auto-approval); item stays in For Approval; catalog upsert unchanged", "up": "migrations/035_pre_approve_catalog_only.sql" }
+      { "version": 35, "description": "Pre-approve is catalog-only (no auto-approval); item stays in For Approval; catalog upsert unchanged", "up": "migrations/035_pre_approve_catalog_only.sql" },
+      { "version": 36, "description": "Wave C: request_comments thread table + RLS + realtime publication + admin_comment backfill", "up": "migrations/036_request_comments.sql" },
+      { "version": 37, "description": "Wave C: purchase_requests.last_overdue_reminder_at (14-day reminder dedupe column)", "up": "migrations/037_last_overdue_reminder_at.sql" },
+      { "version": 38, "description": "Wave C: pg_cron job for daily 08:00 overdue reminders (net.http_post -> procurement-capture-and-notify)", "up": "migrations/038_overdue_cron.sql" }
     ],
     "tables": [
       { "name": "locations",         "rls": { "read": "authenticated", "write": "admin" } },
@@ -76,9 +79,13 @@
       { "name": "_config",           "rls": { "read": "admin", "write": "admin" } },
       { "name": "purchase_orders",   "rls": { "read": "authenticated", "write": "admin" } },
       { "name": "favorite_items",    "rls": { "read": "authenticated", "write": "admin" } },
-      { "name": "pre_approved_items","rls": { "read": "authenticated", "write": "admin" } }
+      { "name": "pre_approved_items","rls": { "read": "authenticated", "write": "admin" } },
+      { "name": "request_comments",  "rls": { "read": "authenticated", "write": "admin" } }
     ]
   },
+  "config": [
+    { "key": "supabase_url", "source": "project_url", "description": "Project base URL; read by the pg_cron overdue-reminder job (migration 038) to call the edge function." }
+  ],
   "notifications": [
     { "key": "request_submitted", "label": "New request to approve", "description": "A new purchase request was submitted and needs approval.", "sort_order": 1, "requires_permission": "apps/procurement/approvals/act" },
     { "key": "item_approved", "label": "Item approved", "description": "A requested item was approved.", "sort_order": 2 },
