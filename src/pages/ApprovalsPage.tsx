@@ -1,7 +1,7 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useToast } from '@elasticit-llc/app-bridge'
 import { useAppPermissions } from '../lib/useAppPermissions'
-import { useProcurementApi, LineItemWithRequest } from '../data/db'
+import { useProcurementApi, LineItemWithRequest, type RequestCommentRow } from '../data/db'
 import { StatusBadge } from '../requester/StatusBadge'
 import { FavoritesTab } from '../purchasing/FavoritesTab'
 import { PreApprovedTab } from '../approvals/PreApprovedTab'
@@ -18,7 +18,7 @@ export function ApprovalsPage() {
   const [error, setError] = useState<string | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [imageUrls, setImageUrls] = useState<Record<string, string>>({})
-  const [names, setNames] = useState<Record<string, string>>({})
+  const [comments, setComments] = useState<RequestCommentRow[]>([])
   const [drafts, setDrafts] = useState<Record<string, string>>({})
   const [preApprovedNames, setPreApprovedNames] = useState<Set<string>>(new Set())
   const [tab, setTab] = useState<'items' | 'preapproved' | 'favorites'>('items')
@@ -31,7 +31,7 @@ export function ApprovalsPage() {
       setItems(data)
       const catalog = await api.listPreApprovedItems()
       setPreApprovedNames(new Set(catalog.map((c) => c.name.toLowerCase())))
-      setNames(await api.resolveUserNames(data.map((i) => i.commented_by).filter((x): x is string => !!x)))
+      setComments(await api.listRequestCommentsMany(Array.from(new Set(data.map((i) => i.request.id)))))
       const urls: Record<string, string> = {}
       await Promise.all(data.filter((i) => i.product_image_path).map(async (i) => { const u = await api.getProductImageUrl(i.product_image_path as string); if (u) urls[i.id] = u }))
       setImageUrls(urls)
@@ -61,6 +61,41 @@ export function ApprovalsPage() {
       if (reqId && !remaining.some((it) => it.request.id === reqId)) await api.notifyApproved(reqId)
     } catch (err: unknown) {
       showToast({ message: err instanceof Error ? err.message : 'Action failed', type: 'error' })
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  const commentsByRequest = useMemo(() => {
+    const map: Record<string, RequestCommentRow[]> = {}
+    for (const c of comments) (map[c.request_id] ??= []).push(c)
+    return map
+  }, [comments])
+  const threadCountFor = (requestId: string) => (commentsByRequest[requestId] ?? []).length
+  // The full thread lives on the Requests page (RequestDetail). Plain <a href> forces a
+  // full navigation so the shell reloads on the requests page and RequestsPage reads ?request=<id>.
+  const threadLink = (requestId: string) =>
+    `${window.location.pathname.replace(/[^/]+$/, 'requests')}?request=${encodeURIComponent(requestId)}`
+
+  async function saveComment(itemId: string) {
+    const item = items.find((it) => it.id === itemId)
+    if (!item) return
+    const body = (drafts[itemId] ?? '').trim()
+    if (!body) return
+    setBusyId(itemId)
+    try {
+      const row = await api.postRequestComment({
+        request_id: item.request.id,
+        line_item_id: itemId,
+        source: 'approvals',
+        body,
+      })
+      api.fireCommentNotification(row.id)
+      setDrafts((d) => ({ ...d, [itemId]: '' }))
+      setComments(await api.listRequestCommentsMany(Array.from(new Set(items.map((i) => i.request.id)))))
+      showToast({ message: 'Comment posted', type: 'success' })
+    } catch (err: unknown) {
+      showToast({ message: err instanceof Error ? err.message : 'Failed to post comment', type: 'error' })
     } finally {
       setBusyId(null)
     }
@@ -204,28 +239,31 @@ export function ApprovalsPage() {
             </p>
           </div>
 
-          {/* Comment editor */}
+          {/* Comment thread (C2) — posts to the request thread (source 'approvals') */}
           {canComment && (
             <div className="grid gap-1">
-              <label className="text-xs font-medium text-foreground">Comment</label>
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-medium text-foreground">Comment</label>
+                {threadCountFor(item.request.id) > 0 && (
+                  <span className="text-[11px] text-muted-foreground">{threadCountFor(item.request.id)} in thread</span>
+                )}
+              </div>
               <textarea
                 rows={2}
-                maxLength={100}
-                defaultValue={item.admin_comment ?? ''}
+                maxLength={1000}
+                value={drafts[item.id] ?? ''}
                 onChange={(e) => setDrafts((d) => ({ ...d, [item.id]: e.target.value }))}
-                placeholder="Short note (max 100 chars)…"
+                placeholder="Add a note for the requester… (max 1000 chars)"
                 className="w-full rounded-md border border-input bg-input px-2 py-1 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring resize-none"
               />
               <div className="flex items-center justify-between gap-2">
-                {item.commented_at ? (
-                  <span className="text-[11px] text-muted-foreground">— {names[item.commented_by ?? ''] ?? 'Unknown'} · {formatDate(item.commented_at)}</span>
-                ) : <span />}
+                <a href={threadLink(item.request.id)} className="text-[11px] text-primary underline">View full thread</a>
                 <button
                   type="button"
-                  disabled={busyId === item.id}
-                  onClick={async () => { setBusyId(item.id); try { await api.setLineItemComment(item.id, drafts[item.id] ?? item.admin_comment ?? ''); await load() } catch (err) { showToast({ message: err instanceof Error ? err.message : 'Failed to save comment', type: 'error' }) } finally { setBusyId(null) } }}
+                  disabled={busyId === item.id || !(drafts[item.id] ?? '').trim()}
+                  onClick={() => { void saveComment(item.id) }}
                   className="inline-flex items-center rounded-md border border-border px-2.5 py-1 text-xs font-medium text-foreground hover:bg-muted disabled:opacity-50"
-                >Save comment</button>
+                >Post comment</button>
               </div>
             </div>
           )}

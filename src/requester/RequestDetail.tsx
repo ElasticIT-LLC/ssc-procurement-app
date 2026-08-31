@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useToast } from '@elasticit-llc/app-bridge'
-import { useProcurementApi, RequestRow, LineItemRow, FavoriteItem } from '../data/db'
+import { useProcurementApi, RequestRow, LineItemRow, FavoriteItem, type RequestCommentRow } from '../data/db'
 import { useAppPermissions } from '../lib/useAppPermissions'
 import { StatusBadge } from './StatusBadge'
 import { ReplacementBadge } from './ReplacementBadge'
@@ -8,6 +8,9 @@ import { ReturnForm } from './ReturnForm'
 import { HeartIcon } from '../components/HeartIcon'
 import { PERMS, formatDate } from '../lib/constants'
 import { formatItemRef } from '../lib/itemRef'
+import { RequestActivity } from '../components/RequestActivity'
+import { RequestThread } from '../components/RequestThread'
+import { buildTimeline } from '../lib/timeline'
 
 interface RequestDetailProps {
   requestId: string
@@ -30,6 +33,8 @@ export function RequestDetail({ requestId, onBack }: RequestDetailProps) {
   const [receivingId, setReceivingId] = useState<string | null>(null)
   const [favorites, setFavorites] = useState<FavoriteItem[]>([])
   const [heartBusyId, setHeartBusyId] = useState<string | null>(null)
+  const [comments, setComments] = useState<RequestCommentRow[]>([])
+  const [approvedNames, setApprovedNames] = useState<Record<string, string>>({})
 
   useEffect(() => {
     // Best-effort: a failed favorites fetch never blocks the request view.
@@ -97,12 +102,16 @@ export function RequestDetail({ requestId, onBack }: RequestDetailProps) {
     setLoading(true)
     setError(null)
     try {
-      const [req, items] = await Promise.all([
+      const [req, items, cmts] = await Promise.all([
         api.getRequest(requestId),
         api.listLineItems(requestId),
+        api.listRequestComments(requestId),
       ])
       setRequest(req)
       setLineItems(items)
+      setComments(cmts)
+      const approvers = Array.from(new Set(items.map((i) => i.approved_by).filter((x): x is string => !!x)))
+      if (approvers.length) setApprovedNames(await api.resolveUserNames(approvers))
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to load request')
     } finally {
@@ -111,6 +120,36 @@ export function RequestDetail({ requestId, onBack }: RequestDetailProps) {
   }, [requestId])
 
   useEffect(() => { load() }, [load])
+
+  useEffect(() => {
+    let poll: number | undefined
+    const stop = api.subscribeRequestComments(
+      requestId,
+      () => { void api.listRequestComments(requestId).then(setComments).catch(() => {}) },
+      () => {
+        if (poll === undefined) {
+          poll = window.setInterval(() => {
+            void api.listRequestComments(requestId).then(setComments).catch(() => {})
+          }, 30000)
+        }
+      },
+    )
+    return () => { stop(); if (poll !== undefined) window.clearInterval(poll) }
+  }, [requestId])
+
+  const timeline = useMemo(
+    () =>
+      request
+        ? buildTimeline({
+            request,
+            items: lineItems,
+            comments,
+            itemName: (li) => formatItemRef(request.request_number, li.line_no),
+            nameOf: (id) => approvedNames[id] ?? 'Unknown',
+          })
+        : [],
+    [request, lineItems, comments, approvedNames],
+  )
 
   async function handleReceive(itemId: string) {
     setReceivingId(itemId)
@@ -257,6 +296,23 @@ export function RequestDetail({ requestId, onBack }: RequestDetailProps) {
             )}
           </div>
         ))}
+      </div>
+
+      {/* Activity history (C1 — derived timeline, no event log) */}
+      <div className="grid gap-3">
+        <h3 className="text-sm font-semibold text-foreground">Activity</h3>
+        <RequestActivity events={timeline} />
+      </div>
+
+      {/* Comment thread (C2) — full thread, @mention picker, realtime */}
+      <div className="grid gap-3">
+        <h3 className="text-sm font-semibold text-foreground">Comments</h3>
+        <RequestThread
+          request={request}
+          items={lineItems}
+          comments={comments}
+          onPosted={() => { void api.listRequestComments(requestId).then(setComments).catch(() => {}) }}
+        />
       </div>
     </div>
   )
