@@ -353,8 +353,12 @@ Deno.serve(async (req) => {
 
   // ── Test notification (dev/QA pipeline check; fixed content) ─────────────
   if (event === 'test_notification') {
-    const recipient = (body.recipient ?? '').trim()
+    const recipient = (body.recipient ?? '').trim().toLowerCase()
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipient)) return json({ event: 'test_notification', error: 'valid recipient email required' }, 400)
+    // verify_jwt is off on this function (keyless cron pattern), so restrict test
+    // mailings to real portal users to avoid an open-relay / phishing vector.
+    const { data: recipientUser } = await db.from('user_profiles').select('id').eq('email', recipient).maybeSingle()
+    if (!recipientUser) return json({ event: 'test_notification', error: 'recipient must be a portal user' }, 403)
     if (!sender || !HVE_PASSWORD) return json({ event: 'test_notification', skipped: true, reason: 'sender or HVE password not configured' })
     const title = `${clientName ? `${clientName} Procurement` : 'Procurement'}: Test Notification`
     const html = buildNotificationEmail({

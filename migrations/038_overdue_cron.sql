@@ -9,6 +9,10 @@
 -- NOTE: uses cron.schedule() rather than a raw INSERT because cron.job is owned by
 -- supabase_admin on managed Supabase (postgres lacks INSERT), and cron.schedule()
 -- records jobname explicitly (a raw INSERT leaves jobname NULL).
+-- timeout_milliseconds raised from the 5s default: the function sends one SMTP email
+-- per overdue request sequentially before responding, so real volume can exceed 5s
+-- (the Deno function runs to completion either way; this only avoids a spurious
+-- pg_net timeout in cron.job_run_details).
 
 DO $$
 BEGIN
@@ -23,6 +27,7 @@ SELECT cron.schedule(
   $$SELECT net.http_post(
         url := (SELECT value FROM app_procurement._config WHERE key = 'supabase_url') || '/functions/v1/procurement-capture-and-notify',
         body := '{"event":"overdue_reminder"}'::jsonb,
-        headers := '{"Content-Type":"application/json"}'::jsonb
+        headers := '{"Content-Type":"application/json"}'::jsonb,
+        timeout_milliseconds := 30000
       );$$
 );
