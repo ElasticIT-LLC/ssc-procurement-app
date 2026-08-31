@@ -23,4 +23,11 @@ describe('parseMentions', () => {
   it('does not double-count a user matched by name and email', () => {
     expect(parseMentions('@Jane Doe and @jane.doe@x.com', cands)).toEqual(['Jane Doe'])
   })
+  it('does not match a shorter local part inside a longer email token', () => {
+    const extra: MentionCandidate[] = [
+      { user_id: 'u3', display_name: 'Jane', email: 'jane@x.com' },
+      { user_id: 'u1', display_name: 'Jane Doe', email: 'jane.doe@x.com' },
+    ]
+    expect(parseMentions('ping @jane.doe@x.com', extra)).toEqual(['Jane Doe'])
+  })
 })

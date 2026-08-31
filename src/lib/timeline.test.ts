@@ -70,6 +70,17 @@ describe('buildTimeline', () => {
     expect(kinds[kinds.length - 1]).toBe('submitted')
   })
 
+  it('emits no decision event when approval_date or approved_by is missing', () => {
+    const events = buildTimeline({
+      request: req(),
+      items: [li({ id: 'l1', status: 'approved', approval_date: null }), li({ id: 'l2', status: 'declined', approved_by: null })],
+      comments: [],
+      itemName,
+      nameOf,
+    })
+    expect(events.map((e) => e.kind)).toEqual(['submitted'])
+  })
+
   it('prefers dedicated received_at/cancelled_at stamps over updated_at', () => {
     const events = buildTimeline({
       request: req(),
