@@ -56,11 +56,11 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: cors })
   if (req.method !== 'POST') return json({ error: 'POST only' }, 405)
 
-  let body: { request_id?: string; only_line_item_id?: string; event?: string; line_item_ids?: string[]; notification_key?: string; details?: string; comment_id?: string }
+  let body: { request_id?: string; only_line_item_id?: string; event?: string; line_item_ids?: string[]; notification_key?: string; details?: string; comment_id?: string; recipient?: string }
   try { body = await req.json() } catch { return json({ error: 'invalid JSON' }, 400) }
   const event = body.event ?? 'submitted'
   const requestId = body.request_id
-  if (!requestId && event !== 'notification' && event !== 'comment_added' && event !== 'overdue_reminder') return json({ error: 'request_id required' }, 400)
+  if (!requestId && event !== 'notification' && event !== 'comment_added' && event !== 'overdue_reminder' && event !== 'test_notification') return json({ error: 'request_id required' }, 400)
 
   const db = createClient(SUPABASE_URL, SERVICE_KEY)
 
@@ -349,6 +349,31 @@ Deno.serve(async (req) => {
       if (stampErr) console.error('overdue stamp update failed:', stampErr)
     }
     return json({ event: 'overdue_reminder', requests: due.length, email_per_request: emails, bell_rows: bells })
+  }
+
+  // ── Test notification (dev/QA pipeline check; fixed content) ─────────────
+  if (event === 'test_notification') {
+    const recipient = (body.recipient ?? '').trim()
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipient)) return json({ event: 'test_notification', error: 'valid recipient email required' }, 400)
+    if (!sender || !HVE_PASSWORD) return json({ event: 'test_notification', skipped: true, reason: 'sender or HVE password not configured' })
+    const title = `${clientName ? `${clientName} Procurement` : 'Procurement'}: Test Notification`
+    const html = buildNotificationEmail({
+      title,
+      body: 'This is a test notification from the Procurement app. If you received this email, the notification pipeline (sender, SMTP delivery, and branding) is working correctly.',
+      linkUrl: portalUrl,
+      linkText: 'Open Portal',
+      clientName,
+      brandColor,
+    })
+    let emailSent = false
+    try {
+      await sendSmtp(
+        { host: HVE_HOST, port: HVE_PORT, fromAddress: sender, useTls: true, auth: { type: 'login', username: sender, password: HVE_PASSWORD } },
+        { recipients: [recipient], subject: title, htmlBody: html, fromDisplayName: clientName ? `${clientName} Procurement` : 'Procurement', highPriority: false },
+      )
+      emailSent = true
+    } catch (e) { console.error('test notification email failed:', e instanceof Error ? e.message : e) }
+    return json({ event: 'test_notification', email_sent: emailSent, recipient })
   }
 
   // ── Generic shell notification (replaces send-notification for this app) ─
