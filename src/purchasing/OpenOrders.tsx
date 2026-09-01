@@ -29,7 +29,8 @@ export function OpenOrders() {
     } finally {
       setLoading(false)
     }
-  }, [api])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
   useEffect(() => { load() }, [load])
 
   async function receive(id: string) {
