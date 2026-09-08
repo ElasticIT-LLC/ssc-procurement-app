@@ -1,11 +1,12 @@
 {
   "name": "procurement",
-  "version": "0.16.3",
+  "version": "0.27.0",
   "description": "ElasticIT portal app — deployed via Admin UI `.eitapp` upload",
   "type": "module",
   "private": true,
   "dependencies": {
-    "recharts": "^3.10.1"
+    "recharts": "^3.10.1",
+    "xlsx": "^0.18.5"
   },
   "scripts": {
     "dev": "vite build --watch",
@@ -25,7 +26,7 @@
   },
   "devDependencies": {
     "@elasticit-llc/app-bridge": "file:./vendor/elasticit-llc-app-bridge-0.7.5.tgz",
-    "@elasticit-llc/ui-kit": "file:./vendor/elasticit-llc-ui-kit-0.5.4.tgz",
+    "@elasticit-llc/ui-kit": "file:./vendor/elasticit-llc-ui-kit-0.5.5-qa.0.tgz",
     "@tailwindcss/vite": "^4.3.3",
     "@types/archiver": "^8.0.0",
     "@types/react": "^19.2.18",
