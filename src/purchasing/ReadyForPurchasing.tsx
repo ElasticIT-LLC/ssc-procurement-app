@@ -34,6 +34,8 @@ export function ReadyForPurchasing() {
   const [submittingId, setSubmittingId] = useState<string | null>(null)
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [showPoForm, setShowPoForm] = useState(false)
+  const [imageUrls, setImageUrls] = useState<Record<string, string>>({})
+  const [capturingId, setCapturingId] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -49,6 +51,9 @@ export function ReadyForPurchasing() {
       // ordered/cancelled, moved onto a PO, or changed elsewhere) so the toolbar
       // count and a subsequent Create-PO never reference stale items.
       setSelected(prev => new Set([...prev].filter(id => data.some(i => i.id === id))))
+      const urls: Record<string, string> = {}
+      await Promise.all(data.filter((i) => i.product_image_path).map(async (i) => { const u = await api.getProductImageUrl(i.product_image_path as string); if (u) urls[i.id] = u }))
+      setImageUrls(urls)
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to load items')
     } finally {
@@ -172,6 +177,23 @@ export function ReadyForPurchasing() {
                 <StatusBadge status={item.status} />
               </div>
             </div>
+
+            {/* Product image or retry capture (mirrors ApprovalsPage) */}
+            {imageUrls[item.id] ? (
+              <img src={imageUrls[item.id]} alt="Product" className="max-w-[240px] rounded-md border border-border" />
+            ) : item.item_url ? (
+              <button
+                type="button"
+                disabled={capturingId === item.id}
+                onClick={async () => {
+                  setCapturingId(item.id)
+                  try { await api.captureAndNotify(item.request.id, item.id); await load() } finally { setCapturingId(null) }
+                }}
+                className="self-start inline-flex items-center rounded-md border border-border px-2.5 py-1 text-xs font-medium text-muted-foreground hover:bg-muted disabled:opacity-50"
+              >
+                Product image unavailable — Retry capture
+              </button>
+            ) : null}
 
             {item.item_url && (
               <a
