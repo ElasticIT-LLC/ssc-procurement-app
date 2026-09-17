@@ -15,7 +15,19 @@ export const PERMS = {
   create: 'apps/procurement/requests/create', view: 'apps/procurement/requests/view',
   approve: 'apps/procurement/approvals/act', purchase: 'apps/procurement/purchasing/manage',
   returns: 'apps/procurement/returns/manage', admin: 'apps/procurement/admin/manage',
+  formsView: 'apps/procurement/forms/view', formsSubmit: 'apps/procurement/forms/submit',
 } as const
+
+export const FULL_ACCESS = 'apps/procurement/*'
+
+export function hasAppPermission(permissions: string[] | undefined, key: string, isAdmin = false): boolean {
+  if (isAdmin) return true
+  const perms = permissions ?? []
+  if (perms.includes('*')) return true
+  if (perms.includes(key)) return true
+  if (perms.includes(FULL_ACCESS) && key.startsWith('apps/procurement/')) return true
+  return false
+}
 
 // Render a date/timestamp without the UTC off-by-one shift. `new Date('YYYY-MM-DD')`
 // parses date-only strings as UTC midnight, which renders a day early in timezones
@@ -27,5 +39,5 @@ export function formatDate(value: string | null | undefined, options?: Intl.Date
   const d = dateOnly
     ? new Date(Number(dateOnly[1]), Number(dateOnly[2]) - 1, Number(dateOnly[3]))
     : new Date(value)
-  return d.toLocaleDateString(options ? 'en-US' : undefined, options)
+  return d.toLocaleDateString('en-US', options ?? { month: '2-digit', day: '2-digit', year: 'numeric' })
 }

@@ -92,3 +92,45 @@ export function buildNotificationEmail(o: NotificationEmailParams): string {
   const body = `<p style="margin:0 0 16px 0">${o.body}</p>${o.linkUrl ? vmlButton(o.linkUrl, o.linkText, '220px', o.brandColor) : ''}<p style="margin:14px 0 0 0;font-size:12px;color:#555">This is an automated notification from Procurement.</p>`
   return shell(o.title, 'Notification', body, o.clientName, o.brandColor)
 }
+
+function esc(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+}
+
+export interface CommentEmailParams {
+  authorName: string
+  authorRole: 'requester' | 'staff'
+  requestNumber: string | null
+  itemName: string | null
+  body: string
+  linkUrl: string
+  clientName: string
+  brandColor?: string
+}
+export function buildCommentEmail(o: CommentEmailParams): string {
+  const { td } = tableStyles(o.brandColor)
+  const c = color(o.brandColor)
+  const who = o.authorRole === 'staff' ? 'the procurement team' : o.authorName
+  const num = o.requestNumber ?? ''
+  const itemLine = o.itemName ? `<p style="margin:0 0 12px 0;font-size:13px;color:#555">Item: ${esc(o.itemName)}</p>` : ''
+  const rows = `<tr><td style="${td}"><strong>${esc(who)}</strong> ${o.authorRole === 'staff' ? 'commented' : 'replied'}</td><td style="${td}">${num ? `Request ${esc(num)}` : ''}</td></tr>`
+  const body = `<p style="margin:0 0 16px 0">${esc(who)} added a comment on your procurement request${num ? ` <strong>${esc(num)}</strong>` : ''}:</p>${itemLine}<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;border:1px solid #e4e7ea;margin:0 0 20px 0">${rows}</table><blockquote style="margin:0 0 20px 0;padding:12px 16px;border-left:3px solid ${c};background:#f4f6f8;color:#36414d;font-size:14px;line-height:1.5">${esc(o.body)}</blockquote>${o.linkUrl ? vmlButton(o.linkUrl, 'View in Portal', '220px', o.brandColor) : ''}<p style="margin:14px 0 0 0;font-size:12px;color:#555">This is an automated notification from Procurement.</p>`
+  return shell('New comment on your procurement request', 'Comment thread update', body, o.clientName, o.brandColor)
+}
+
+export interface OverdueReminderParams {
+  requestNumber: string | null
+  requesterName: string
+  days: number
+  itemCount: number
+  linkUrl: string
+  clientName: string
+  brandColor?: string
+}
+export function buildOverdueReminderEmail(o: OverdueReminderParams): string {
+  const { td } = tableStyles(o.brandColor)
+  const num = o.requestNumber ?? '—'
+  const rows = `<tr><td style="${td}"><strong>Request ${esc(num)}</strong></td><td style="${td}">${esc(o.requesterName)}</td><td style="${td};text-align:center">${o.days} days</td><td style="${td};text-align:center">${o.itemCount}</td></tr>`
+  const body = `<p style="margin:0 0 16px 0">The following procurement request has been pending for more than 14 days and still needs approval action:</p><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;border:1px solid #e4e7ea;margin:0 0 20px 0"><tr><th style="${td}">Request</th><th style="${td}">Requester</th><th style="${td};text-align:center">Days Pending</th><th style="${td};text-align:center">Items</th></tr>${rows}</table>${o.linkUrl ? vmlButton(o.linkUrl, 'Review Request', '220px', o.brandColor) : ''}<p style="margin:14px 0 0 0;font-size:12px;color:#555">This reminder repeats every 14 days while the request stays pending.</p>`
+  return shell('Request pending 14+ days', 'Overdue procurement reminder', body, o.clientName, o.brandColor)
+}

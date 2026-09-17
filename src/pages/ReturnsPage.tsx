@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback } from 'react'
-import { useToast, usePermissions } from '@elasticit-llc/app-bridge'
+import { useToast } from '@elasticit-llc/app-bridge'
+import { useAppPermissions } from '../lib/useAppPermissions'
 import { useProcurementApi, LineItemWithRequest } from '../data/db'
 import { StatusBadge } from '../requester/StatusBadge'
 import { PERMS, formatDate } from '../lib/constants'
-import { useFormattingRules } from '../formatting/useFormattingRules'
 import { formatItemRef } from '../lib/itemRef'
 
 function humanizeReason(reason: string): string {
@@ -21,12 +21,11 @@ function ReturnCard({
   busy: boolean
   onProcess?: (item: LineItemWithRequest) => void
 }) {
-  const { toneClassFor } = useFormattingRules()
   const processed = item.return_processed_at != null
   const wantsReplacement = item.wants_replacement ?? false
 
   return (
-    <div className={`rounded-lg border border-border bg-card p-4 grid gap-3 ${toneClassFor(item as unknown as Record<string, unknown>)}`}>
+    <div className="rounded-lg border border-border bg-card p-4 grid gap-3">
       {/* Header */}
       <div className="flex items-start justify-between gap-2">
         <div>
@@ -104,12 +103,13 @@ function ReturnCard({
 export function ReturnsPage() {
   const api = useProcurementApi()
   const { showToast } = useToast()
-  const { hasPermission } = usePermissions()
+  const { hasAppPermission } = useAppPermissions()
 
   const [items, setItems] = useState<LineItemWithRequest[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
+  const [tab, setTab] = useState<'pending' | 'processed'>('pending')
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -139,7 +139,7 @@ export function ReturnsPage() {
     }
   }
 
-  if (!hasPermission(PERMS.returns)) {
+  if (!hasAppPermission(PERMS.returns)) {
     return (
       <div className="rounded-md bg-destructive/10 border border-destructive/30 p-4 text-sm text-destructive">
         You do not have permission to view this page.
@@ -169,38 +169,55 @@ export function ReturnsPage() {
 
       {!loading && !error && (
         <>
-          {/* Pending returns */}
-          <div className="grid gap-4">
-            <h2 className="text-sm font-semibold text-foreground">Pending Returns ({pending.length})</h2>
-            {pending.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No items awaiting return processing.</p>
-            ) : (
-              <div className="grid gap-3">
-                {pending.map((item) => (
-                  <ReturnCard
-                    key={item.id}
-                    item={item}
-                    busy={busyId === item.id}
-                    onProcess={handleProcess}
-                  />
-                ))}
-              </div>
-            )}
+          <div className="flex gap-1 border-b border-border">
+            <button
+              type="button"
+              onClick={() => setTab('pending')}
+              className={`px-3 py-2 text-sm font-medium -mb-px border-b-2 ${tab === 'pending' ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
+            >
+              Pending Returns ({pending.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setTab('processed')}
+              className={`px-3 py-2 text-sm font-medium -mb-px border-b-2 ${tab === 'processed' ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
+            >
+              Processed Returns ({processed.length})
+            </button>
           </div>
 
-          {/* Processed returns */}
-          <div className="grid gap-4">
-            <h2 className="text-sm font-semibold text-foreground">Processed Returns ({processed.length})</h2>
-            {processed.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No processed returns yet.</p>
-            ) : (
-              <div className="grid gap-3">
-                {processed.map((item) => (
-                  <ReturnCard key={item.id} item={item} busy={false} />
-                ))}
-              </div>
-            )}
-          </div>
+          {tab === 'pending' && (
+            <div className="grid gap-4">
+              {pending.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No items awaiting return processing.</p>
+              ) : (
+                <div className="grid gap-3">
+                  {pending.map((item) => (
+                    <ReturnCard
+                      key={item.id}
+                      item={item}
+                      busy={busyId === item.id}
+                      onProcess={handleProcess}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {tab === 'processed' && (
+            <div className="grid gap-4">
+              {processed.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No processed returns yet.</p>
+              ) : (
+                <div className="grid gap-3">
+                  {processed.map((item) => (
+                    <ReturnCard key={item.id} item={item} busy={false} />
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </>
       )}
     </div>

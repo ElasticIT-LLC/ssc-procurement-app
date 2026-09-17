@@ -1,17 +1,19 @@
 import { useState } from 'react'
 import { useProcurementApi, Location } from '../data/db'
+import { DateInput, todayIso } from '../components/DateInput'
 
 interface Props {
   itemIds: string[]
+  requestIds: string[]
   locations: Location[]
   onCancel: () => void
   onCreated: (po: { id: string; po_number: string }) => void | Promise<void>
 }
 
-export function CreatePurchaseOrderForm({ itemIds, locations, onCancel, onCreated }: Props) {
+export function CreatePurchaseOrderForm({ itemIds, requestIds, locations, onCancel, onCreated }: Props) {
   const api = useProcurementApi()
   const [vendor, setVendor] = useState('')
-  const [datePurchased, setDatePurchased] = useState('')
+  const [datePurchased, setDatePurchased] = useState(todayIso())
   const [eta, setEta] = useState('')
   const [shippingLocationId, setShippingLocationId] = useState('')
   const [customShipping, setCustomShipping] = useState('')
@@ -35,6 +37,24 @@ export function CreatePurchaseOrderForm({ itemIds, locations, onCancel, onCreate
       // Reuse the existing ordered notification, fired once for the whole PO
       // (the items were ordered together — one notification, not one per item).
       await api.fireNotification('item_ordered', undefined, itemIds)
+      // C2/D5: post the PO notes to each distinct request thread (source 'purchasing').
+      // Bulk POs span requests, so one comment per request; body carries the PO number.
+      const note = notes.trim()
+      if (note && requestIds.length) {
+        for (const reqId of requestIds) {
+          try {
+            const row = await api.postRequestComment({
+              request_id: reqId,
+              line_item_id: null,
+              source: 'purchasing',
+              body: `${note} (PO ${po.po_number})`,
+            })
+            api.fireCommentNotification(row.id)
+          } catch (e) {
+            console.error('Failed to post PO thread comment:', e)
+          }
+        }
+      }
       await onCreated(po)
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to create purchase order')
@@ -53,11 +73,19 @@ export function CreatePurchaseOrderForm({ itemIds, locations, onCancel, onCreate
       </div>
       <div className="grid gap-1">
         <label className="text-xs font-medium text-foreground">Date Purchased</label>
-        <input type="date" value={datePurchased} onChange={e => setDatePurchased(e.target.value)} className="w-full rounded-md border border-input bg-input px-3 py-1.5 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring" />
+        <DateInput
+          value={datePurchased}
+          onChange={setDatePurchased}
+          className="w-full rounded-md border border-input bg-input px-3 py-1.5 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+        />
       </div>
       <div className="grid gap-1">
         <label className="text-xs font-medium text-foreground">ETA</label>
-        <input type="date" value={eta} onChange={e => setEta(e.target.value)} className="w-full rounded-md border border-input bg-input px-3 py-1.5 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring" />
+        <DateInput
+          value={eta}
+          onChange={setEta}
+          className="w-full rounded-md border border-input bg-input px-3 py-1.5 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+        />
       </div>
       <div className="grid gap-1">
         <label className="text-xs font-medium text-foreground">Shipping Location</label>
