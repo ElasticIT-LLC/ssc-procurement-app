@@ -1,7 +1,9 @@
 import { useState, useEffect, useCallback } from 'react'
-import { useToast, usePermissions } from '@elasticit-llc/app-bridge'
+import { useToast } from '@elasticit-llc/app-bridge'
+import { useAppPermissions } from '../lib/useAppPermissions'
 import { useProcurementApi, Location, Department } from '../data/db'
 import { PERMS, LINE_ITEM_STATUS } from '../lib/constants'
+import { DateInput } from '../components/DateInput'
 import { FIELD_OPTIONS, OPERATOR_OPTIONS, DEFAULT_RULES, type FormatRule, type FormatField, type FormatOperator } from '../formatting/rules'
 import { TONE_OPTIONS } from '../formatting/tones'
 
@@ -301,10 +303,9 @@ function FormattingRuleRow({ rule, index, count, onChange, onMove, onDelete }: F
         )}
 
         {showValue && type === 'date' && (
-          <input
-            type="date"
+          <DateInput
             value={rule.value ?? ''}
-            onChange={e => onChange(index, { ...rule, value: e.target.value })}
+            onChange={(v) => onChange(index, { ...rule, value: v })}
             className="rounded-md border border-input bg-input px-2 py-1 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
           />
         )}
@@ -337,6 +338,20 @@ function FormattingRuleRow({ rule, index, count, onChange, onMove, onDelete }: F
             <option key={t.tone} value={t.tone}>{t.label}</option>
           ))}
         </select>
+
+        <div className="flex items-center gap-2.5" aria-label="Font style">
+          {([['bold', 'Bold'], ['italic', 'Italic'], ['underline', 'Underline']] as const).map(([key, label]) => (
+            <label key={key} className="inline-flex items-center gap-1 text-xs text-muted-foreground select-none">
+              <input
+                type="checkbox"
+                checked={!!rule[key]}
+                onChange={e => onChange(index, { ...rule, [key]: e.target.checked })}
+                className="h-3.5 w-3.5 rounded border-border accent-primary"
+              />
+              {label}
+            </label>
+          ))}
+        </div>
 
         <div className="ml-auto flex items-center gap-1 shrink-0">
           <button
@@ -411,7 +426,7 @@ function FormattingRulesCard() {
   }
 
   function handleAdd() {
-    setRules(prev => [...prev, { id: crypto.randomUUID(), field: 'status', operator: 'equals', value: '', tone: 'neutral', enabled: true }])
+    setRules(prev => [...prev, { id: crypto.randomUUID(), field: 'status', operator: 'equals', value: '', tone: 'neutral', bold: false, italic: false, underline: false, enabled: true }])
   }
 
   function handleReset() {
@@ -434,7 +449,7 @@ function FormattingRulesCard() {
     <CollapsibleCard title="Conditional Formatting" right={`${rules.length} rule${rules.length === 1 ? '' : 's'}`}>
       <div className="grid gap-3">
       <p className="text-sm text-muted-foreground">
-        Rules are evaluated top to bottom — the first enabled match sets the row's tint. Applies across Records, Requests, Approvals, Purchasing, and Returns.
+        Rules are evaluated top to bottom — the first enabled match sets the row's tint and font style. Applies across Records, Requests, Approvals, Purchasing, and Returns.
       </p>
       <p className="text-sm text-muted-foreground">
         Formatting rules only color rows — they do not create new statuses. The status list is fixed.
@@ -498,7 +513,7 @@ function FormattingRulesCard() {
 export function AdminPage() {
   const api = useProcurementApi()
   const { showToast } = useToast()
-  const { hasPermission } = usePermissions()
+  const { hasAppPermission } = useAppPermissions()
 
   const [locations, setLocations] = useState<Location[]>([])
   const [departments, setDepartments] = useState<Department[]>([])
@@ -588,7 +603,7 @@ export function AdminPage() {
     }
   }
 
-  if (!hasPermission(PERMS.admin)) {
+  if (!hasAppPermission(PERMS.admin)) {
     return (
       <div className="rounded-md bg-destructive/10 border border-destructive/30 p-4 text-sm text-destructive">
         You do not have permission to view this page.

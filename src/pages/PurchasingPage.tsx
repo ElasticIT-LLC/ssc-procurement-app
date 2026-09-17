@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { usePermissions } from '@elasticit-llc/app-bridge'
+import { useAppPermissions } from '../lib/useAppPermissions'
 import { PERMS } from '../lib/constants'
 import { ReadyForPurchasing } from '../purchasing/ReadyForPurchasing'
 import { OpenOrders } from '../purchasing/OpenOrders'
@@ -13,10 +13,10 @@ const TABS: { key: Tab; label: string }[] = [
 ]
 
 export function PurchasingPage() {
-  const { hasPermission } = usePermissions()
+  const { hasAppPermission } = useAppPermissions()
   const [tab, setTab] = useState<Tab>('ready')
 
-if (!hasPermission(PERMS.purchase) && !hasPermission(PERMS.admin)) {
+if (!hasAppPermission(PERMS.purchase) && !hasAppPermission(PERMS.admin)) {
     return (
       <div className="rounded-md bg-destructive/10 border border-destructive/30 p-4 text-sm text-destructive">
         You do not have permission to view this page.

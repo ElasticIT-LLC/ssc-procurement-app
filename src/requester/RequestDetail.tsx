@@ -1,11 +1,16 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useToast } from '@elasticit-llc/app-bridge'
-import { useProcurementApi, RequestRow, LineItemRow } from '../data/db'
+import { useProcurementApi, RequestRow, LineItemRow, FavoriteItem, type RequestCommentRow } from '../data/db'
+import { useAppPermissions } from '../lib/useAppPermissions'
 import { StatusBadge } from './StatusBadge'
 import { ReplacementBadge } from './ReplacementBadge'
 import { ReturnForm } from './ReturnForm'
-import { formatDate } from '../lib/constants'
+import { HeartIcon } from '../components/HeartIcon'
+import { PERMS, formatDate } from '../lib/constants'
 import { formatItemRef } from '../lib/itemRef'
+import { RequestActivity } from '../components/RequestActivity'
+import { RequestThread } from '../components/RequestThread'
+import { buildTimeline } from '../lib/timeline'
 
 interface RequestDetailProps {
   requestId: string
@@ -15,6 +20,10 @@ interface RequestDetailProps {
 export function RequestDetail({ requestId, onBack }: RequestDetailProps) {
   const api = useProcurementApi()
   const { showToast } = useToast()
+  const { hasAppPermission } = useAppPermissions()
+  const isAdmin = hasAppPermission(PERMS.admin)
+  // Only approvers, purchasers, and admins can curate the shared favorites list.
+  const canCurate = isAdmin || hasAppPermission(PERMS.approve) || hasAppPermission(PERMS.purchase)
 
   const [request, setRequest] = useState<RequestRow | null>(null)
   const [lineItems, setLineItems] = useState<LineItemRow[]>([])
@@ -22,17 +31,87 @@ export function RequestDetail({ requestId, onBack }: RequestDetailProps) {
   const [error, setError] = useState<string | null>(null)
   const [returnOpenId, setReturnOpenId] = useState<string | null>(null)
   const [receivingId, setReceivingId] = useState<string | null>(null)
+  const [favorites, setFavorites] = useState<FavoriteItem[]>([])
+  const [heartBusyId, setHeartBusyId] = useState<string | null>(null)
+  const [comments, setComments] = useState<RequestCommentRow[]>([])
+  const [approvedNames, setApprovedNames] = useState<Record<string, string>>({})
+
+  useEffect(() => {
+    // Best-effort: a failed favorites fetch never blocks the request view.
+    api.listFavorites().then(setFavorites).catch(() => {})
+  }, [requestId])
+
+  const favoriteOf = (item: LineItemRow) =>
+    favorites.find(
+      (f) =>
+        f.name.trim().toLowerCase() ===
+        (item.item_description ?? '').trim().toLowerCase(),
+    )
+
+  const isFavorite = (item: LineItemRow) => favoriteOf(item) !== undefined
+
+  async function handleHeart(item: LineItemRow) {
+    const name = item.item_description?.trim()
+    if (!name) return
+    const existing = favoriteOf(item)
+    if (existing) {
+      if (!isAdmin) {
+        showToast({
+          message: 'Already in favorites — an admin can remove it in the Favorite Items tab',
+          type: 'info',
+        })
+        return
+      }
+      setHeartBusyId(item.id)
+      try {
+        await api.removeFavorite(existing.id)
+        setFavorites(await api.listFavorites())
+        showToast({ message: 'Removed from favorites', type: 'success' })
+      } catch (err: unknown) {
+        showToast({
+          message: err instanceof Error ? err.message : 'Failed to remove from favorites',
+          type: 'error',
+        })
+      } finally {
+        setHeartBusyId(null)
+      }
+      return
+    }
+    setHeartBusyId(item.id)
+    try {
+      await api.addFavorite(name, item.item_url ?? undefined)
+      setFavorites(await api.listFavorites())
+        showToast({ message: 'Added to favorites — now visible to everyone', type: 'success' })
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : ''
+      if (/unique|23505/i.test(msg)) {
+        setFavorites(await api.listFavorites().catch(() => favorites))
+        showToast({ message: 'Already in favorites', type: 'info' })
+      } else {
+        showToast({
+          message: msg || 'Failed to add to favorites',
+          type: 'error',
+        })
+      }
+    } finally {
+      setHeartBusyId(null)
+    }
+  }
 
   const load = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
-      const [req, items] = await Promise.all([
+      const [req, items, cmts] = await Promise.all([
         api.getRequest(requestId),
         api.listLineItems(requestId),
+        api.listRequestComments(requestId),
       ])
       setRequest(req)
       setLineItems(items)
+      setComments(cmts)
+      const approvers = Array.from(new Set(items.map((i) => i.approved_by).filter((x): x is string => !!x)))
+      if (approvers.length) setApprovedNames(await api.resolveUserNames(approvers))
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to load request')
     } finally {
@@ -41,6 +120,36 @@ export function RequestDetail({ requestId, onBack }: RequestDetailProps) {
   }, [requestId])
 
   useEffect(() => { load() }, [load])
+
+  useEffect(() => {
+    let poll: number | undefined
+    const stop = api.subscribeRequestComments(
+      requestId,
+      () => { void api.listRequestComments(requestId).then(setComments).catch(() => {}) },
+      () => {
+        if (poll === undefined) {
+          poll = window.setInterval(() => {
+            void api.listRequestComments(requestId).then(setComments).catch(() => {})
+          }, 30000)
+        }
+      },
+    )
+    return () => { stop(); if (poll !== undefined) window.clearInterval(poll) }
+  }, [requestId])
+
+  const timeline = useMemo(
+    () =>
+      request
+        ? buildTimeline({
+            request,
+            items: lineItems,
+            comments,
+            itemName: (li) => formatItemRef(request.request_number, li.line_no),
+            nameOf: (id) => approvedNames[id] ?? 'Unknown',
+          })
+        : [],
+    [request, lineItems, comments, approvedNames],
+  )
 
   async function handleReceive(itemId: string) {
     setReceivingId(itemId)
@@ -110,8 +219,34 @@ export function RequestDetail({ requestId, onBack }: RequestDetailProps) {
                   <ReplacementBadge item={item} className="ml-2" />
                 </p>
                 <p className="text-xs text-muted-foreground">Qty: {item.quantity}</p>
+                <p className="text-xs text-muted-foreground">
+                  Substitution:{' '}
+                  {item.substitution_ok ? (
+                    'Yes'
+                  ) : (
+                    <span className="font-bold text-red-600">No</span>
+                  )}
+                </p>
               </div>
-              <StatusBadge status={item.status} />
+              <div className="flex items-center gap-2 shrink-0">
+                {item.item_description?.trim() && canCurate && (
+                  <button
+                    type="button"
+                    onClick={() => handleHeart(item)}
+                    disabled={heartBusyId === item.id}
+                    title={isFavorite(item) ? 'In the shared favorites list' : 'Add to the shared favorites list'}
+                    aria-label={isFavorite(item) ? 'Remove from favorites' : 'Add to favorites'}
+                    className={`text-base leading-none rounded-md border px-2 py-1 transition-colors disabled:opacity-50 ${
+                      isFavorite(item)
+                        ? 'text-destructive border-destructive/40 bg-destructive/10'
+                        : 'text-muted-foreground border-border hover:text-foreground hover:border-foreground/40 hover:bg-muted'
+                    }`}
+                  >
+                    <HeartIcon filled={isFavorite(item)} />
+                  </button>
+                )}
+                <StatusBadge status={item.status} />
+              </div>
             </div>
 
             {item.item_url && (
@@ -168,6 +303,23 @@ export function RequestDetail({ requestId, onBack }: RequestDetailProps) {
             )}
           </div>
         ))}
+      </div>
+
+      {/* Activity history (C1 — derived timeline, no event log) */}
+      <div className="grid gap-3">
+        <h3 className="text-sm font-semibold text-foreground">Activity</h3>
+        <RequestActivity events={timeline} />
+      </div>
+
+      {/* Comment thread (C2) — full thread, @mention picker, realtime */}
+      <div className="grid gap-3">
+        <h3 className="text-sm font-semibold text-foreground">Comments</h3>
+        <RequestThread
+          request={request}
+          items={lineItems}
+          comments={comments}
+          onPosted={() => { void api.listRequestComments(requestId).then(setComments).catch(() => {}) }}
+        />
       </div>
     </div>
   )

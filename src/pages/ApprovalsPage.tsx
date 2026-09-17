@@ -1,24 +1,28 @@
-import { useState, useEffect, useCallback } from 'react'
-import { useToast, usePermissions } from '@elasticit-llc/app-bridge'
-import { useProcurementApi, LineItemWithRequest } from '../data/db'
+import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useToast } from '@elasticit-llc/app-bridge'
+import { useAppPermissions } from '../lib/useAppPermissions'
+import { useProcurementApi, LineItemWithRequest, type RequestCommentRow } from '../data/db'
 import { StatusBadge } from '../requester/StatusBadge'
+import { decisionNotificationKey } from '../lib/decisionNotification'
+import { FavoritesTab } from '../purchasing/FavoritesTab'
+import { PreApprovedTab } from '../approvals/PreApprovedTab'
 import { PERMS, formatDate } from '../lib/constants'
-import { useFormattingRules } from '../formatting/useFormattingRules'
 import { formatItemRef } from '../lib/itemRef'
 
 export function ApprovalsPage() {
   const api = useProcurementApi()
   const { showToast } = useToast()
-  const { hasPermission } = usePermissions()
-  const { toneClassFor } = useFormattingRules()
+  const { hasAppPermission } = useAppPermissions()
 
   const [items, setItems] = useState<LineItemWithRequest[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [imageUrls, setImageUrls] = useState<Record<string, string>>({})
-  const [names, setNames] = useState<Record<string, string>>({})
+  const [comments, setComments] = useState<RequestCommentRow[]>([])
   const [drafts, setDrafts] = useState<Record<string, string>>({})
+  const [preApprovedNames, setPreApprovedNames] = useState<Set<string>>(new Set())
+  const [tab, setTab] = useState<'items' | 'preapproved' | 'favorites'>('items')
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -26,7 +30,9 @@ export function ApprovalsPage() {
     try {
       const data = await api.listLineItemsByStatus(['pending', 'on_hold'])
       setItems(data)
-      setNames(await api.resolveUserNames(data.map((i) => i.commented_by).filter((x): x is string => !!x)))
+      const catalog = await api.listPreApprovedItems()
+      setPreApprovedNames(new Set(catalog.map((c) => c.name.toLowerCase())))
+      setComments(await api.listRequestCommentsMany(Array.from(new Set(data.map((i) => i.request.id)))))
       const urls: Record<string, string> = {}
       await Promise.all(data.filter((i) => i.product_image_path).map(async (i) => { const u = await api.getProductImageUrl(i.product_image_path as string); if (u) urls[i.id] = u }))
       setImageUrls(urls)
@@ -44,13 +50,33 @@ export function ApprovalsPage() {
     setBusyId(id)
     try {
       await api.decideLineItem(id, action)
+      // C2: a note left on the card ships with the decision as a thread comment
+      // (source 'approvals', item-scoped). Best-effort — a failed comment never undoes the decision.
+      const draft = (drafts[id] ?? '').trim()
+      let notePosted = false
+      let noteFailed = false
+      if (draft && reqId) {
+        try {
+          const row = await api.postRequestComment({ request_id: reqId, line_item_id: id, source: 'approvals', body: draft })
+          api.fireCommentNotification(row.id)
+          setDrafts((d) => ({ ...d, [id]: '' }))
+          notePosted = true
+        } catch (e) {
+          console.error('Failed to post decision note as thread comment:', e)
+          noteFailed = true
+        }
+      }
       const messages: Record<typeof action, string> = {
         approved: 'Item approved',
         declined: 'Item declined',
         on_hold: 'Item placed on hold',
       }
-      showToast({ message: messages[action], type: 'success' })
-      api.fireNotification(action === 'approved' ? 'item_approved' : 'item_declined', reqId, [id])
+      const toastMsg = noteFailed ? `${messages[action]} — note could not be posted` : notePosted ? `${messages[action]} + note posted to thread` : messages[action]
+      showToast({ message: toastMsg, type: noteFailed ? 'error' : 'success' })
+      // decisionNotificationKey maps each decision to its own catalog key
+      // (regression: on_hold used to fire item_declined, sending a misleading
+      // "Item declined" email).
+      api.fireNotification(decisionNotificationKey(action), reqId, [id])
       const remaining = await api.listLineItemsByStatus(['pending', 'on_hold'])
       setItems(remaining)
       if (reqId && !remaining.some((it) => it.request.id === reqId)) await api.notifyApproved(reqId)
@@ -61,9 +87,58 @@ export function ApprovalsPage() {
     }
   }
 
-  const canComment = hasPermission(PERMS.approve) || hasPermission(PERMS.purchase) || hasPermission(PERMS.admin)
+  const commentsByRequest = useMemo(() => {
+    const map: Record<string, RequestCommentRow[]> = {}
+    for (const c of comments) (map[c.request_id] ??= []).push(c)
+    return map
+  }, [comments])
+  const threadCountFor = (requestId: string) => (commentsByRequest[requestId] ?? []).length
+  // The full thread lives on the Requests page (RequestDetail). Plain <a href> forces a
+  // full navigation so the shell reloads on the requests page and RequestsPage reads ?request=<id>.
+  const threadLink = (requestId: string) =>
+    `${window.location.pathname.replace(/[^/]+$/, 'requests')}?request=${encodeURIComponent(requestId)}`
 
-  if (!hasPermission(PERMS.approve)) {
+  async function saveComment(itemId: string) {
+    const item = items.find((it) => it.id === itemId)
+    if (!item) return
+    const body = (drafts[itemId] ?? '').trim()
+    if (!body) return
+    setBusyId(itemId)
+    try {
+      const row = await api.postRequestComment({
+        request_id: item.request.id,
+        line_item_id: itemId,
+        source: 'approvals',
+        body,
+      })
+      api.fireCommentNotification(row.id)
+      setDrafts((d) => ({ ...d, [itemId]: '' }))
+      setComments(await api.listRequestCommentsMany(Array.from(new Set(items.map((i) => i.request.id)))))
+      showToast({ message: 'Comment posted', type: 'success' })
+    } catch (err: unknown) {
+      showToast({ message: err instanceof Error ? err.message : 'Failed to post comment', type: 'error' })
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  async function handlePreApprove(item: LineItemWithRequest) {
+    if (!window.confirm(`Pre-approve "${item.item_description || 'this item'}"?\nIt will be added to the pre-approved catalog. The item stays in For Approval until approved.`)) return
+    setBusyId(item.id)
+    try {
+      await api.preApproveLineItem(item.id)
+      showToast({ message: 'Added to pre-approved catalog', type: 'success' })
+      await load()
+    } catch (err: unknown) {
+      showToast({ message: err instanceof Error ? err.message : 'Pre-approve failed', type: 'error' })
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  const canComment = hasAppPermission(PERMS.approve) || hasAppPermission(PERMS.purchase) || hasAppPermission(PERMS.admin)
+
+  if (!hasAppPermission(PERMS.approve)) {
     return (
       <div className="rounded-md bg-destructive/10 border border-destructive/30 p-4 text-sm text-destructive">
         You do not have permission to view this page.
@@ -78,22 +153,46 @@ export function ApprovalsPage() {
         <p className="text-muted-foreground text-sm">Review pending and on-hold items.</p>
       </div>
 
-      {loading && (
+      <div className="flex gap-1 border-b border-border">
+        <button
+          type="button"
+          onClick={() => setTab('items')}
+          className={`px-3 py-2 text-sm font-medium -mb-px border-b-2 ${tab === 'items' ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
+        >
+          For Approval
+        </button>
+        <button
+          type="button"
+          onClick={() => setTab('preapproved')}
+          className={`px-3 py-2 text-sm font-medium -mb-px border-b-2 ${tab === 'preapproved' ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
+        >
+          Pre-approved
+        </button>
+        <button
+          type="button"
+          onClick={() => setTab('favorites')}
+          className={`px-3 py-2 text-sm font-medium -mb-px border-b-2 ${tab === 'favorites' ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
+        >
+          Favorite Items
+        </button>
+      </div>
+
+      {tab === 'items' && loading && (
         <div className="py-8 text-center text-muted-foreground text-sm">Loading…</div>
       )}
 
-      {!loading && error && (
+      {tab === 'items' && !loading && error && (
         <div className="rounded-md bg-destructive/10 border border-destructive/30 p-4 text-sm text-destructive">
           {error}
         </div>
       )}
 
-      {!loading && !error && items.length === 0 && (
+      {tab === 'items' && !loading && !error && items.length === 0 && (
         <p className="text-sm text-muted-foreground">No items pending approval.</p>
       )}
 
-      {!loading && !error && items.map(item => (
-        <div key={item.id} className={`rounded-lg border border-border bg-card p-4 grid gap-3 ${toneClassFor(item as unknown as Record<string, unknown>)}`}>
+      {tab === 'items' && !loading && !error && items.map(item => (
+        <div key={item.id} className="rounded-lg border border-border bg-card p-4 grid gap-3">
           {/* Header: description + status */}
           <div className="flex items-start justify-between gap-2">
             <div>
@@ -101,8 +200,14 @@ export function ApprovalsPage() {
                 {formatItemRef(item.request?.request_number, item.line_no)} — {item.item_description || 'Unnamed item'}
               </p>
               <p className="text-xs text-muted-foreground">Qty: {item.quantity}</p>
+              <p className="text-xs text-muted-foreground">Substitution: {item.substitution_ok ? 'Yes' : 'No'}</p>
             </div>
-            <StatusBadge status={item.status} />
+            <div className="flex items-center gap-1.5">
+              {preApprovedNames.has((item.item_description ?? '').toLowerCase()) && (
+                <span className="rounded bg-primary/15 px-1.5 py-0.5 text-[10px] font-medium text-primary">Pre-approved</span>
+              )}
+              <StatusBadge status={item.status} />
+            </div>
           </div>
 
           {/* Product image or retry capture */}
@@ -155,28 +260,31 @@ export function ApprovalsPage() {
             </p>
           </div>
 
-          {/* Comment editor */}
+          {/* Comment thread (C2) — posts to the request thread (source 'approvals') */}
           {canComment && (
             <div className="grid gap-1">
-              <label className="text-xs font-medium text-foreground">Comment</label>
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-medium text-foreground">Comment</label>
+                {threadCountFor(item.request.id) > 0 && (
+                  <span className="text-[11px] text-muted-foreground">{threadCountFor(item.request.id)} in thread</span>
+                )}
+              </div>
               <textarea
                 rows={2}
-                maxLength={100}
-                defaultValue={item.admin_comment ?? ''}
+                maxLength={1000}
+                value={drafts[item.id] ?? ''}
                 onChange={(e) => setDrafts((d) => ({ ...d, [item.id]: e.target.value }))}
-                placeholder="Short note (max 100 chars)…"
+                placeholder="Add a note for the requester (posts with your decision, max 1000 chars)"
                 className="w-full rounded-md border border-input bg-input px-2 py-1 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring resize-none"
               />
               <div className="flex items-center justify-between gap-2">
-                {item.commented_at ? (
-                  <span className="text-[11px] text-muted-foreground">— {names[item.commented_by ?? ''] ?? 'Unknown'} · {formatDate(item.commented_at)}</span>
-                ) : <span />}
+                <a href={threadLink(item.request.id)} className="text-[11px] text-primary underline">View full thread</a>
                 <button
                   type="button"
-                  disabled={busyId === item.id}
-                  onClick={async () => { setBusyId(item.id); try { await api.setLineItemComment(item.id, drafts[item.id] ?? item.admin_comment ?? ''); await load() } catch (err) { showToast({ message: err instanceof Error ? err.message : 'Failed to save comment', type: 'error' }) } finally { setBusyId(null) } }}
+                  disabled={busyId === item.id || !(drafts[item.id] ?? '').trim()}
+                  onClick={() => { void saveComment(item.id) }}
                   className="inline-flex items-center rounded-md border border-border px-2.5 py-1 text-xs font-medium text-foreground hover:bg-muted disabled:opacity-50"
-                >Save comment</button>
+                >Post comment</button>
               </div>
             </div>
           )}
@@ -190,6 +298,14 @@ export function ApprovalsPage() {
               className="inline-flex items-center rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
             >
               Approve
+            </button>
+            <button
+              type="button"
+              disabled={busyId === item.id}
+              onClick={() => handlePreApprove(item)}
+              className="inline-flex items-center rounded-md border border-primary/40 bg-primary/15 px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary/25 disabled:opacity-50"
+            >
+              Pre-approve
             </button>
             <button
               type="button"
@@ -209,7 +325,11 @@ export function ApprovalsPage() {
             </button>
           </div>
         </div>
-      ))}
+        ))}
+
+      {tab === 'preapproved' && <PreApprovedTab />}
+
+      {tab === 'favorites' && <FavoritesTab />}
     </div>
   )
 }

@@ -1,11 +1,12 @@
 {
   "name": "procurement",
-  "version": "0.16.2",
+  "version": "0.28.0",
   "description": "ElasticIT portal app — deployed via Admin UI `.eitapp` upload",
   "type": "module",
   "private": true,
   "dependencies": {
-    "recharts": "^3.10.1"
+    "recharts": "^3.10.1",
+    "xlsx": "^0.18.5"
   },
   "scripts": {
     "dev": "vite build --watch",
@@ -25,23 +26,23 @@
   },
   "devDependencies": {
     "@elasticit-llc/app-bridge": "file:./vendor/elasticit-llc-app-bridge-0.7.5.tgz",
-    "@elasticit-llc/ui-kit": "file:./vendor/elasticit-llc-ui-kit-0.5.4.tgz",
+    "@elasticit-llc/ui-kit": "file:./vendor/elasticit-llc-ui-kit-0.5.5-qa.0.tgz",
     "@tailwindcss/vite": "^4.3.3",
     "@types/archiver": "^8.0.0",
-    "@types/react": "^19.2.18",
-    "@types/react-dom": "^19.2.4",
-    "@vitejs/plugin-react": "^6.0.5",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.1",
     "archiver": "^8.0.0",
-    "concurrently": "^10.0.4",
+    "concurrently": "^10.0.5",
     "husky": "^9.1.7",
     "jsdom": "^29.1.1",
-    "react": "^19.2.8",
-    "react-dom": "^19.2.8",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
     "tailwindcss": "^4.2.1",
-    "tsx": "^4.23.1",
+    "tsx": "^4.23.13",
     "typescript": "^6.0.3",
-    "vite": "^8.2.0",
-    "vitest": "^4.1.10"
+    "vite": "^8.3.0",
+    "vitest": "^4.1.11"
   },
   "license": "UNLICENSED"
 }

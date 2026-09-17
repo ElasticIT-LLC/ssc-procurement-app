@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useToast } from '@elasticit-llc/app-bridge'
-import { useProcurementApi, Location, Department } from '../data/db'
+import { useProcurementApi, Location, Department, FavoriteItem } from '../data/db'
 import { LineItemFormRow, LineItemDraft, LineItemDraftErrors } from './LineItemFormRow'
 import { useShipToWorkers } from './useShipToWorkers'
 
@@ -57,11 +57,18 @@ export function NewRequestForm({ onCancel, onSuccess, submitFn }: NewRequestForm
   const [locations, setLocations] = useState<Location[]>([])
   const [departments, setDepartments] = useState<Department[]>([])
   const [loadError, setLoadError] = useState<string | null>(null)
+  const [favorites, setFavorites] = useState<FavoriteItem[]>([])
 
   useEffect(() => {
     Promise.all([api.listLocations(), api.listDepartments()])
       .then(([locs, depts]) => { setLocations(locs); setDepartments(depts) })
       .catch((err: unknown) => setLoadError(err instanceof Error ? err.message : 'Failed to load options'))
+  }, [])
+
+  // Best-effort: on load failure the Item Name field degrades to plain text.
+  useEffect(() => {
+    api.listFavorites().then(setFavorites).catch(() => setFavorites([]))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   function updateItem(index: number, updated: LineItemDraft) {
@@ -142,6 +149,7 @@ export function NewRequestForm({ onCancel, onSuccess, submitFn }: NewRequestForm
             workers={workers}
             workersLoading={workersLoading}
             onRefreshWorkers={refreshWorkers}
+            favorites={favorites}
           />
         ))}
       </div>

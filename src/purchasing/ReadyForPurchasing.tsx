@@ -1,11 +1,12 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useToast } from '@elasticit-llc/app-bridge'
 import { useProcurementApi, LineItemWithRequest, Location } from '../data/db'
+import { DateInput, todayIso } from '../components/DateInput'
 import { StatusBadge } from '../requester/StatusBadge'
 import { ReplacementBadge } from '../requester/ReplacementBadge'
 import { formatDate } from '../lib/constants'
-import { useFormattingRules } from '../formatting/useFormattingRules'
 import { formatItemRef } from '../lib/itemRef'
+import { resolveLocationName } from '../lib/locationLabel'
 import { CreatePurchaseOrderForm } from './CreatePurchaseOrderForm'
 
 interface OrderForm {
@@ -17,13 +18,12 @@ interface OrderForm {
 }
 
 function emptyForm(): OrderForm {
-  return { date_purchased: '', eta: '', shipping_location_id: '', custom_shipping_location: '', purchase_notes: '' }
+  return { date_purchased: todayIso(), eta: '', shipping_location_id: '', custom_shipping_location: '', purchase_notes: '' }
 }
 
 export function ReadyForPurchasing() {
   const api = useProcurementApi()
   const { showToast } = useToast()
-  const { toneClassFor } = useFormattingRules()
 
   const [items, setItems] = useState<LineItemWithRequest[]>([])
   const [locations, setLocations] = useState<Location[]>([])
@@ -34,6 +34,8 @@ export function ReadyForPurchasing() {
   const [submittingId, setSubmittingId] = useState<string | null>(null)
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [showPoForm, setShowPoForm] = useState(false)
+  const [imageUrls, setImageUrls] = useState<Record<string, string>>({})
+  const [capturingId, setCapturingId] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -49,6 +51,9 @@ export function ReadyForPurchasing() {
       // ordered/cancelled, moved onto a PO, or changed elsewhere) so the toolbar
       // count and a subsequent Create-PO never reference stale items.
       setSelected(prev => new Set([...prev].filter(id => data.some(i => i.id === id))))
+      const urls: Record<string, string> = {}
+      await Promise.all(data.filter((i) => i.product_image_path).map(async (i) => { const u = await api.getProductImageUrl(i.product_image_path as string); if (u) urls[i.id] = u }))
+      setImageUrls(urls)
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to load items')
     } finally {
@@ -85,6 +90,22 @@ export function ReadyForPurchasing() {
       })
       await api.notifyStatusUpdate(item.request.id, [item.id], 'item_ordered')
       api.fireNotification('item_ordered', item.request.id, [item.id])
+      // C2/D5: post purchase notes to the request thread (source 'purchasing') after the
+      // order RPC succeeds. Best-effort — a comment failure never fails the order.
+      const note = form.purchase_notes.trim()
+      if (note) {
+        try {
+          const row = await api.postRequestComment({
+            request_id: item.request.id,
+            line_item_id: item.id,
+            source: 'purchasing',
+            body: note,
+          })
+          api.fireCommentNotification(row.id)
+        } catch (e) {
+          console.error('Failed to post purchase-notes thread comment:', e)
+        }
+      }
       showToast({ message: 'Order recorded', type: 'success' })
       setOpenFormId(null)
       await load()
@@ -124,6 +145,7 @@ export function ReadyForPurchasing() {
       {showPoForm && (
         <CreatePurchaseOrderForm
           itemIds={[...selected]}
+          requestIds={Array.from(new Set(items.filter(i => selected.has(i.id)).map(i => i.request.id)))}
           locations={locations}
           onCancel={() => setShowPoForm(false)}
           onCreated={async (po) => { setShowPoForm(false); setSelected(new Set()); showToast({ message: `Created ${po.po_number}`, type: 'success' }); await load() }}
@@ -135,9 +157,10 @@ export function ReadyForPurchasing() {
         const isOpen = openFormId === item.id
         const isOther = form.shipping_location_id === '__other__'
         const busy = submittingId === item.id
+        const locText = resolveLocationName(item, locations)
 
         return (
-          <div key={item.id} className={`rounded-lg border border-border bg-card p-4 grid gap-3 ${toneClassFor(item as unknown as Record<string, unknown>)}`}>
+          <div key={item.id} className="rounded-lg border border-border bg-card p-4 grid gap-3">
             {/* Header */}
             <div className="flex items-start justify-between gap-2">
               <div>
@@ -145,13 +168,32 @@ export function ReadyForPurchasing() {
                   {formatItemRef(item.request?.request_number, item.line_no)} — {item.item_description || 'Unnamed item'}
                   <ReplacementBadge item={item} className="ml-2" />
                 </p>
-                <p className="text-xs text-muted-foreground">Qty: {item.quantity}</p>
-              </div>
-              <div className="flex items-start gap-2">
+                 <p className="text-xs text-muted-foreground">Qty: {item.quantity}</p>
+                 {locText && <p className="text-xs text-muted-foreground">Location: {locText}</p>}
+                 {item.ship_to_name && <p className="text-xs text-muted-foreground">Ship to: {item.ship_to_name}</p>}
+                </div>
+               <div className="flex items-start gap-2">
                 <input type="checkbox" checked={selected.has(item.id)} onChange={() => toggleSelect(item.id)} className="mt-1 h-4 w-4 accent-primary" aria-label="Select for purchase order" />
                 <StatusBadge status={item.status} />
               </div>
             </div>
+
+            {/* Product image or retry capture (mirrors ApprovalsPage) */}
+            {imageUrls[item.id] ? (
+              <img src={imageUrls[item.id]} alt="Product" className="max-w-[240px] rounded-md border border-border" />
+            ) : item.item_url ? (
+              <button
+                type="button"
+                disabled={capturingId === item.id}
+                onClick={async () => {
+                  setCapturingId(item.id)
+                  try { await api.captureAndNotify(item.request.id, item.id); await load() } finally { setCapturingId(null) }
+                }}
+                className="self-start inline-flex items-center rounded-md border border-border px-2.5 py-1 text-xs font-medium text-muted-foreground hover:bg-muted disabled:opacity-50"
+              >
+                Product image unavailable — Retry capture
+              </button>
+            ) : null}
 
             {item.item_url && (
               <a
@@ -211,20 +253,18 @@ export function ReadyForPurchasing() {
 
                 <div className="grid gap-1">
                   <label className="text-xs font-medium text-foreground">Date Purchased</label>
-                  <input
-                    type="date"
+                  <DateInput
                     value={form.date_purchased}
-                    onChange={e => updateForm(item.id, { date_purchased: e.target.value })}
+                    onChange={(v) => updateForm(item.id, { date_purchased: v })}
                     className="w-full rounded-md border border-input bg-input px-3 py-1.5 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                   />
                 </div>
 
                 <div className="grid gap-1">
                   <label className="text-xs font-medium text-foreground">ETA</label>
-                  <input
-                    type="date"
+                  <DateInput
                     value={form.eta}
-                    onChange={e => updateForm(item.id, { eta: e.target.value })}
+                    onChange={(v) => updateForm(item.id, { eta: v })}
                     className="w-full rounded-md border border-input bg-input px-3 py-1.5 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                   />
                 </div>

@@ -3,7 +3,7 @@
   "slug": "procurement",
   "name": "Solterra Procurement",
   "icon": "Package",
-  "version": "0.16.2",
+  "version": "0.28.0",
   "permissions": [
     { "key": "apps/procurement/*", "label": "Full Access", "description": "Full access to Procurement", "group": "Administration" },
     { "key": "apps/procurement/requests/create", "label": "Create requests", "description": "Create and submit purchase requests; mark items received; initiate returns", "group": "Requests" },
@@ -55,7 +55,22 @@
       { "version": 21, "description": "Every individual order creates a single-item PO", "up": "migrations/021_order_line_item_creates_po.sql" },
       { "version": 22, "description": "Cancel button applies to ordered items and updates PO status", "up": "migrations/022_cancel_ordered_item.sql" },
       { "version": 23, "description": "Allow anon read on active locations/departments for public form dropdowns", "up": "migrations/023_public_form_reference_read.sql" },
-      { "version": 24, "description": "Record requester name on private-form submissions", "up": "migrations/024_submit_request_anon_name.sql" }
+      { "version": 24, "description": "Record requester name on private-form submissions", "up": "migrations/024_submit_request_anon_name.sql" },
+      { "version": 25, "description": "Allow requesters to read public/private form submissions via requester_email", "up": "migrations/025_requester_email_rls.sql" },
+      { "version": 26, "description": "Extend email RLS fallback to user_profiles.email for SSO users (no JWT email)", "up": "migrations/026_requester_profile_email_rls.sql" },
+      { "version": 27, "description": "NULLIF empty JWT email claim (SSO issues \"email\":\"\"), COALESCE missed the profile fallback", "up": "migrations/027_nullif_jwt_email_rls.sql" },
+      { "version": 28, "description": "Records archive: line_items.archived_at + archive_line_item RPC (soft delete replaces UI delete)", "up": "migrations/028_archive_line_item.sql" },
+      { "version": 29, "description": "Favorite items catalog (admin-curated, form auto-suggestions) + RLS", "up": "migrations/029_favorite_items.sql" },
+      { "version": 30, "description": "Converge favorite_items RLS: drop loose per-action policies, canonical read-all / admin-write only", "up": "migrations/030_favorite_items_rls_convergence.sql" },
+      { "version": 31, "description": "Heart button: any signed-in user can INSERT favorites from the Requests page (update/delete stay admin)", "up": "migrations/031_favorite_items_heart_insert.sql" },
+      { "version": 32, "description": "Favorites: only approvers/purchasers/admins may insert; trigger stamps created_by for Added-by attribution", "up": "migrations/032_favorite_items_curators.sql" },
+      { "version": 33, "description": "Pre-approved items catalog (table + RLS + created_by trigger) + line_items reporting columns (received_at, cancelled_at, pre_approved_item_id)", "up": "migrations/033_pre_approved_items.sql" },
+      { "version": 34, "description": "Pre-approved RPCs (pre_approve_line_item, order_pre_approved_item, delete_pre_approved_item) + receive_line_item v2 / cancel_line_item v3 with received_at/cancelled_at stamps", "up": "migrations/034_pre_approved_rpcs.sql" },
+      { "version": 35, "description": "Pre-approve is catalog-only (no auto-approval); item stays in For Approval; catalog upsert unchanged", "up": "migrations/035_pre_approve_catalog_only.sql" },
+      { "version": 36, "description": "Wave C: request_comments thread table + RLS + realtime publication + admin_comment backfill", "up": "migrations/036_request_comments.sql" },
+      { "version": 37, "description": "Wave C: purchase_requests.last_overdue_reminder_at (14-day reminder dedupe column)", "up": "migrations/037_last_overdue_reminder_at.sql" },
+      { "version": 38, "description": "Wave C: pg_cron job for daily 08:00 overdue reminders (net.http_post -> procurement-capture-and-notify)", "up": "migrations/038_overdue_cron.sql" },
+      { "version": 39, "description": "Phase 4: item_on_hold notification key — backfill opt-in for users already opted into item_declined", "up": "migrations/039_item_on_hold_optin.sql" }
     ],
     "tables": [
       { "name": "locations",         "rls": { "read": "authenticated", "write": "admin" } },
@@ -63,16 +78,23 @@
       { "name": "purchase_requests", "rls": { "read": "authenticated", "write": "authenticated" } },
       { "name": "line_items",        "rls": { "read": "authenticated", "write": "authenticated" } },
       { "name": "_config",           "rls": { "read": "admin", "write": "admin" } },
-      { "name": "purchase_orders",   "rls": { "read": "authenticated", "write": "admin" } }
+      { "name": "purchase_orders",   "rls": { "read": "authenticated", "write": "admin" } },
+      { "name": "favorite_items",    "rls": { "read": "authenticated", "write": "admin" } },
+      { "name": "pre_approved_items","rls": { "read": "authenticated", "write": "admin" } }
     ]
   },
+  "config": [
+    { "key": "supabase_url", "source": "project_url", "description": "Project base URL; read by the pg_cron overdue-reminder job (migration 038) to call the edge function." }
+  ],
   "notifications": [
-    { "key": "request_submitted", "label": "New request to approve", "description": "A new purchase request was submitted and needs approval.", "sort_order": 1 },
+    { "key": "request_submitted", "label": "New request to approve", "description": "A new purchase request was submitted and needs approval.", "sort_order": 1, "requires_permission": "apps/procurement/approvals/act" },
     { "key": "item_approved", "label": "Item approved", "description": "A requested item was approved.", "sort_order": 2 },
     { "key": "item_declined", "label": "Item declined", "description": "A requested item was declined.", "sort_order": 3 },
     { "key": "item_ordered", "label": "Item ordered", "description": "An approved item was ordered.", "sort_order": 4 },
-    { "key": "return_initiated", "label": "Return initiated", "description": "A return was initiated for a received item.", "sort_order": 5 },
-    { "key": "item_cancelled", "label": "Item cancelled", "description": "An approved item was cancelled; a new request is needed.", "sort_order": 6 }
+    { "key": "return_initiated", "label": "Return initiated", "description": "A return was initiated for a received item.", "sort_order": 5, "requires_permission": "apps/procurement/returns/manage" },
+    { "key": "item_cancelled", "label": "Item cancelled", "description": "An approved item was cancelled; a new request is needed.", "sort_order": 6 },
+    { "key": "request_overdue_reminder", "label": "Request overdue", "description": "A pending or on-hold request has been waiting 14+ days and needs a decision.", "sort_order": 7, "requires_permission": "apps/procurement/approvals/act" },
+    { "key": "item_on_hold", "label": "Item on hold", "description": "A requested item was placed on hold.", "sort_order": 8 }
   ],
   "edge_functions": [
     { "name": "procurement-capture-and-notify", "entrypoint": "supabase/functions/procurement-capture-and-notify/index.ts", "verify_jwt": false },
