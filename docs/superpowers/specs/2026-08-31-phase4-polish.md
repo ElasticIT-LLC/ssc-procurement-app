@@ -97,7 +97,23 @@ key (requesters, and staff who opted in) gets the email + bell.
 - [x] `package.json`: v0.27.0
 - [x] Gate: vitest 17 files / 89 tests, validate, build — all green
 - [x] Package `dist/procurement-0.27.0.eitapp`
-- [ ] Push `for-qa`
-- [ ] Deploy edge fn to QA (supabase_deploy_edge_function, jkbqaxpfvqbeepwhunhl)
-- [ ] ClickUp handover comment on task 86eyrbzn3 (user uploads the .eitapp;
+- [x] Push `for-qa` (df4e6f3)
+- [x] Deploy edge fn to QA (CLI, jkbqaxpfvqbeepwhunhl — v61, verified byte-identical)
+- [x] ClickUp handover comment on task 86eyrbzn3 (user uploads the .eitapp;
       publish-app applies 039 + upserts the catalog row on upload)
+
+## Post-ship fix (2026-09-01, same 0.27.0 artifact — repackaged)
+
+**Bug:** Open Orders tab blinked "Loading…" endlessly; Closed Orders tab took
+minutes. Root cause: the 0.27.0 Location/Ship-to change made `OpenOrders.load`
+depend on `api`, but `useProcurementApi()` returns a fresh object every render,
+so the mount effect re-ran after every render — an infinite refetch loop that
+also flooded the browser connection queue behind it.
+
+**Fix:** `src/purchasing/OpenOrders.tsx` — `useCallback` deps back to `[]`
+(matches ReadyForPurchasing/ClosedOrders). Regression test
+`src/purchasing/OpenOrders.test.ts` (jsdom, mocks `useProcurementApi` to return
+a fresh object per call — the bug precondition; asserts exactly 1 fetch over
+500ms). Red before fix (test timed out at 5s on the loop), green after.
+
+- [x] e2d3578 pushed to for-qa; gate green (18 files / 90 tests); artifact repackaged
