@@ -204,6 +204,23 @@ export function RequestDetail({ requestId, onBack }: RequestDetailProps) {
         </div>
       </div>
 
+      {/* Approver hint: this view has no approve/decline actions — they live on
+          the Approvals page. Full navigation (like threadLink) so the shell
+          reloads onto the approvals page. */}
+      {hasAppPermission(PERMS.approve) && lineItems.some((i) => i.status === 'pending' || i.status === 'on_hold') && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-info/10 border border-info/30 px-3 py-2">
+          <p className="text-xs text-info">
+            Items in this request are waiting for a decision. Approve, decline, or hold them on the Approvals page.
+          </p>
+          <a
+            href={window.location.pathname.replace(/[^/]+$/, 'approvals')}
+            className="shrink-0 inline-flex items-center rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:opacity-90"
+          >
+            Go to Approvals
+          </a>
+        </div>
+      )}
+
       {/* Line items */}
       <div className="grid gap-3">
         <h3 className="text-sm font-semibold text-foreground">Items ({lineItems.length})</h3>
