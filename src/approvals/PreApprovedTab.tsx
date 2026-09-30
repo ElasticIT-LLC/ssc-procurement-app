@@ -218,7 +218,7 @@ export function PreApprovedTab() {
                 <input type="number" min={1} step={1} value={form.quantity} onChange={(e) => updateForm({ quantity: Number(e.target.value) })} className={inputClass} />
               </div>
               <div className="grid gap-1">
-                <label className="text-xs font-medium text-foreground">Date needed</label>
+                <label className="text-xs font-medium text-foreground">ETA</label>
                 <DateInput value={form.date_needed} onChange={(v) => updateForm({ date_needed: v })} className={inputClass} />
               </div>
             </div>

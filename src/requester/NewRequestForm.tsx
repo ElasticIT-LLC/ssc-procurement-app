@@ -33,7 +33,7 @@ function validateItem(item: LineItemDraft): LineItemDraftErrors {
   if (!item.item_description.trim()) errs.item_description = 'Item name is required'
   if (item.quantity < 1) errs.quantity = 'Quantity must be at least 1'
   if (!item.memo.trim()) errs.memo = 'Memo is required'
-  if (!item.date_needed) errs.date_needed = 'Date needed is required'
+  if (!item.date_needed) errs.date_needed = 'ETA is required'
   const hasLocation = item.location_id !== null || item.custom_location.trim().length > 0
   if (!hasLocation) errs.location = 'A location or custom location is required'
   const hasDept = item.department_id !== null || item.custom_department.trim().length > 0

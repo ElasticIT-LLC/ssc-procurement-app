@@ -208,8 +208,8 @@ export function LineItemFormRow({
         />
       </Field>
 
-      {/* Date Needed */}
-      <Field label="Date Needed" error={errors.date_needed}>
+      {/* ETA */}
+      <Field label="ETA" error={errors.date_needed}>
         <DateInput
           value={value.date_needed}
           onChange={(v) => set({ date_needed: v })}

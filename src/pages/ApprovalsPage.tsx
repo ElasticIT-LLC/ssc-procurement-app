@@ -236,10 +236,10 @@ export function ApprovalsPage() {
             <p className="text-xs text-muted-foreground">Memo: {item.memo}</p>
           )}
 
-          {/* Date needed */}
+          {/* ETA */}
           {item.date_needed && (
             <p className="text-xs text-muted-foreground">
-              Date needed: {formatDate(item.date_needed)}
+              ETA: {formatDate(item.date_needed)}
             </p>
           )}
 

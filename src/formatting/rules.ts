@@ -6,8 +6,8 @@ export interface FormatRule { id: string; label?: string; field: FormatField; op
 
 export const FIELD_OPTIONS: { field: FormatField; label: string; type: 'status' | 'date' | 'number' | 'text' }[] = [
   { field: 'status', label: 'Status', type: 'status' },
-  { field: 'date_needed', label: 'Date needed', type: 'date' },
-  { field: 'eta', label: 'ETA', type: 'date' },
+  { field: 'date_needed', label: 'ETA', type: 'date' },
+  { field: 'eta', label: 'Order ETA', type: 'date' },
   { field: 'quantity', label: 'Quantity', type: 'number' },
   { field: 'department', label: 'Department', type: 'text' },
   { field: 'location', label: 'Location', type: 'text' },

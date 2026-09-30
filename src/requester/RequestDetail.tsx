@@ -283,7 +283,7 @@ export function RequestDetail({ requestId, onBack }: RequestDetailProps) {
 
             {item.date_needed && (
               <p className="text-xs text-muted-foreground">
-                Date needed: {formatDate(item.date_needed)}
+                ETA: {formatDate(item.date_needed)}
               </p>
             )}
 
