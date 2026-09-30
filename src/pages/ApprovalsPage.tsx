@@ -4,7 +4,6 @@ import { useAppPermissions } from '../lib/useAppPermissions'
 import { useProcurementApi, LineItemWithRequest, type RequestCommentRow } from '../data/db'
 import { StatusBadge } from '../requester/StatusBadge'
 import { decisionNotificationKey } from '../lib/decisionNotification'
-import { FavoritesTab } from '../purchasing/FavoritesTab'
 import { PreApprovedTab } from '../approvals/PreApprovedTab'
 import { PERMS, formatDate } from '../lib/constants'
 import { formatItemRef } from '../lib/itemRef'
@@ -22,7 +21,7 @@ export function ApprovalsPage() {
   const [comments, setComments] = useState<RequestCommentRow[]>([])
   const [drafts, setDrafts] = useState<Record<string, string>>({})
   const [preApprovedNames, setPreApprovedNames] = useState<Set<string>>(new Set())
-  const [tab, setTab] = useState<'items' | 'preapproved' | 'favorites'>('items')
+  const [tab, setTab] = useState<'items' | 'preapproved'>('items')
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true)
@@ -196,13 +195,6 @@ export function ApprovalsPage() {
         >
           Pre-approved
         </button>
-        <button
-          type="button"
-          onClick={() => setTab('favorites')}
-          className={`px-3 py-2 text-sm font-medium -mb-px border-b-2 ${tab === 'favorites' ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
-        >
-          Favorite Items
-        </button>
       </div>
 
       {tab === 'items' && loading && (
@@ -356,8 +348,6 @@ export function ApprovalsPage() {
         ))}
 
       {tab === 'preapproved' && <PreApprovedTab />}
-
-      {tab === 'favorites' && <FavoritesTab />}
     </div>
   )
 }

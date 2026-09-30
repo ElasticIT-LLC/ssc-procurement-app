@@ -7,7 +7,7 @@ import { PERMS, formatDate } from '../lib/constants'
 // Curated shared reorder catalog, surfaced as auto-suggestions in request forms
 // and readable by everyone. Approvers, purchasers, and admins can add items
 // (RLS migration 032); removing stays admin-only. Reached from Purchasing →
-// Favorite Items and Approvals → Favorite Items.
+// Favorite Items.
 export function FavoritesTab() {
   const api = useProcurementApi()
   const { showToast } = useToast()
