@@ -27,6 +27,7 @@ export function PreApprovedTab() {
   const [form, setForm] = useState<PreApprovedOrderDraft | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [removingId, setRemovingId] = useState<string | null>(null)
+  const [imageUrls, setImageUrls] = useState<Record<string, string>>({})
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -41,6 +42,20 @@ export function PreApprovedTab() {
       setLocations(locs)
       setDepartments(depts)
       setNames(await api.resolveUserNames(catalog.map((i) => i.created_by).filter((x): x is string => !!x)))
+      // Signed URLs for catalog product images (best-effort — an image failure
+      // must not break the catalog listing).
+      const urls: Record<string, string> = {}
+      try {
+        await Promise.all(
+          catalog.filter((i) => i.product_image_path).map(async (i) => {
+            const u = await api.getProductImageUrl(i.product_image_path as string)
+            if (u) urls[i.id] = u
+          }),
+        )
+        setImageUrls(urls)
+      } catch {
+        // ignore — affected rows fall back to the '—' placeholder
+      }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to load pre-approved items')
     } finally {
@@ -123,6 +138,7 @@ export function PreApprovedTab() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border bg-muted/40 text-left text-xs text-muted-foreground">
+                <th className="px-3 py-2 font-medium">Image</th>
                 <th className="px-3 py-2 font-medium">Item</th>
                 <th className="px-3 py-2 font-medium">Qty</th>
                 <th className="px-3 py-2 font-medium">Location</th>
@@ -135,6 +151,13 @@ export function PreApprovedTab() {
             <tbody>
               {items.map((item) => (
                 <tr key={item.id} className="border-b border-border last:border-0">
+                  <td className="px-3 py-2">
+                    {imageUrls[item.id] ? (
+                      <img src={imageUrls[item.id]} alt="" className="max-w-[96px] rounded-md border border-border" />
+                    ) : (
+                      <span className="text-xs text-muted-foreground">—</span>
+                    )}
+                  </td>
                   <td className="px-3 py-2">
                     <span className="font-medium text-foreground">{item.name}</span>
                     {item.item_url && (
