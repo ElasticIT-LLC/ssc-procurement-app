@@ -4,7 +4,7 @@ import { useAppPermissions } from '../lib/useAppPermissions'
 import { useProcurementApi, PreApprovedItem, Location, Department } from '../data/db'
 import { PERMS, formatDate } from '../lib/constants'
 import { Modal } from '../components/Modal'
-import { DateInput } from '../components/DateInput'
+import { DateInput, minEtaIso } from '../components/DateInput'
 import { prefillFromCatalog, draftToRpcPayload, OTHER, type PreApprovedOrderDraft } from './preApproved'
 
 const inputClass = 'w-full rounded-md border border-input bg-input px-3 py-1.5 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring'
@@ -27,6 +27,7 @@ export function PreApprovedTab() {
   const [form, setForm] = useState<PreApprovedOrderDraft | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [removingId, setRemovingId] = useState<string | null>(null)
+  const [imageUrls, setImageUrls] = useState<Record<string, string>>({})
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -41,6 +42,20 @@ export function PreApprovedTab() {
       setLocations(locs)
       setDepartments(depts)
       setNames(await api.resolveUserNames(catalog.map((i) => i.created_by).filter((x): x is string => !!x)))
+      // Signed URLs for catalog product images (best-effort — an image failure
+      // must not break the catalog listing).
+      const urls: Record<string, string> = {}
+      try {
+        await Promise.all(
+          catalog.filter((i) => i.product_image_path).map(async (i) => {
+            const u = await api.getProductImageUrl(i.product_image_path as string)
+            if (u) urls[i.id] = u
+          }),
+        )
+        setImageUrls(urls)
+      } catch {
+        // ignore — affected rows fall back to the '—' placeholder
+      }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to load pre-approved items')
     } finally {
@@ -74,6 +89,7 @@ export function PreApprovedTab() {
   const deptIsOther = form?.department_id === OTHER
   const canSubmit = !!form
     && form.name.trim() !== ''
+    && (!form.date_needed || form.date_needed >= minEtaIso())
     && (form.location_id === OTHER ? form.custom_location.trim() !== '' : form.location_id !== '')
     && (form.department_id === OTHER ? form.custom_department.trim() !== '' : form.department_id !== '')
 
@@ -123,6 +139,7 @@ export function PreApprovedTab() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border bg-muted/40 text-left text-xs text-muted-foreground">
+                <th className="px-3 py-2 font-medium">Image</th>
                 <th className="px-3 py-2 font-medium">Item</th>
                 <th className="px-3 py-2 font-medium">Qty</th>
                 <th className="px-3 py-2 font-medium">Location</th>
@@ -135,6 +152,13 @@ export function PreApprovedTab() {
             <tbody>
               {items.map((item) => (
                 <tr key={item.id} className="border-b border-border last:border-0">
+                  <td className="px-3 py-2">
+                    {imageUrls[item.id] ? (
+                      <img src={imageUrls[item.id]} alt="" className="max-w-[96px] rounded-md border border-border" />
+                    ) : (
+                      <span className="text-xs text-muted-foreground">—</span>
+                    )}
+                  </td>
                   <td className="px-3 py-2">
                     <span className="font-medium text-foreground">{item.name}</span>
                     {item.item_url && (
@@ -195,8 +219,11 @@ export function PreApprovedTab() {
                 <input type="number" min={1} step={1} value={form.quantity} onChange={(e) => updateForm({ quantity: Number(e.target.value) })} className={inputClass} />
               </div>
               <div className="grid gap-1">
-                <label className="text-xs font-medium text-foreground">Date needed</label>
-                <DateInput value={form.date_needed} onChange={(v) => updateForm({ date_needed: v })} className={inputClass} />
+                <label className="text-xs font-medium text-foreground">ETA</label>
+                <DateInput value={form.date_needed} onChange={(v) => updateForm({ date_needed: v })} minDate={minEtaIso()} className={inputClass} />
+                {form.date_needed && form.date_needed < minEtaIso() && (
+                  <p className="text-xs text-destructive">ETA must be at least 5 days from today</p>
+                )}
               </div>
             </div>
             <div className="grid gap-1">

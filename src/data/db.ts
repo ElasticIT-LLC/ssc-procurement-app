@@ -47,7 +47,7 @@ export interface Location { id: string; name: string; is_active: boolean }
 export interface Department { id: string; name: string; is_active: boolean }
 export interface ShipToWorker { id: string; name: string; location: string | null; label: string }
 export interface FavoriteItem { id: string; name: string; item_url: string | null; created_by: string | null; created_at: string }
-export interface PreApprovedItem { id: string; name: string; item_url: string | null; quantity: number; substitution_ok: boolean; location_id: string | null; custom_location: string | null; department_id: string | null; custom_department: string | null; date_needed: string | null; memo: string | null; created_by: string | null; created_at: string; source_line_item_id: string | null }
+export interface PreApprovedItem { id: string; name: string; item_url: string | null; product_image_path: string | null; quantity: number; substitution_ok: boolean; location_id: string | null; custom_location: string | null; department_id: string | null; custom_department: string | null; date_needed: string | null; memo: string | null; created_by: string | null; created_at: string; source_line_item_id: string | null }
 export interface RequestCommentRow {
   id: string
   request_id: string

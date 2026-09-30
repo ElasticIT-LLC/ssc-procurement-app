@@ -80,7 +80,7 @@ export function CreatePurchaseOrderForm({ itemIds, requestIds, locations, onCanc
         />
       </div>
       <div className="grid gap-1">
-        <label className="text-xs font-medium text-foreground">ETA</label>
+        <label className="text-xs font-medium text-foreground">Order ETA</label>
         <DateInput
           value={eta}
           onChange={setEta}

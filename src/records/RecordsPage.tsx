@@ -25,7 +25,7 @@ function csvCell(value: string): string {
 }
 
 function exportCsv(rows: LineItemDetailed[], catalog: Record<string, PreApprovedItem>, sourceRef: Record<string, string>, latestByItem: Record<string, RequestCommentRow>) {
-  const headers = ['Submitted', 'Requester', 'Email', 'Item', 'Qty', 'Location', 'Department', 'Status', 'Date Needed', 'ETA', 'Request Notes', 'Latest comment', 'Received', 'Cancelled', 'Pre-approved Item', 'Source Item']
+  const headers = ['Submitted', 'Requester', 'Email', 'Item', 'Qty', 'Location', 'Department', 'Status', 'ETA', 'Order ETA', 'Request Notes', 'Latest comment', 'Received', 'Cancelled', 'Pre-approved Item', 'Source Item']
   const lines = [headers.join(',')]
   for (const item of rows) {
     const cat = item.pre_approved_item_id ? catalog[item.pre_approved_item_id] : undefined
@@ -236,8 +236,8 @@ export function RecordsPage() {
                 <th className={head}>Location</th>
                 <th className={head}>Department</th>
                 <th className={head}>Status</th>
-                <th className={head}>Date Needed</th>
                 <th className={head}>ETA</th>
+                <th className={head}>Order ETA</th>
                 <th className={head}>Request Notes</th>
                 <th className={head}>Latest comment</th>
                 {showActionsColumn && <th className={head}>Actions</th>}

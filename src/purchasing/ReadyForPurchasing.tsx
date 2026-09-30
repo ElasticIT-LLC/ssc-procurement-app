@@ -212,7 +212,7 @@ export function ReadyForPurchasing() {
 
             {item.date_needed && (
               <p className="text-xs text-muted-foreground">
-                Date needed: {formatDate(item.date_needed)}
+                ETA: {formatDate(item.date_needed)}
               </p>
             )}
 
@@ -261,7 +261,7 @@ export function ReadyForPurchasing() {
                 </div>
 
                 <div className="grid gap-1">
-                  <label className="text-xs font-medium text-foreground">ETA</label>
+                  <label className="text-xs font-medium text-foreground">Order ETA</label>
                   <DateInput
                     value={form.eta}
                     onChange={(v) => updateForm(item.id, { eta: v })}

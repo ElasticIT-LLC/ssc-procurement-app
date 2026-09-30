@@ -6,6 +6,7 @@ const catalogItem: PreApprovedItem = {
   id: 'cat-1',
   name: 'Standing Desks',
   item_url: 'https://example.com/desk',
+  product_image_path: null,
   quantity: 4,
   substitution_ok: true,
   date_needed: '2026-09-15',

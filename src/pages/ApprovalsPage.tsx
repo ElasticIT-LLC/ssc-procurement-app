@@ -4,7 +4,6 @@ import { useAppPermissions } from '../lib/useAppPermissions'
 import { useProcurementApi, LineItemWithRequest, type RequestCommentRow } from '../data/db'
 import { StatusBadge } from '../requester/StatusBadge'
 import { decisionNotificationKey } from '../lib/decisionNotification'
-import { FavoritesTab } from '../purchasing/FavoritesTab'
 import { PreApprovedTab } from '../approvals/PreApprovedTab'
 import { PERMS, formatDate } from '../lib/constants'
 import { formatItemRef } from '../lib/itemRef'
@@ -22,10 +21,10 @@ export function ApprovalsPage() {
   const [comments, setComments] = useState<RequestCommentRow[]>([])
   const [drafts, setDrafts] = useState<Record<string, string>>({})
   const [preApprovedNames, setPreApprovedNames] = useState<Set<string>>(new Set())
-  const [tab, setTab] = useState<'items' | 'preapproved' | 'favorites'>('items')
+  const [tab, setTab] = useState<'items' | 'preapproved'>('items')
 
-  const load = useCallback(async () => {
-    setLoading(true)
+  const load = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true)
     setError(null)
     try {
       const data = await api.listLineItemsByStatus(['pending', 'on_hold'])
@@ -44,6 +43,34 @@ export function ApprovalsPage() {
   }, [])
 
   useEffect(() => { load() }, [load])
+
+  // Auto-poll: product images may still be capturing after submit. While any
+  // visible item has an item_url but no loaded image, re-check every 10s.
+  // Silent refresh so the list doesn't flicker; the interval self-terminates
+  // once every visible item has an image (or the tab is switched away).
+  const missingImageKey = items.filter((i) => i.item_url && !imageUrls[i.id]).map((i) => i.id).join(',')
+  useEffect(() => {
+    if (tab !== 'items' || missingImageKey === '') return
+    const missingIds = missingImageKey.split(',')
+    const timer = setInterval(async () => {
+      const urls: Record<string, string> = {}
+      await Promise.all(
+        items.filter((i) => missingIds.includes(i.id) && i.product_image_path).map(async (i) => {
+          const u = await api.getProductImageUrl(i.product_image_path as string)
+          if (u) urls[i.id] = u
+        }),
+      )
+      if (Object.keys(urls).length === 0) {
+        // No signed URLs yet — the capture function may have written
+        // product_image_path since our last list; re-list silently to pick it up.
+        await load(true)
+      } else {
+        setImageUrls((prev) => ({ ...prev, ...urls }))
+      }
+    }, 10000)
+    return () => clearInterval(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, missingImageKey])
 
   async function handleAction(id: string, action: 'approved' | 'declined' | 'on_hold') {
     const reqId = items.find((it) => it.id === id)?.request.id
@@ -168,13 +195,6 @@ export function ApprovalsPage() {
         >
           Pre-approved
         </button>
-        <button
-          type="button"
-          onClick={() => setTab('favorites')}
-          className={`px-3 py-2 text-sm font-medium -mb-px border-b-2 ${tab === 'favorites' ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
-        >
-          Favorite Items
-        </button>
       </div>
 
       {tab === 'items' && loading && (
@@ -236,10 +256,10 @@ export function ApprovalsPage() {
             <p className="text-xs text-muted-foreground">Memo: {item.memo}</p>
           )}
 
-          {/* Date needed */}
+          {/* ETA */}
           {item.date_needed && (
             <p className="text-xs text-muted-foreground">
-              Date needed: {formatDate(item.date_needed)}
+              ETA: {formatDate(item.date_needed)}
             </p>
           )}
 
@@ -328,8 +348,6 @@ export function ApprovalsPage() {
         ))}
 
       {tab === 'preapproved' && <PreApprovedTab />}
-
-      {tab === 'favorites' && <FavoritesTab />}
     </div>
   )
 }

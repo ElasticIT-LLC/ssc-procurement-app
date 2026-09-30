@@ -3,7 +3,7 @@
   "slug": "procurement",
   "name": "Solterra Procurement",
   "icon": "Package",
-  "version": "1.1.0-qa.1",
+  "version": "1.1.0-qa.2",
   "permissions": [
     { "key": "apps/procurement/*", "label": "Full Access", "description": "Full access to Procurement", "group": "Administration" },
     { "key": "apps/procurement/requests/create", "label": "Create requests", "description": "Create and submit purchase requests; mark items received; initiate returns", "group": "Requests" },
@@ -70,7 +70,10 @@
       { "version": 36, "description": "Wave C: request_comments thread table + RLS + realtime publication + admin_comment backfill", "up": "migrations/036_request_comments.sql" },
       { "version": 37, "description": "Wave C: purchase_requests.last_overdue_reminder_at (14-day reminder dedupe column)", "up": "migrations/037_last_overdue_reminder_at.sql" },
       { "version": 38, "description": "Wave C: pg_cron job for daily 08:00 overdue reminders (net.http_post -> procurement-capture-and-notify)", "up": "migrations/038_overdue_cron.sql" },
-      { "version": 39, "description": "Phase 4: item_on_hold notification key — backfill opt-in for users already opted into item_declined", "up": "migrations/039_item_on_hold_optin.sql" }
+      { "version": 39, "description": "Phase 4: item_on_hold notification key - backfill opt-in for users already opted into item_declined", "up": "migrations/039_item_on_hold_optin.sql" },
+      { "version": 40, "description": "Pre-approved catalog: product_image_path column + pre_approve_line_item copies image + backfill", "up": "migrations/040_pre_approved_images.sql" },
+      { "version": 41, "description": "Block line items with date_needed closer than 5 days out (BEFORE INSERT trigger)", "up": "migrations/041_min_date_needed.sql" },
+      { "version": 42, "description": "Canonical submit trigger: auto screenshot + approval email on request insert (keyless, _config URL) — fixes missing trigger on both prod projects", "up": "migrations/042_submit_trigger.sql" }
     ],
     "tables": [
       { "name": "locations",         "rls": { "read": "authenticated", "write": "admin" } },
