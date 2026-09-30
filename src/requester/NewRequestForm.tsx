@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useToast } from '@elasticit-llc/app-bridge'
 import { useProcurementApi, Location, Department, FavoriteItem } from '../data/db'
 import { LineItemFormRow, LineItemDraft, LineItemDraftErrors } from './LineItemFormRow'
+import { minEtaIso } from '../components/DateInput'
 import { useShipToWorkers } from './useShipToWorkers'
 
 interface NewRequestFormProps {
@@ -34,6 +35,7 @@ function validateItem(item: LineItemDraft): LineItemDraftErrors {
   if (item.quantity < 1) errs.quantity = 'Quantity must be at least 1'
   if (!item.memo.trim()) errs.memo = 'Memo is required'
   if (!item.date_needed) errs.date_needed = 'ETA is required'
+  else if (item.date_needed < minEtaIso()) errs.date_needed = 'ETA must be at least 5 days from today'
   const hasLocation = item.location_id !== null || item.custom_location.trim().length > 0
   if (!hasLocation) errs.location = 'A location or custom location is required'
   const hasDept = item.department_id !== null || item.custom_department.trim().length > 0

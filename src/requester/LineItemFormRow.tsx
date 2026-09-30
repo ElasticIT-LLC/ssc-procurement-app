@@ -2,7 +2,7 @@ import { Location, Department, FavoriteItem } from '../data/db'
 import { ShipToWorker } from '../data/db'
 import { ShipToCombobox } from './ShipToCombobox'
 import { ItemNameCombobox } from './ItemNameCombobox'
-import { DateInput } from '../components/DateInput'
+import { DateInput, minEtaIso } from '../components/DateInput'
 
 export interface LineItemDraft {
   ship_to_name: string
@@ -213,6 +213,7 @@ export function LineItemFormRow({
         <DateInput
           value={value.date_needed}
           onChange={(v) => set({ date_needed: v })}
+          minDate={minEtaIso()}
           className="h-9 w-full rounded-md border border-border bg-input px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
         />
       </Field>

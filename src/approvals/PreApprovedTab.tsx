@@ -4,7 +4,7 @@ import { useAppPermissions } from '../lib/useAppPermissions'
 import { useProcurementApi, PreApprovedItem, Location, Department } from '../data/db'
 import { PERMS, formatDate } from '../lib/constants'
 import { Modal } from '../components/Modal'
-import { DateInput } from '../components/DateInput'
+import { DateInput, minEtaIso } from '../components/DateInput'
 import { prefillFromCatalog, draftToRpcPayload, OTHER, type PreApprovedOrderDraft } from './preApproved'
 
 const inputClass = 'w-full rounded-md border border-input bg-input px-3 py-1.5 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring'
@@ -89,6 +89,7 @@ export function PreApprovedTab() {
   const deptIsOther = form?.department_id === OTHER
   const canSubmit = !!form
     && form.name.trim() !== ''
+    && (!form.date_needed || form.date_needed >= minEtaIso())
     && (form.location_id === OTHER ? form.custom_location.trim() !== '' : form.location_id !== '')
     && (form.department_id === OTHER ? form.custom_department.trim() !== '' : form.department_id !== '')
 
@@ -219,7 +220,10 @@ export function PreApprovedTab() {
               </div>
               <div className="grid gap-1">
                 <label className="text-xs font-medium text-foreground">ETA</label>
-                <DateInput value={form.date_needed} onChange={(v) => updateForm({ date_needed: v })} className={inputClass} />
+                <DateInput value={form.date_needed} onChange={(v) => updateForm({ date_needed: v })} minDate={minEtaIso()} className={inputClass} />
+                {form.date_needed && form.date_needed < minEtaIso() && (
+                  <p className="text-xs text-destructive">ETA must be at least 5 days from today</p>
+                )}
               </div>
             </div>
             <div className="grid gap-1">

@@ -3,7 +3,7 @@ import { useShellContext } from '@elasticit-llc/app-bridge'
 import { useToast } from '@elasticit-llc/app-bridge'
 import { useProcurementApi, Location, Department } from '../data/db'
 import { NewRequestForm } from '../requester/NewRequestForm'
-import { DateInput } from '../components/DateInput'
+import { DateInput, minEtaIso } from '../components/DateInput'
 import { FavoritesLink } from '../components/FavoritesModal'
 
 interface AnonLineItemDraft {
@@ -55,6 +55,7 @@ function validateItem(item: AnonLineItemDraft): LineItemDraftErrors {
   if (item.quantity < 1) errs.quantity = 'Quantity must be at least 1'
   if (!item.memo.trim()) errs.memo = 'Memo is required'
   if (!item.date_needed) errs.date_needed = 'ETA is required'
+  else if (item.date_needed < minEtaIso()) errs.date_needed = 'ETA must be at least 5 days from today'
   const hasLocation = item.location_id !== null || item.custom_location.trim().length > 0
   if (!hasLocation) errs.location = 'A location or custom location is required'
   const hasDept = item.department_id !== null || item.custom_department.trim().length > 0
@@ -349,6 +350,7 @@ export function PublicRequestFormPage() {
                 <DateInput
                   value={item.date_needed}
                   onChange={(v) => updateItem(index, { ...item, date_needed: v })}
+                  minDate={minEtaIso()}
                   className="h-9 w-full rounded-md border border-border bg-input px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                 />
               </Field>
