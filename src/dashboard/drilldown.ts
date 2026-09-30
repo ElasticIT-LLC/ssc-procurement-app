@@ -53,3 +53,17 @@ export function myPendingRequests(
     return false
   })
 }
+
+/** All requests owned by the given user (any status): requester_id match, or
+ *  public-form submissions matched by requester_email. */
+export function ownRequests(
+  requests: RequestRow[],
+  userId: string | null | undefined,
+  userEmail: string | null | undefined,
+): RequestRow[] {
+  return requests.filter(r => {
+    if (userId && r.requester_id === userId) return true
+    if (!r.requester_id && userEmail && r.requester_email === userEmail) return true
+    return false
+  })
+}

@@ -14,6 +14,7 @@ import {
   filterItemsByStatus,
   filterItemsByLocation,
   myPendingRequests,
+  ownRequests,
 } from '../dashboard/drilldown'
 import { formatRequestNo, formatItemRef } from '../lib/itemRef'
 
@@ -157,6 +158,14 @@ export function DashboardPage() {
   const canReturns = hasAppPermission(PERMS.returns)
   const canCreate = hasAppPermission(PERMS.create)
 
+  // Requesters (non-staff) see only their own data on the dashboard; staff
+  // roles (approver/purchaser/returns/admin) see everything.
+  const isStaff = canApprove || canPurchase || canReturns || hasAppPermission(PERMS.admin)
+  const scopedRequests = isStaff ? requests : ownRequests(requests, user?.id, user?.email)
+  const scopedRequestIds = new Set(scopedRequests.map((r) => r.id))
+  const scopedItems = isStaff ? items : items.filter((i) => scopedRequestIds.has(i.request.id))
+  const scopedTotal = isStaff ? totalItems : scopedItems.length
+
   const load = useCallback(async () => {
     setLoading(true)
     setError(null)
@@ -181,15 +190,15 @@ export function DashboardPage() {
   useEffect(() => { load() }, [load])
 
   const myPending = myPendingRequests(requests, user?.id, user?.email)
-  const recentItems = requests.slice(0, 5)
-  const reqStatusData = countByStatusList(requests, REQUEST_STATUS)
-  const itemStatusData = countByStatusList(items, LINE_ITEM_STATUS)
-  const reqMonthData = requestsByMonth(requests)
+  const recentItems = scopedRequests.slice(0, 5)
+  const reqStatusData = countByStatusList(scopedRequests, REQUEST_STATUS)
+  const itemStatusData = countByStatusList(scopedItems, LINE_ITEM_STATUS)
+  const reqMonthData = requestsByMonth(scopedRequests)
   const locationNames = Object.fromEntries(locations.map(l => [l.id, l.name]))
-  const itemLocationData = itemsByLocation(items, locationNames)
-  const approvalItems = filterItemsByStatus(items, ['pending', 'on_hold'])
-  const purchaseItems = filterItemsByStatus(items, ['approved'])
-  const returnItems = filterItemsByStatus(items, ['returned'])
+  const itemLocationData = itemsByLocation(scopedItems, locationNames)
+  const approvalItems = filterItemsByStatus(scopedItems, ['pending', 'on_hold'])
+  const purchaseItems = filterItemsByStatus(scopedItems, ['approved'])
+  const returnItems = filterItemsByStatus(scopedItems, ['returned'])
 
   return (
     <div className="grid gap-6">
@@ -217,9 +226,9 @@ export function DashboardPage() {
           <div className="flex gap-3">
             <KpiCard
               label="Total Items"
-              value={totalItems}
+              value={scopedTotal}
               sub="Across all requests"
-              onClick={() => setDrilldown({ title: `Total Items (${totalItems})`, kind: 'item', rows: items })}
+              onClick={() => setDrilldown({ title: `Total Items (${scopedTotal})`, kind: 'item', rows: scopedItems })}
             />
             {canCreate && (
               <KpiCard
@@ -265,7 +274,7 @@ export function DashboardPage() {
                 xKey="status"
                 yKey="count"
                 height={240}
-                onPointClick={(status) => setDrilldown({ title: `Requests — ${status}`, kind: 'request', rows: filterRequestsByStatus(requests, status) })}
+                onPointClick={(status) => setDrilldown({ title: `Requests — ${status}`, kind: 'request', rows: filterRequestsByStatus(scopedRequests, status) })}
               />
             </div>
             <div className="rounded-lg border border-border bg-card p-4">
@@ -276,7 +285,7 @@ export function DashboardPage() {
                 xKey="status"
                 yKey="count"
                 height={240}
-                onPointClick={(status) => setDrilldown({ title: `Items — ${status}`, kind: 'item', rows: filterItemsByStatus(items, [status]) })}
+                onPointClick={(status) => setDrilldown({ title: `Items — ${status}`, kind: 'item', rows: filterItemsByStatus(scopedItems, [status]) })}
               />
             </div>
             <div className="rounded-lg border border-border bg-card p-4">
@@ -287,7 +296,7 @@ export function DashboardPage() {
                 xKey="month"
                 yKey="count"
                 height={240}
-                onPointClick={(month) => setDrilldown({ title: `Requests in ${month}`, kind: 'request', rows: filterRequestsByMonth(requests, month) })}
+                onPointClick={(month) => setDrilldown({ title: `Requests in ${month}`, kind: 'request', rows: filterRequestsByMonth(scopedRequests, month) })}
               />
             </div>
             <div className="rounded-lg border border-border bg-card p-4">
@@ -298,7 +307,7 @@ export function DashboardPage() {
                 xKey="location"
                 yKey="count"
                 height={240}
-                onPointClick={(location) => setDrilldown({ title: `Items at ${location}`, kind: 'item', rows: filterItemsByLocation(items, locationNames, location) })}
+                onPointClick={(location) => setDrilldown({ title: `Items at ${location}`, kind: 'item', rows: filterItemsByLocation(scopedItems, locationNames, location) })}
               />
             </div>
           </div>
