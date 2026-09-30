@@ -24,8 +24,8 @@ export function ApprovalsPage() {
   const [preApprovedNames, setPreApprovedNames] = useState<Set<string>>(new Set())
   const [tab, setTab] = useState<'items' | 'preapproved' | 'favorites'>('items')
 
-  const load = useCallback(async () => {
-    setLoading(true)
+  const load = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true)
     setError(null)
     try {
       const data = await api.listLineItemsByStatus(['pending', 'on_hold'])
@@ -44,6 +44,34 @@ export function ApprovalsPage() {
   }, [])
 
   useEffect(() => { load() }, [load])
+
+  // Auto-poll: product images may still be capturing after submit. While any
+  // visible item has an item_url but no loaded image, re-check every 10s.
+  // Silent refresh so the list doesn't flicker; the interval self-terminates
+  // once every visible item has an image (or the tab is switched away).
+  const missingImageKey = items.filter((i) => i.item_url && !imageUrls[i.id]).map((i) => i.id).join(',')
+  useEffect(() => {
+    if (tab !== 'items' || missingImageKey === '') return
+    const missingIds = missingImageKey.split(',')
+    const timer = setInterval(async () => {
+      const urls: Record<string, string> = {}
+      await Promise.all(
+        items.filter((i) => missingIds.includes(i.id) && i.product_image_path).map(async (i) => {
+          const u = await api.getProductImageUrl(i.product_image_path as string)
+          if (u) urls[i.id] = u
+        }),
+      )
+      if (Object.keys(urls).length === 0) {
+        // No signed URLs yet — the capture function may have written
+        // product_image_path since our last list; re-list silently to pick it up.
+        await load(true)
+      } else {
+        setImageUrls((prev) => ({ ...prev, ...urls }))
+      }
+    }, 10000)
+    return () => clearInterval(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, missingImageKey])
 
   async function handleAction(id: string, action: 'approved' | 'declined' | 'on_hold') {
     const reqId = items.find((it) => it.id === id)?.request.id
