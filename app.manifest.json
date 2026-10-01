@@ -73,7 +73,8 @@
       { "version": 39, "description": "Phase 4: item_on_hold notification key - backfill opt-in for users already opted into item_declined", "up": "migrations/039_item_on_hold_optin.sql" },
       { "version": 40, "description": "Pre-approved catalog: product_image_path column + pre_approve_line_item copies image + backfill", "up": "migrations/040_pre_approved_images.sql" },
       { "version": 41, "description": "Block line items with date_needed closer than 5 days out (BEFORE INSERT trigger)", "up": "migrations/041_min_date_needed.sql" },
-      { "version": 42, "description": "Canonical submit trigger: auto screenshot + approval email on request insert (keyless, _config URL) — fixes missing trigger on both prod projects", "up": "migrations/042_submit_trigger.sql" }
+      { "version": 42, "description": "Canonical submit trigger: auto screenshot + approval email on request insert (keyless, _config URL) — fixes missing trigger on both prod projects", "up": "migrations/042_submit_trigger.sql" },
+      { "version": 43, "description": "Allow re-decision of approved items (decline/hold/undo) when not yet on a PO", "up": "migrations/043_redecide_after_approval.sql" }
     ],
     "tables": [
       { "name": "locations",         "rls": { "read": "authenticated", "write": "admin" } },
