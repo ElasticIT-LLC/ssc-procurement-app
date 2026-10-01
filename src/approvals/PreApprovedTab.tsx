@@ -5,6 +5,8 @@ import { useProcurementApi, PreApprovedItem, Location, Department } from '../dat
 import { PERMS, formatDate } from '../lib/constants'
 import { Modal } from '../components/Modal'
 import { DateInput, minEtaIso } from '../components/DateInput'
+import { ShipToCombobox } from '../requester/ShipToCombobox'
+import { useShipToWorkers } from '../requester/useShipToWorkers'
 import { prefillFromCatalog, draftToRpcPayload, OTHER, type PreApprovedOrderDraft } from './preApproved'
 
 const inputClass = 'w-full rounded-md border border-input bg-input px-3 py-1.5 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring'
@@ -16,6 +18,10 @@ export function PreApprovedTab() {
 
   const isAdmin = hasAppPermission(PERMS.admin)
   const canOrder = hasAppPermission(PERMS.purchase) || hasAppPermission(PERMS.approve) || isAdmin
+
+  // z8ygbxq1wb: Ship-to name combo box — same Rippling worker source as the
+  // in-app and private request forms.
+  const { workers, loading: workersLoading, refresh: refreshWorkers } = useShipToWorkers()
 
   const [items, setItems] = useState<PreApprovedItem[]>([])
   const [locations, setLocations] = useState<Location[]>([])
@@ -228,7 +234,13 @@ export function PreApprovedTab() {
             </div>
             <div className="grid gap-1">
               <label className="text-xs font-medium text-foreground">Ship-to name</label>
-              <input type="text" value={form.ship_to_name} onChange={(e) => updateForm({ ship_to_name: e.target.value })} placeholder="Optional" className={inputClass} />
+              <ShipToCombobox
+                value={form.ship_to_name}
+                onChange={(v) => updateForm({ ship_to_name: v })}
+                workers={workers}
+                loading={workersLoading}
+                onRefresh={refreshWorkers}
+              />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="grid gap-1">
