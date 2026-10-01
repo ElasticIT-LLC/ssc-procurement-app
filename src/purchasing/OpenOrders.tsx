@@ -75,7 +75,7 @@ export function OpenOrders() {
             <div className="flex items-start justify-between gap-2">
               <div>
                 <p className="text-sm font-semibold text-foreground">{po.po_number}{po.vendor ? ` · ${po.vendor}` : ''}</p>
-                <p className="text-xs text-muted-foreground">{prog.received} of {prog.total} received{po.eta ? ` · ETA ${formatDate(po.eta)}` : ''}</p>
+                <p className="text-xs text-muted-foreground">{prog.received} of {prog.total} received{po.eta ? ` · Order ETA ${formatDate(po.eta)}` : ''}</p>
               </div>
               <button type="button" disabled={busyId === po.id} onClick={() => closePo(po.id)} className="inline-flex items-center rounded-md border border-border px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted disabled:opacity-50">Close PO</button>
             </div>

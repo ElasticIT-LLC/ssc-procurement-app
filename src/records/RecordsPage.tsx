@@ -4,6 +4,8 @@ import { useAppPermissions } from '../lib/useAppPermissions'
 import { useProcurementApi, LineItemDetailed, LineItemWithRequest, PreApprovedItem, type RequestCommentRow } from '../data/db'
 import { StatusBadge } from '../requester/StatusBadge'
 import { ReplacementBadge } from '../requester/ReplacementBadge'
+import { PreApprovedBadge } from '../components/PreApprovedBadge'
+import { ReDecideActions } from '../components/ReDecideActions'
 import { ReturnForm } from '../requester/ReturnForm'
 import { FULL_ACCESS, PERMS, formatDate } from '../lib/constants'
 import { useFormattingRules } from '../formatting/useFormattingRules'
@@ -25,7 +27,7 @@ function csvCell(value: string): string {
 }
 
 function exportCsv(rows: LineItemDetailed[], catalog: Record<string, PreApprovedItem>, sourceRef: Record<string, string>, latestByItem: Record<string, RequestCommentRow>) {
-  const headers = ['Submitted', 'Requester', 'Email', 'Item', 'Qty', 'Location', 'Department', 'Status', 'Date Needed', 'ETA', 'Request Notes', 'Latest comment', 'Received', 'Cancelled', 'Pre-approved Item', 'Source Item']
+  const headers = ['Submitted', 'Requester', 'Email', 'Item', 'Qty', 'Location', 'Department', 'Status', 'ETA', 'Order ETA', 'Request Notes', 'Latest comment', 'Received', 'Cancelled', 'Pre-approved Item', 'Source Item']
   const lines = [headers.join(',')]
   for (const item of rows) {
     const cat = item.pre_approved_item_id ? catalog[item.pre_approved_item_id] : undefined
@@ -236,8 +238,8 @@ export function RecordsPage() {
                 <th className={head}>Location</th>
                 <th className={head}>Department</th>
                 <th className={head}>Status</th>
-                <th className={head}>Date Needed</th>
                 <th className={head}>ETA</th>
+                <th className={head}>Order ETA</th>
                 <th className={head}>Request Notes</th>
                 <th className={head}>Latest comment</th>
                 {showActionsColumn && <th className={head}>Actions</th>}
@@ -267,7 +269,7 @@ export function RecordsPage() {
                   <td className={cell}>{item.substitution_ok ? 'Yes' : 'No'}</td>
                   <td className={cell}>{locationName(item)}</td>
                   <td className={cell}>{departmentName(item)}</td>
-                  <td className={cell}><span className="inline-flex flex-wrap items-center gap-1"><StatusBadge status={item.status} /><ReplacementBadge item={item} />{item.archived_at && <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">Archived</span>}</span></td>
+                  <td className={cell}><span className="inline-flex flex-wrap items-center gap-1"><StatusBadge status={item.status} /><ReplacementBadge item={item} /><PreApprovedBadge item={item} />{item.archived_at && <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">Archived</span>}</span></td>
                   <td className={`${cell} whitespace-nowrap`}>{formatDate(item.date_needed) || '—'}</td>
                   <td className={`${cell} whitespace-nowrap`}>{formatDate(item.eta) || '—'}</td>
                   <td className={`${cell} max-w-[14rem] text-muted-foreground`}>
@@ -308,6 +310,9 @@ export function RecordsPage() {
                           >
                             Return
                           </button>
+                        )}
+                        {item.status === 'approved' && item.po_id == null && (
+                          <ReDecideActions item={item} onDone={() => load()} />
                         )}
                         {canArchive && (
                           <button

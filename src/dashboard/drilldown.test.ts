@@ -5,6 +5,7 @@ import {
   filterItemsByStatus,
   filterItemsByLocation,
   myPendingRequests,
+  ownRequests,
 } from './drilldown'
 import type { RequestRow, LineItemDetailed } from '../data/db'
 
@@ -86,5 +87,22 @@ describe('myPendingRequests', () => {
       req({ id: 'r4', requester_id: 'someone-else', requester_email: null }),
     ]
     expect(myPendingRequests(rows, 'u1', 'jane@x.com').map(r => r.id).sort()).toEqual(['r1', 'r3'])
+  })
+})
+
+describe('ownRequests', () => {
+  it('keeps requests matched by requester_id regardless of status', () => {
+    const rows = [
+      req({ status: 'approved' }),
+      req({ id: 'r2', requester_id: 'u2', status: 'pending' }),
+    ]
+    expect(ownRequests(rows, 'u1', 'jane@x.com').map(r => r.id)).toEqual(['r1'])
+  })
+  it('keeps public-form submissions matched by requester_email when requester_id is null', () => {
+    const rows = [
+      req({ id: 'r3', requester_id: null, requester_email: 'jane@x.com' }),
+      req({ id: 'r4', requester_id: null, requester_email: 'b@x.com' }),
+    ]
+    expect(ownRequests(rows, 'u9', 'jane@x.com').map(r => r.id)).toEqual(['r3'])
   })
 })

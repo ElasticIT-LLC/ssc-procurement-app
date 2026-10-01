@@ -83,6 +83,11 @@ async function handleRequest(req: Request) {
     if (!request) return json({ error: 'request not found' }, 404)
   }
 
+  // Pre-approved re-orders (order_pre_approved_item) always stamp the request
+  // notes with this prefix — a synchronous, race-free signal that this request
+  // never needed approval (z8ygbxp4cm: keep it out of the approval workflow).
+  const isPreApprovedOrder = requestId != null && (request?.notes ?? '').startsWith('Pre-approved order: ')
+
   // Shared settings loaded once for all event branches
   const { data: settings } = await db.from('client_settings').select('key, value').in('key', ['client_name', 'portal_url', 'hve_sender_address', 'procurement_brand_color'])
   const sMap = new Map((settings ?? []).map((s: { key: string; value: string }) => [s.key, s.value]))
@@ -133,6 +138,7 @@ async function handleRequest(req: Request) {
 
   // ── Requester confirmation ──────────────────────────────────────────────
   if (event === 'requester_confirmation') {
+    if (isPreApprovedOrder) return json({ event: 'requester_confirmation', skipped: true, reason: 'pre-approved order; the ordering user is the requester' })
     const { data: items } = await db.schema('app_procurement').from('line_items').select('id, item_description, quantity, custom_location, custom_department, locations!location_id(name), departments!department_id(name)').eq('request_id', requestId)
     const allItems = (items ?? []) as Array<Record<string, any>>
     const nm = (li: Record<string, any>) => li.locations?.name ?? li.custom_location ?? '—'
@@ -464,34 +470,103 @@ async function handleRequest(req: Request) {
   const { data: lineItems, error: liErr } = await liQuery
   if (liErr) return json({ error: liErr.message }, 500)
 
-  // 2. Capture screenshots (non-fatal per item).
+  // 2. Capture screenshots (non-fatal per item; up to 3 in parallel so one slow
+  //    page load doesn't serialize the whole batch).
   const apiKey = await getAppSecret(db, 'SCREENSHOT_API_KEY')
   const screenshotUrl = (await getAppSecret(db, 'SCREENSHOT_URL')) ?? DEFAULT_SCREENSHOT_URL
   const results: { line_item_id: string; captured: boolean; error?: string }[] = []
-  for (const li of lineItems ?? []) {
+  const all = lineItems ?? []
+  for (const li of all) {
     if (!li.item_url || (li.product_image_path && !body.only_line_item_id)) { results.push({ line_item_id: li.id, captured: !!li.product_image_path }); continue }
     if (!apiKey) { results.push({ line_item_id: li.id, captured: false, error: 'SCREENSHOT_API_KEY not set' }); continue }
+  }
+  const pending = all.filter((li) => li.item_url && !(li.product_image_path && !body.only_line_item_id) && !!apiKey)
+  const CAPTURE_CONCURRENCY = 3
+  const CAPTURE_TIMEOUT_MS = 45000
+  let cursor = 0
+  async function captureOne(li: (typeof all)[number]): Promise<void> {
     try {
-      const shot = await fetch(screenshotUrl, { method: 'POST', headers: { 'x-api-key': apiKey, 'Content-Type': 'application/json' }, body: JSON.stringify({ url: li.item_url }) })
-      if (!shot.ok) throw new Error(`screenshot ${shot.status}`)
-      const png = new Uint8Array(await shot.arrayBuffer())
-      const path = `${requestId}/${li.id}.png`
-      const up = await db.storage.from('product-images').upload(path, png, { contentType: 'image/png', upsert: true })
-      if (up.error) throw up.error
-      await db.schema('app_procurement').from('line_items').update({ product_image_path: path }).eq('id', li.id)
-      li.product_image_path = path
-      results.push({ line_item_id: li.id, captured: true })
+      const ctrl = new AbortController()
+      const timer = setTimeout(() => ctrl.abort(), CAPTURE_TIMEOUT_MS)
+      try {
+        const shot = await fetch(screenshotUrl, { method: 'POST', headers: { 'x-api-key': apiKey, 'Content-Type': 'application/json' }, body: JSON.stringify({ url: li.item_url }), signal: ctrl.signal })
+        if (!shot.ok) throw new Error(`screenshot ${shot.status}`)
+        const png = new Uint8Array(await shot.arrayBuffer())
+        const path = `${requestId}/${li.id}.png`
+        const up = await db.storage.from('product-images').upload(path, png, { contentType: 'image/png', upsert: true })
+        if (up.error) throw up.error
+        await db.schema('app_procurement').from('line_items').update({ product_image_path: path }).eq('id', li.id)
+        li.product_image_path = path
+        results.push({ line_item_id: li.id, captured: true })
+      } finally {
+        clearTimeout(timer)
+      }
     } catch (e) {
-      results.push({ line_item_id: li.id, captured: false, error: e instanceof Error ? e.message : String(e) })
+      const msg = e instanceof Error ? (e.name === 'AbortError' ? `screenshot timed out after ${CAPTURE_TIMEOUT_MS / 1000}s` : e.message) : String(e)
+      results.push({ line_item_id: li.id, captured: false, error: msg })
     }
   }
+  await Promise.all(
+    Array.from({ length: Math.min(CAPTURE_CONCURRENCY, pending.length) }, () =>
+      (async () => {
+        for (;;) {
+          const i = cursor++
+          if (i >= pending.length) return
+          await captureOne(pending[i])
+        }
+      })(),
+    ),
+  )
 
-  // 3. Resolve approvers.
+  // 3. Pre-approved re-orders (z8ygbxp4cj + z8ygbxp4cm): the line item was
+  //    inserted directly as 'approved', so the "Approval Required" email is
+  //    wrong — it made pre-approved orders look routed back into approval.
+  //    Instead, notify purchasing: the existing "Approved Procurement Request"
+  //    email plus an in-app bell for every purchasing/manage holder. Screenshot
+  //    capture above still runs, so the item has its image in Ready for
+  //    Purchasing. (Retries via only_line_item_id never re-notify.)
+  const preApprovedLinked = (lineItems ?? []).some((li: any) => li.pre_approved_item_id != null)
+  if (isPreApprovedOrder && !body.only_line_item_id && (!lineItems || lineItems.length === 0 || preApprovedLinked)) {
+    const { data: purchasers } = await db.schema('app_procurement').rpc('get_permission_holders', { p_permission: 'apps/procurement/purchasing/manage' })
+    const purchaserRows = (purchasers ?? []) as { user_id: string | null; email: string | null }[]
+    const purchaserEmails = purchaserRows.map((p) => p.email).filter((e): e is string => !!e)
+    const orderingUser = request?.requester_name ?? request?.requester_email ?? 'a purchaser'
+    let purchaserEmailed = false
+    if (purchaserEmails.length && sender && HVE_PASSWORD) {
+      const deciderIds = [...new Set((lineItems ?? []).map((i: any) => i.approved_by).filter(Boolean))]
+      const deciderMap = new Map<string, string>()
+      if (deciderIds.length) {
+        const { data: profs } = await db.from('user_profiles').select('id, display_name, email').in('id', deciderIds)
+        for (const p of (profs ?? []) as Array<{ id: string; display_name: string | null; email: string | null }>) deciderMap.set(p.id, p.display_name || p.email || '')
+      }
+      const nm = (li: any) => li.locations?.name ?? li.custom_location ?? '—'
+      const dp = (li: any) => li.departments?.name ?? li.custom_department ?? '—'
+      const html = buildApprovedEmail({ requester: orderingUser, approverName: orderingUser, recordsUrl, purchasingUrl, clientName, brandColor, items: (lineItems ?? []).map((i: any) => ({ name: i.item_description ?? 'Item', qty: String(i.quantity), status: STATUS_MAP[i.status] ?? i.status, dept: dp(i), location: nm(i), approvedBy: deciderMap.get(i.approved_by) ?? '', url: i.item_url ?? null })) })
+      try {
+        await sendSmtp({ host: HVE_HOST, port: HVE_PORT, fromAddress: sender, useTls: true, auth: { type: 'login', username: sender, password: HVE_PASSWORD } }, { recipients: purchaserEmails, subject: 'Approved Procurement Request', htmlBody: html, fromDisplayName: clientName ? `${clientName} Procurement` : 'Procurement', highPriority: true })
+        purchaserEmailed = true
+      } catch (e) {
+        console.error('pre-approved purchaser email failed:', e instanceof Error ? e.message : e)
+      }
+    }
+    const bellUsers = [...new Set(purchaserRows.map((p) => p.user_id).filter((x): x is string => !!x))]
+    const firstItem = (lineItems ?? [])[0] as any
+    const preTitle = `${clientName ? `${clientName} Procurement` : 'Procurement'}: Pre-approved item ordered`
+    const preBody = `${orderingUser} ordered "${firstItem?.item_description ?? 'an item'}" from the pre-approved catalog — ready to purchase.`
+    const preBellRows = bellUsers.map((uid) => ({ user_id: uid, event_type: 'procurement:pre_approved_ordered', title: preTitle, body: preBody, link: purchasingUrl, app_slug: 'procurement' }))
+    if (preBellRows.length) {
+      const { error: preBellErr } = await db.from('notifications').insert(preBellRows)
+      if (preBellErr) console.error('pre-approved bell insert failed:', preBellErr)
+    }
+    return json({ event: 'submitted', pre_approved: true, purchaser_emailed: purchaserEmailed, purchaser_bells: preBellRows.length, items: results })
+  }
+
+  // 4. Resolve approvers.
   const { data: approvers } = await db.schema('app_procurement').rpc('get_permission_holders', { p_permission: APPROVE_PERMISSION })
   const recipientRows = (approvers ?? []) as { user_id: string; email: string }[]
   const recipientEmails = recipientRows.map((r) => r.email)
 
-  // 4. Send rich HVE email (only on full-request runs, not single-item retries).
+  // 5. Send rich HVE email (only on full-request runs, not single-item retries).
   let emailSent = false
   if (!body.only_line_item_id && recipientEmails.length && HVE_PASSWORD) {
     if (sender) {

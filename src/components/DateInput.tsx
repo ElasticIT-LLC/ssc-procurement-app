@@ -3,6 +3,8 @@ import { useEffect, useRef, useState, type InputHTMLAttributes } from 'react'
 interface DateInputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'type' | 'value' | 'onChange'> {
   value: string
   onChange: (value: string) => void
+  /** Optional ISO (YYYY-MM-DD) earliest selectable date; earlier days render disabled in the calendar. */
+  minDate?: string
 }
 
 const MONTH_NAMES = [
@@ -29,9 +31,7 @@ function toIso(date: Date): string {
   return `${y}-${m}-${d}`
 }
 
-export function todayIso(): string {
-  return toIso(new Date())
-}
+export { minEtaIso, todayIso } from '../lib/dates'
 
 function toDisplay(value: string): string {
   if (!value) return ''
@@ -62,9 +62,11 @@ function addMonths(date: Date, delta: number): Date {
 function Calendar({
   value,
   onChange,
+  minDate,
 }: {
   value: string
   onChange: (value: string) => void
+  minDate?: string
 }) {
   const [monthDate, setMonthDate] = useState(() => startOfMonth(parseIso(value) ?? new Date()))
 
@@ -89,6 +91,7 @@ function Calendar({
   }
 
   const selectedDate = parseIso(value)
+  const min = minDate ? parseIso(minDate) : null
 
   function selectDate(day: number) {
     onChange(toIso(new Date(year, month, day)))
@@ -157,6 +160,19 @@ function Calendar({
               selectedDate.getFullYear() === year &&
               selectedDate.getMonth() === month &&
               selectedDate.getDate() === day
+            const disabled = min != null && new Date(year, month, day).getTime() < min.getTime()
+            if (disabled) {
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  disabled
+                  className="rounded p-1 cursor-not-allowed text-muted-foreground/40"
+                >
+                  {day}
+                </button>
+              )
+            }
             return (
               <button
                 key={key}
@@ -176,7 +192,7 @@ function Calendar({
   )
 }
 
-export function DateInput({ value, onChange, className = '', ...rest }: DateInputProps) {
+export function DateInput({ value, onChange, className = '', minDate, ...rest }: DateInputProps) {
   const [displayValue, setDisplayValue] = useState(() => toDisplay(value))
   const [open, setOpen] = useState(false)
   const wrapperRef = useRef<HTMLDivElement>(null)
@@ -297,7 +313,7 @@ export function DateInput({ value, onChange, className = '', ...rest }: DateInpu
         </svg>
       </button>
       {open && (
-        <Calendar value={value} onChange={handleCalendarSelect} />
+        <Calendar value={value} onChange={handleCalendarSelect} minDate={minDate} />
       )}
     </div>
   )

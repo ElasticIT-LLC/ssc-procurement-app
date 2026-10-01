@@ -4,12 +4,14 @@ import { PERMS } from '../lib/constants'
 import { ReadyForPurchasing } from '../purchasing/ReadyForPurchasing'
 import { OpenOrders } from '../purchasing/OpenOrders'
 import { ClosedOrders } from '../purchasing/ClosedOrders'
+import { FavoritesTab } from '../purchasing/FavoritesTab'
 
-type Tab = 'ready' | 'open' | 'closed'
+type Tab = 'ready' | 'open' | 'closed' | 'favorites'
 const TABS: { key: Tab; label: string }[] = [
   { key: 'ready', label: 'Ready for Purchasing' },
   { key: 'open', label: 'Open Orders' },
   { key: 'closed', label: 'Closed Orders' },
+  { key: 'favorites', label: 'Favorite Items' },
 ]
 
 export function PurchasingPage() {
@@ -45,6 +47,7 @@ if (!hasAppPermission(PERMS.purchase) && !hasAppPermission(PERMS.admin)) {
       {tab === 'ready' && <ReadyForPurchasing />}
       {tab === 'open' && <OpenOrders />}
       {tab === 'closed' && <ClosedOrders />}
+      {tab === 'favorites' && <FavoritesTab />}
     </div>
   )
 }
