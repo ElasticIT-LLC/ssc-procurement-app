@@ -4,6 +4,9 @@ import { useProcurementApi, LineItemWithRequest, Location } from '../data/db'
 import { DateInput, todayIso } from '../components/DateInput'
 import { StatusBadge } from '../requester/StatusBadge'
 import { ReplacementBadge } from '../requester/ReplacementBadge'
+import { PreApprovedBadge } from '../components/PreApprovedBadge'
+import { ReDecideActions } from '../components/ReDecideActions'
+import { useSilentPoll } from '../lib/useSilentPoll'
 import { formatDate } from '../lib/constants'
 import { formatItemRef } from '../lib/itemRef'
 import { resolveLocationName } from '../lib/locationLabel'
@@ -37,8 +40,8 @@ export function ReadyForPurchasing() {
   const [imageUrls, setImageUrls] = useState<Record<string, string>>({})
   const [capturingId, setCapturingId] = useState<string | null>(null)
 
-  const load = useCallback(async () => {
-    setLoading(true)
+  const load = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true)
     setError(null)
     try {
       const [data, locs] = await Promise.all([
@@ -62,6 +65,10 @@ export function ReadyForPurchasing() {
   }, [])
 
   useEffect(() => { load() }, [load])
+
+  // z8ygbxp4ch: silent 10s auto-refresh so newly approved items (including
+  // pre-approved re-orders) appear without a manual page refresh.
+  useSilentPoll(() => load(true), 10000)
 
   function toggleForm(itemId: string) {
     if (openFormId === itemId) {
@@ -167,6 +174,7 @@ export function ReadyForPurchasing() {
                 <p className="text-sm font-medium text-foreground">
                   {formatItemRef(item.request?.request_number, item.line_no)} — {item.item_description || 'Unnamed item'}
                   <ReplacementBadge item={item} className="ml-2" />
+                  <PreApprovedBadge item={item} className="ml-2" />
                 </p>
                  <p className="text-xs text-muted-foreground">Qty: {item.quantity}</p>
                  {locText && <p className="text-xs text-muted-foreground">Location: {locText}</p>}
@@ -328,6 +336,10 @@ export function ReadyForPurchasing() {
                 </div>
               </div>
             )}
+
+            {/* Post-approval change-of-mind (z8ygbxp4cg): only renders for
+                approved items not yet on a PO, for users with the gate. */}
+            <ReDecideActions item={item} onDone={() => load(true)} />
           </div>
         )
       })}

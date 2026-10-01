@@ -105,7 +105,7 @@ export function useProcurementApi() {
   async function submitRequestAnon(email: string, name: string | null, notes: string, lineItems: Record<string, unknown>[]): Promise<string> {
     return ok(await db().rpc(RPCS.submitAnon, { p_requester_email: email, p_requester_name: name, p_notes: notes, p_line_items: lineItems })) as string
   }
-  async function decideLineItem(id: string, action: 'approved' | 'declined' | 'on_hold'): Promise<void> {
+  async function decideLineItem(id: string, action: 'approved' | 'declined' | 'on_hold' | 'pending'): Promise<void> {
     ok(await db().rpc(RPCS.decide, { p_line_item_id: id, p_action: action }))
   }
   async function orderLineItem(id: string, f: { date_purchased?: string; eta?: string; shipping_location_id?: string | null; custom_shipping_location?: string | null; purchase_notes?: string | null }): Promise<void> {
