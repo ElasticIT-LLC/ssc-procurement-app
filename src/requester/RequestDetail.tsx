@@ -4,6 +4,8 @@ import { useProcurementApi, RequestRow, LineItemRow, FavoriteItem, type RequestC
 import { useAppPermissions } from '../lib/useAppPermissions'
 import { StatusBadge } from './StatusBadge'
 import { ReplacementBadge } from './ReplacementBadge'
+import { PreApprovedBadge } from '../components/PreApprovedBadge'
+import { useSilentPoll } from '../lib/useSilentPoll'
 import { ReturnForm } from './ReturnForm'
 import { HeartIcon } from '../components/HeartIcon'
 import { PERMS, formatDate } from '../lib/constants'
@@ -98,8 +100,8 @@ export function RequestDetail({ requestId, onBack }: RequestDetailProps) {
     }
   }
 
-  const load = useCallback(async () => {
-    setLoading(true)
+  const load = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true)
     setError(null)
     try {
       const [req, items, cmts] = await Promise.all([
@@ -120,6 +122,10 @@ export function RequestDetail({ requestId, onBack }: RequestDetailProps) {
   }, [requestId])
 
   useEffect(() => { load() }, [load])
+
+  // z8ygbxp4ch: silent 10s auto-refresh so status changes (approval, re-decision,
+  // ordering) appear without a manual page refresh.
+  useSilentPoll(() => load(true), 10000)
 
   useEffect(() => {
     let poll: number | undefined
@@ -234,6 +240,7 @@ export function RequestDetail({ requestId, onBack }: RequestDetailProps) {
                 <p className="text-sm font-medium text-foreground">
                   {formatItemRef(request?.request_number, item.line_no)} — {item.item_description || 'Unnamed item'}
                   <ReplacementBadge item={item} className="ml-2" />
+                  <PreApprovedBadge item={item} className="ml-2" />
                 </p>
                 <p className="text-xs text-muted-foreground">Qty: {item.quantity}</p>
                 <p className="text-xs text-muted-foreground">

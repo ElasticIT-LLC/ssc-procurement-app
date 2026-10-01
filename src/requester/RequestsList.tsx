@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useAppPermissions } from '../lib/useAppPermissions'
 import { useShellContext, useToast } from '@elasticit-llc/app-bridge'
 import { useProcurementApi, RequestRow, FavoriteItem } from '../data/db'
@@ -9,6 +9,7 @@ import { StatusBadge } from './StatusBadge'
 import { FavoritesLink } from '../components/FavoritesModal'
 import { HeartIcon } from '../components/HeartIcon'
 import { useFormattingRules } from '../formatting/useFormattingRules'
+import { useSilentPoll } from '../lib/useSilentPoll'
 
 interface RequestsListProps {
   onNew: () => void
@@ -38,27 +39,32 @@ export function RequestsList({ onNew, onSelect }: RequestsListProps) {
   const visible = filterByStatus(requests, tab)
   const TABS = ['all', ...REQUEST_STATUS] as const
 
-  useEffect(() => {
-    setLoading(true)
+  const refresh = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true)
     setError(null)
-    const load = async () => {
-      // Scope by the shell (effective) user, which reflects impersonation (preview as
-      // target). The Supabase JWT stays the real operator during preview, so
-      // auth.getUser() would return the operator and scope the list to the wrong person.
-      // SSO users can have a NULL email on the auth record; the shell profile carries
-      // the directory email, so use it to match public-form submissions.
-      const id = shellUser?.id
-      if (!id) throw new Error('Unable to identify current user')
-      if (canSeeAll) return api.listRequests()
-      const email = shellUser?.email || undefined
-      return api.listRequests(id, email)
-    }
-    load()
+    // Scope by the shell (effective) user, which reflects impersonation (preview as
+    // target). The Supabase JWT stays the real operator during preview, so
+    // auth.getUser() would return the operator and scope the list to the wrong person.
+    // SSO users can have a NULL email on the auth record; the shell profile carries
+    // the directory email, so use it to match public-form submissions.
+    const id = shellUser?.id
+    if (!id) throw new Error('Unable to identify current user')
+    if (canSeeAll) return api.listRequests()
+    const email = shellUser?.email || undefined
+    return api.listRequests(id, email)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shellUser?.id, shellUser?.email, canSeeAll])
+
+  useEffect(() => {
+    refresh()
       .then((rows) => setRequests(rows))
       .catch((err: unknown) => setError(err instanceof Error ? err.message : 'Failed to load requests'))
       .finally(() => setLoading(false))
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [shellUser?.id, shellUser?.email, canSeeAll])
+  }, [refresh])
+
+  // z8ygbxp4ch: silent 10s auto-refresh so new/updated requests appear without a
+  // manual page refresh.
+  useSilentPoll(() => refresh(true).then((rows) => setRequests(rows)), 10000)
 
   useEffect(() => {
     // Best-effort: a failed favorites fetch never blocks the request list.
