@@ -1,4 +1,5 @@
 import type { PreApprovedItem } from '../data/db'
+import { minEtaIso } from '../lib/dates'
 
 export const OTHER = '__other__'
 
@@ -18,15 +19,18 @@ export interface PreApprovedOrderDraft {
 
 // Pre-fill the New Purchase dialog from a catalog entry (spec B3: all fields
 // editable). ship_to_name is intentionally not stored on the catalog, so it
-// always starts empty. A catalog entry stored with a custom location/department
-// opens with the "Other" sentinel selected so the custom text is visible.
+// always starts empty. ETA always opens at the minimum allowed date
+// (today + 5, matching the server rule) instead of the catalog's stored
+// date, which goes stale. A catalog entry stored with a custom
+// location/department opens with the "Other" sentinel selected so the custom
+// text is visible.
 export function prefillFromCatalog(item: PreApprovedItem | null): PreApprovedOrderDraft {
   return {
     name: item?.name ?? '',
     item_url: item?.item_url ?? '',
     quantity: item?.quantity ?? 1,
     substitution_ok: item?.substitution_ok ?? false,
-    date_needed: item?.date_needed ?? '',
+    date_needed: minEtaIso(),
     memo: item?.memo ?? '',
     ship_to_name: '',
     location_id: item?.location_id ?? (item?.custom_location ? OTHER : ''),

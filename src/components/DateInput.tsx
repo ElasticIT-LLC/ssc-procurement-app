@@ -31,16 +31,7 @@ function toIso(date: Date): string {
   return `${y}-${m}-${d}`
 }
 
-export function todayIso(): string {
-  return toIso(new Date())
-}
-
-/** Earliest valid ETA: local today + 5 days, ISO YYYY-MM-DD. */
-export function minEtaIso(): string {
-  const d = new Date()
-  d.setDate(d.getDate() + 5)
-  return toIso(d)
-}
+export { minEtaIso, todayIso } from '../lib/dates'
 
 function toDisplay(value: string): string {
   if (!value) return ''

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { prefillFromCatalog, draftToRpcPayload, OTHER, type PreApprovedOrderDraft } from './preApproved'
+import { minEtaIso } from '../lib/dates'
 import type { PreApprovedItem } from '../data/db'
 
 const catalogItem: PreApprovedItem = {
@@ -44,7 +45,7 @@ describe('prefillFromCatalog', () => {
       item_url: 'https://example.com/desk',
       quantity: 4,
       substitution_ok: true,
-      date_needed: '2026-09-15',
+      date_needed: minEtaIso(),
       memo: 'Second floor',
       ship_to_name: '',
       location_id: 'loc-1',
@@ -54,9 +55,15 @@ describe('prefillFromCatalog', () => {
     })
   })
 
+  it('always opens ETA at the minimum allowed date (today + 5), never the stale catalog date', () => {
+    expect(prefillFromCatalog(catalogItem).date_needed).toBe(minEtaIso())
+    expect(prefillFromCatalog({ ...catalogItem, date_needed: '2030-01-01' }).date_needed).toBe(minEtaIso())
+    expect(prefillFromCatalog({ ...catalogItem, date_needed: null }).date_needed).toBe(minEtaIso())
+  })
+
   it('falls back to empty defaults when there is no catalog entry', () => {
     expect(prefillFromCatalog(null)).toEqual({
-      name: '', item_url: '', quantity: 1, substitution_ok: false, date_needed: '', memo: '',
+      name: '', item_url: '', quantity: 1, substitution_ok: false, date_needed: minEtaIso(), memo: '',
       ship_to_name: '', location_id: '', custom_location: '', department_id: '', custom_department: '',
     })
   })
