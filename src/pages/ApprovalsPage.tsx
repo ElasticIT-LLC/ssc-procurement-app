@@ -5,8 +5,6 @@ import { useProcurementApi, LineItemWithRequest, type RequestCommentRow } from '
 import { StatusBadge } from '../requester/StatusBadge'
 import { decisionNotificationKey } from '../lib/decisionNotification'
 import { PreApprovedTab } from '../approvals/PreApprovedTab'
-import { ReDecideActions } from '../components/ReDecideActions'
-import { PreApprovedBadge } from '../components/PreApprovedBadge'
 import { useSilentPoll } from '../lib/useSilentPoll'
 import { PERMS, formatDate } from '../lib/constants'
 import { formatItemRef } from '../lib/itemRef'
@@ -24,8 +22,7 @@ export function ApprovalsPage() {
   const [comments, setComments] = useState<RequestCommentRow[]>([])
   const [drafts, setDrafts] = useState<Record<string, string>>({})
   const [preApprovedNames, setPreApprovedNames] = useState<Set<string>>(new Set())
-  const [decidedItems, setDecidedItems] = useState<LineItemWithRequest[]>([])
-  const [tab, setTab] = useState<'items' | 'decided' | 'preapproved'>('items')
+  const [tab, setTab] = useState<'items' | 'preapproved'>('items')
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true)
@@ -48,31 +45,10 @@ export function ApprovalsPage() {
 
   useEffect(() => { load() }, [load])
 
-  // Decided tab (z8ygbxp4cg): approved items still re-decidable (not yet on a
-  // PO). Approvers need this view because approved items leave the For
-  // Approval queue and would otherwise disappear from their screen.
-  const loadDecided = useCallback(async (silent = false) => {
-    if (!silent) setLoading(true)
-    setError(null)
-    try {
-      const data = await api.listLineItemsByStatus(['approved'])
-      setDecidedItems(data.filter((i) => i.po_id == null))
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to load items')
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    if (tab === 'decided') void loadDecided()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tab])
-
-  // z8ygbxp4ch: silent 10s auto-refresh so newly submitted or re-decided items
-  // appear without a manual page refresh. Skipped on the Pre-approved tab
+  // z8ygbxp4ch: silent 10s auto-refresh so newly submitted items appear
+  // without a manual page refresh. Skipped on the Pre-approved tab
   // (static catalog) and while the tab is hidden (handled inside the hook).
-  useSilentPoll(() => (tab === 'decided' ? loadDecided(true) : load(true)), 10000, tab !== 'preapproved')
+  useSilentPoll(() => load(true), 10000, tab !== 'preapproved')
 
   // Auto-poll: product images may still be capturing after submit. While any
   // visible item has an item_url but no loaded image, re-check every 10s.
@@ -217,13 +193,6 @@ export function ApprovalsPage() {
           className={`px-3 py-2 text-sm font-medium -mb-px border-b-2 ${tab === 'items' ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
         >
           For Approval
-        </button>
-        <button
-          type="button"
-          onClick={() => setTab('decided')}
-          className={`px-3 py-2 text-sm font-medium -mb-px border-b-2 ${tab === 'decided' ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
-        >
-          Decided
         </button>
         <button
           type="button"
@@ -382,48 +351,6 @@ export function ApprovalsPage() {
             </button>
           </div>
         </div>
-        ))}
-
-      {tab === 'decided' && loading && (
-        <div className="py-8 text-center text-muted-foreground text-sm">Loading…</div>
-      )}
-
-      {tab === 'decided' && !loading && error && (
-        <div className="rounded-md bg-destructive/10 border border-destructive/30 p-4 text-sm text-destructive">
-          {error}
-        </div>
-      )}
-
-      {tab === 'decided' && !loading && !error && decidedItems.length === 0 && (
-        <p className="text-sm text-muted-foreground">
-          No approved items awaiting a purchase order. Once you approve something, you can still change
-          your mind here (undo, hold, decline, or cancel) until it is ordered.
-        </p>
-      )}
-
-      {tab === 'decided' &&
-        !loading &&
-        !error &&
-        decidedItems.map(item => (
-          <div key={item.id} className="rounded-lg border border-border bg-card p-4 grid gap-2">
-            <div className="flex items-start justify-between gap-2">
-              <div>
-                <p className="text-sm font-medium text-foreground">
-                  {formatItemRef(item.request?.request_number, item.line_no)} — {item.item_description || 'Unnamed item'}
-                  <PreApprovedBadge item={item} className="ml-2" />
-                </p>
-                <p className="text-xs text-muted-foreground">Qty: {item.quantity}</p>
-                <p className="text-xs text-muted-foreground">
-                  Requester: {item.request.requester_name ?? item.request.requester_email ?? '—'}
-                </p>
-                {item.date_needed && (
-                  <p className="text-xs text-muted-foreground">ETA: {formatDate(item.date_needed)}</p>
-                )}
-              </div>
-              <StatusBadge status={item.status} />
-            </div>
-            <ReDecideActions item={item} onDone={() => loadDecided(true)} />
-          </div>
         ))}
 
       {tab === 'preapproved' && <PreApprovedTab />}
