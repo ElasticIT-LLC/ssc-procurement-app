@@ -16,7 +16,7 @@ function li(over: Partial<LineItemRow> = {}): LineItemRow {
     ship_to_name: null, shipping_location_id: null, custom_shipping_location: null,
     department_id: null, custom_department: null, date_needed: null, eta: null, admin_comment: null,
     commented_by: null, commented_at: null, product_image_path: null, return_reason: null,
-    return_quantity: null, wants_replacement: null, return_notes: null, return_date: null,
+    return_quantity: null, wants_replacement: null, return_notes: null, receive_notes: null, return_date: null,
     created_at: '2026-08-01T09:00:00Z', line_no: 1, return_processed_at: null, po_id: null,
     archived_at: null, received_at: null, cancelled_at: null, pre_approved_item_id: null,
     approved_by: null, approval_date: null, date_purchased: null,
