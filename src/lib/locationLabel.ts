@@ -18,3 +18,16 @@ export function resolveLocationName(
   const custom = item.custom_location?.trim()
   return custom || null
 }
+
+// z8ygbxr03a/03b: distinct, alphabetized display names for items' requested
+// locations (for the segment filters). Items whose location resolves to
+// nothing are skipped.
+export function distinctLocationNames(
+  items: { location_id: string | null; custom_location: string | null }[],
+  locations: LocationRef[],
+): string[] {
+  const names = items
+    .map((i) => resolveLocationName(i, locations))
+    .filter((n): n is string => !!n)
+  return [...new Set(names)].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }))
+}
