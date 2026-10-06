@@ -104,9 +104,13 @@ export function PreApprovedTab() {
     setSubmitting(true)
     try {
       await api.orderPreApprovedItem(orderFor.id, draftToRpcPayload(form))
-      showToast({ message: 'Order created — see Ready for Purchasing', type: 'success' })
+      showToast({ message: 'Order created — opening Ready for Purchasing', type: 'success' })
       setOrderFor(null)
       setForm(null)
+      // z8ygbxr037: deep-link into the Purchasing Ready tab (full navigation,
+      // same pattern as ApprovalsPage.threadLink — the shell reloads and
+      // PurchasingPage reads ?tab=ready).
+      window.location.href = `${window.location.pathname.replace(/[^/]+$/, 'purchasing')}?tab=ready`
     } catch (err: unknown) {
       showToast({ message: err instanceof Error ? err.message : 'Failed to create order', type: 'error' })
     } finally {
