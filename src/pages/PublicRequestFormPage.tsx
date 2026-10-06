@@ -24,6 +24,7 @@ interface AnonLineItemDraft {
 
 interface LineItemDraftErrors {
   item_description?: string
+  item_url?: string
   quantity?: string
   location?: string
   department?: string
@@ -52,6 +53,7 @@ function emptyItem(): AnonLineItemDraft {
 function validateItem(item: AnonLineItemDraft): LineItemDraftErrors {
   const errs: LineItemDraftErrors = {}
   if (!item.item_description.trim()) errs.item_description = 'Item name is required'
+  if (!item.item_url.trim()) errs.item_url = 'Item URL is required'
   if (item.quantity < 1) errs.quantity = 'Quantity must be at least 1'
   if (!item.memo.trim()) errs.memo = 'Memo is required'
   if (!item.date_needed) errs.date_needed = 'ETA is required'
@@ -291,7 +293,7 @@ export function PublicRequestFormPage() {
               </Field>
 
               {/* Item URL */}
-              <Field label="Item URL (highly recommended)">
+              <Field label="Item URL (required)" error={itemErrors[index]?.item_url}>
                 <input
                   type="url"
                   placeholder="https://..."

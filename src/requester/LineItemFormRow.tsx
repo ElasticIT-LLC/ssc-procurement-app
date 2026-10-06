@@ -24,6 +24,7 @@ export interface LineItemDraft {
 
 export interface LineItemDraftErrors {
   item_description?: string
+  item_url?: string
   quantity?: string
   location?: string
   department?: string
@@ -155,7 +156,7 @@ export function LineItemFormRow({
       </Field>
 
       {/* Item URL */}
-      <Field label="Item URL (highly recommended)">
+      <Field label="Item URL (required)" error={errors.item_url}>
         <input
           type="url"
           placeholder="https://..."
