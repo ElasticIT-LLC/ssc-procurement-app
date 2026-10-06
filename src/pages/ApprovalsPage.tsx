@@ -1,9 +1,11 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useToast } from '@elasticit-llc/app-bridge'
 import { useAppPermissions } from '../lib/useAppPermissions'
-import { useProcurementApi, LineItemWithRequest, type RequestCommentRow } from '../data/db'
+import { useProcurementApi, LineItemWithRequest, type RequestCommentRow, Location } from '../data/db'
 import { StatusBadge } from '../requester/StatusBadge'
 import { decisionNotificationKey } from '../lib/decisionNotification'
+import { LocationFilter } from '../components/LocationFilter'
+import { resolveLocationName, distinctLocationNames } from '../lib/locationLabel'
 import { PreApprovedTab } from '../approvals/PreApprovedTab'
 import { useSilentPoll } from '../lib/useSilentPoll'
 import { PERMS, formatDate } from '../lib/constants'
@@ -22,7 +24,9 @@ export function ApprovalsPage() {
   const [comments, setComments] = useState<RequestCommentRow[]>([])
   const [drafts, setDrafts] = useState<Record<string, string>>({})
   const [preApprovedNames, setPreApprovedNames] = useState<Set<string>>(new Set())
-  const [tab, setTab] = useState<'items' | 'preapproved'>('items')
+  const [tab, setTab] = useState<'items' | 'onhold' | 'preapproved'>('items')
+  const [locations, setLocations] = useState<Location[]>([])
+  const [locFilter, setLocFilter] = useState('all')
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true)
@@ -30,6 +34,7 @@ export function ApprovalsPage() {
     try {
       const data = await api.listLineItemsByStatus(['pending', 'on_hold'])
       setItems(data)
+      setLocations(await api.listLocations())
       const catalog = await api.listPreApprovedItems()
       setPreApprovedNames(new Set(catalog.map((c) => c.name.toLowerCase())))
       setComments(await api.listRequestCommentsMany(Array.from(new Set(data.map((i) => i.request.id)))))
@@ -56,7 +61,7 @@ export function ApprovalsPage() {
   // once every visible item has an image (or the tab is switched away).
   const missingImageKey = items.filter((i) => i.item_url && !imageUrls[i.id]).map((i) => i.id).join(',')
   useEffect(() => {
-    if (tab !== 'items' || missingImageKey === '') return
+    if (tab !== 'preapproved' || missingImageKey === '') return
     const missingIds = missingImageKey.split(',')
     const timer = setInterval(async () => {
       const urls: Record<string, string> = {}
@@ -131,6 +136,16 @@ export function ApprovalsPage() {
   const threadLink = (requestId: string) =>
     `${window.location.pathname.replace(/[^/]+$/, 'requests')}?request=${encodeURIComponent(requestId)}`
 
+  // z8ygbxr03a/038: location options from the loaded items; For Approval shows
+  // pending only, On Hold shows on_hold only. Location filter + latest-submitted
+  // sort (request.submitted_at desc; ISO strings compare lexicographically).
+  const locOptions = useMemo(() => distinctLocationNames(items, locations), [items, locations])
+  const visibleItems = useMemo(() => {
+    const inTab = items.filter((i) => (tab === 'onhold' ? i.status === 'on_hold' : i.status === 'pending'))
+    const inLoc = locFilter === 'all' ? inTab : inTab.filter((i) => resolveLocationName(i, locations) === locFilter)
+    return [...inLoc].sort((a, b) => b.request.submitted_at.localeCompare(a.request.submitted_at))
+  }, [items, tab, locFilter, locations])
+
   async function saveComment(itemId: string) {
     const item = items.find((it) => it.id === itemId)
     if (!item) return
@@ -196,6 +211,13 @@ export function ApprovalsPage() {
         </button>
         <button
           type="button"
+          onClick={() => setTab('onhold')}
+          className={`px-3 py-2 text-sm font-medium -mb-px border-b-2 ${tab === 'onhold' ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
+        >
+          On Hold
+        </button>
+        <button
+          type="button"
           onClick={() => setTab('preapproved')}
           className={`px-3 py-2 text-sm font-medium -mb-px border-b-2 ${tab === 'preapproved' ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
         >
@@ -203,21 +225,27 @@ export function ApprovalsPage() {
         </button>
       </div>
 
-      {tab === 'items' && loading && (
+      {tab !== 'preapproved' && (
+        <LocationFilter locations={locOptions} value={locFilter} onChange={setLocFilter} />
+      )}
+
+      {tab !== 'preapproved' && loading && (
         <div className="py-8 text-center text-muted-foreground text-sm">Loading…</div>
       )}
 
-      {tab === 'items' && !loading && error && (
+      {tab !== 'preapproved' && !loading && error && (
         <div className="rounded-md bg-destructive/10 border border-destructive/30 p-4 text-sm text-destructive">
           {error}
         </div>
       )}
 
-      {tab === 'items' && !loading && !error && items.length === 0 && (
-        <p className="text-sm text-muted-foreground">No items pending approval.</p>
+      {tab !== 'preapproved' && !loading && !error && visibleItems.length === 0 && (
+        <p className="text-sm text-muted-foreground">{locFilter !== 'all' ? 'No items match this location.' : tab === 'onhold' ? 'No items on hold.' : 'No items pending approval.'}</p>
       )}
 
-      {tab === 'items' && !loading && !error && items.map(item => (
+      {tab !== 'preapproved' && !loading && !error && visibleItems.map(item => {
+        const locText = resolveLocationName(item, locations)
+        return (
         <div key={item.id} className="rounded-lg border border-border bg-card p-4 grid gap-3">
           {/* Header: description + status */}
           <div className="flex items-start justify-between gap-2">
@@ -227,6 +255,7 @@ export function ApprovalsPage() {
               </p>
               <p className="text-xs text-muted-foreground">Qty: {item.quantity}</p>
               <p className="text-xs text-muted-foreground">Substitution: {item.substitution_ok ? 'Yes' : 'No'}</p>
+              {locText && <p className="text-xs text-muted-foreground">Location: {locText}</p>}
             </div>
             <div className="flex items-center gap-1.5">
               {preApprovedNames.has((item.item_description ?? '').toLowerCase()) && (
@@ -341,17 +370,20 @@ export function ApprovalsPage() {
             >
               Decline
             </button>
-            <button
-              type="button"
-              disabled={busyId === item.id}
-              onClick={() => handleAction(item.id, 'on_hold')}
-              className="inline-flex items-center rounded-md border border-warning/40 bg-warning/15 px-3 py-1.5 text-xs font-medium text-warning hover:bg-warning/25 disabled:opacity-50"
-            >
-              Hold
-            </button>
+            {item.status === 'pending' && (
+              <button
+                type="button"
+                disabled={busyId === item.id}
+                onClick={() => handleAction(item.id, 'on_hold')}
+                className="inline-flex items-center rounded-md border border-warning/40 bg-warning/15 px-3 py-1.5 text-xs font-medium text-warning hover:bg-warning/25 disabled:opacity-50"
+              >
+                Hold
+              </button>
+            )}
           </div>
         </div>
-        ))}
+        )
+      })}
 
       {tab === 'preapproved' && <PreApprovedTab />}
     </div>
