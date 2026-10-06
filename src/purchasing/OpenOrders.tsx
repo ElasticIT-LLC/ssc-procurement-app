@@ -21,6 +21,8 @@ export function OpenOrders() {
   const [locFilter, setLocFilter] = useState('all')
   const [receiveFor, setReceiveFor] = useState<LineItemWithRequest | null>(null)
   const [receiveNote, setReceiveNote] = useState('')
+  const [cancelFor, setCancelFor] = useState<LineItemWithRequest | null>(null)
+  const [cancelComment, setCancelComment] = useState('')
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -69,14 +71,27 @@ export function OpenOrders() {
       setBusyId(null)
     }
   }
-  async function cancel(item: LineItemWithRequest) {
-    if (!window.confirm(`Cancel this ordered item? ${item.item_description || 'Item'} will be marked cancelled and the requester will need to submit a new request if needed.`)) return
-    setBusyId(item.id)
+  // v3.1: cancelling opens a dialog with an optional reason/comment. The
+  // comment (when given) is posted to the request's comment thread so the
+  // requester sees why the item was cancelled in Request Detail.
+  async function confirmCancel() {
+    if (!cancelFor) return
+    setBusyId(cancelFor.id)
     try {
-      await api.cancelLineItem(item.id)
-      await api.notifyStatusUpdate(item.request.id, [item.id], 'item_cancelled')
-      api.fireNotification('item_cancelled', item.request.id, [item.id])
+      await api.cancelLineItem(cancelFor.id)
+      await api.notifyStatusUpdate(cancelFor.request.id, [cancelFor.id], 'item_cancelled')
+      api.fireNotification('item_cancelled', cancelFor.request.id, [cancelFor.id])
+      const comment = cancelComment.trim()
+      if (comment) {
+        try {
+          await api.postRequestComment({ request_id: cancelFor.request.id, line_item_id: cancelFor.id, source: 'purchasing', body: comment })
+        } catch (err: unknown) {
+          showToast({ message: 'Item cancelled, but the comment could not be saved', type: 'error' })
+        }
+      }
       showToast({ message: 'Item cancelled', type: 'success' })
+      setCancelFor(null)
+      setCancelComment('')
       await load()
     } catch (err: unknown) {
       showToast({ message: err instanceof Error ? err.message : 'Failed to cancel item', type: 'error' })
@@ -131,7 +146,7 @@ export function OpenOrders() {
                       {item.status === 'ordered' && (
                         <>
                           <button type="button" disabled={busyId === item.id} onClick={() => { setReceiveFor(item); setReceiveNote('') }} className="inline-flex items-center rounded-md bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50">Mark Received</button>
-                          <button type="button" disabled={busyId === item.id} onClick={() => cancel(item)} className="inline-flex items-center rounded-md border border-destructive/40 bg-destructive/15 px-2.5 py-1 text-xs font-medium text-destructive hover:bg-destructive/25 disabled:opacity-50">Cancel Order</button>
+                          <button type="button" disabled={busyId === item.id} onClick={() => { setCancelFor(item); setCancelComment('') }} className="inline-flex items-center rounded-md border border-destructive/40 bg-destructive/15 px-2.5 py-1 text-xs font-medium text-destructive hover:bg-destructive/25 disabled:opacity-50">Cancel Order</button>
                         </>
                       )}
                     </div>
@@ -160,6 +175,28 @@ export function OpenOrders() {
             <div className="flex gap-2 justify-end">
               <button type="button" disabled={busyId === receiveFor.id} onClick={() => setReceiveFor(null)} className="inline-flex items-center rounded-md border border-border px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted disabled:opacity-50">Cancel</button>
               <button type="button" disabled={busyId === receiveFor.id} onClick={() => { void confirmReceive() }} className="inline-flex items-center rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50">Confirm Received</button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {cancelFor && (
+        <Modal title={`Cancel Order — ${cancelFor.item_description || 'item'}`} onClose={() => { if (busyId !== cancelFor.id) setCancelFor(null) }}>
+          <div className="grid gap-3">
+            <p className="text-sm text-muted-foreground">{formatItemRef(cancelFor.request?.request_number, cancelFor.line_no)} — Qty {cancelFor.quantity}. Cancelling marks the item cancelled and the requester will need to submit a new request if still needed.</p>
+            <div className="grid gap-1">
+              <label className="text-xs font-medium text-foreground">Reason / comment (optional)</label>
+              <textarea
+                rows={3}
+                value={cancelComment}
+                onChange={(e) => setCancelComment(e.target.value)}
+                placeholder="e.g. duplicate order, supplier out of stock…"
+                className="w-full rounded-md border border-input bg-input px-3 py-1.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring resize-none"
+              />
+            </div>
+            <div className="flex gap-2 justify-end">
+              <button type="button" disabled={busyId === cancelFor.id} onClick={() => setCancelFor(null)} className="inline-flex items-center rounded-md border border-border px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted disabled:opacity-50">Cancel</button>
+              <button type="button" disabled={busyId === cancelFor.id} onClick={() => { void confirmCancel() }} className="inline-flex items-center rounded-md bg-destructive px-3 py-1.5 text-xs font-medium text-destructive-foreground hover:opacity-90 disabled:opacity-50">Confirm Cancel</button>
             </div>
           </div>
         </Modal>
