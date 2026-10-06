@@ -316,11 +316,11 @@ export function PublicRequestFormPage() {
                   <input
                     type="checkbox"
                     id={`subst-${index}`}
-                    checked={item.substitution_ok}
-                    onChange={(e) => updateItem(index, { ...item, substitution_ok: e.target.checked })}
+                    checked={!item.substitution_ok}
+                    onChange={(e) => updateItem(index, { ...item, substitution_ok: !e.target.checked })}
                     className="h-4 w-4 rounded border-border accent-primary"
                   />
-                  <label htmlFor={`subst-${index}`} className="text-sm text-foreground">Substitution OK</label>
+                  <label htmlFor={`subst-${index}`} className="text-sm text-foreground">No Substitution</label>
                 </div>
               </div>
 
