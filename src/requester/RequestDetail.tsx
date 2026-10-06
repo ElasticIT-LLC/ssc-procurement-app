@@ -9,6 +9,7 @@ import { useSilentPoll } from '../lib/useSilentPoll'
 import { ReturnForm } from './ReturnForm'
 import { HeartIcon } from '../components/HeartIcon'
 import { PERMS, formatDate } from '../lib/constants'
+import { displayRequestStatus } from '../lib/requestDisplay'
 import { formatItemRef } from '../lib/itemRef'
 import { RequestActivity } from '../components/RequestActivity'
 import { RequestThread } from '../components/RequestThread'
@@ -198,7 +199,7 @@ export function RequestDetail({ requestId, onBack }: RequestDetailProps) {
       <div className="rounded-lg border border-border bg-card p-4 grid gap-2">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold text-foreground">Request</h2>
-          <StatusBadge status={request.status} />
+          <StatusBadge status={displayRequestStatus(request)} />
         </div>
         {request.notes && (
           <p className="text-sm text-foreground">{request.notes}</p>

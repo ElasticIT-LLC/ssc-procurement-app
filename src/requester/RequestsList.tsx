@@ -2,9 +2,10 @@ import { useState, useEffect, useCallback } from 'react'
 import { useAppPermissions } from '../lib/useAppPermissions'
 import { useShellContext, useToast } from '@elasticit-llc/app-bridge'
 import { useProcurementApi, RequestRow, FavoriteItem } from '../data/db'
-import { PERMS, formatDate, REQUEST_STATUS, FULL_ACCESS } from '../lib/constants'
+import { PERMS, formatDate, FULL_ACCESS } from '../lib/constants'
 import { formatRequestNo } from '../lib/itemRef'
-import { countByStatus, filterByStatus } from '../lib/requestFilter'
+import { countByTab, filterByTab } from '../lib/requestFilter'
+import { displayRequestStatus } from '../lib/requestDisplay'
 import { StatusBadge } from './StatusBadge'
 import { FavoritesLink } from '../components/FavoritesModal'
 import { HeartIcon } from '../components/HeartIcon'
@@ -35,9 +36,9 @@ export function RequestsList({ onNew, onSelect }: RequestsListProps) {
   const [tab, setTab] = useState<string>('all')
   const [favorites, setFavorites] = useState<FavoriteItem[]>([])
   const [heartBusyId, setHeartBusyId] = useState<string | null>(null)
-  const counts = countByStatus(requests)
-  const visible = filterByStatus(requests, tab)
-  const TABS = ['all', ...REQUEST_STATUS] as const
+  const counts = countByTab(requests)
+  const visible = filterByTab(requests, tab)
+  const TABS = ['all', 'pending', 'on_hold', 'partially_approved', 'approved', 'received', 'declined', 'cancelled'] as const
 
   const refresh = useCallback(async (silent = false) => {
     if (!silent) setLoading(true)
@@ -227,7 +228,7 @@ export function RequestsList({ onNew, onSelect }: RequestsListProps) {
                         <HeartIcon filled={isHeartFav} />
                       </button>
                     )}
-                    <StatusBadge status={req.status} />
+                    <StatusBadge status={displayRequestStatus(req)} />
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
