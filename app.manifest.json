@@ -3,7 +3,7 @@
   "slug": "procurement",
   "name": "Solterra Procurement",
   "icon": "Package",
-  "version": "1.2.0-qa.1",
+  "version": "1.2.0-qa.2",
   "permissions": [
     { "key": "apps/procurement/*", "label": "Full Access", "description": "Full access to Procurement", "group": "Administration" },
     { "key": "apps/procurement/requests/create", "label": "Create requests", "description": "Create and submit purchase requests; mark items received; initiate returns", "group": "Requests" },
@@ -74,7 +74,8 @@
       { "version": 40, "description": "Pre-approved catalog: product_image_path column + pre_approve_line_item copies image + backfill", "up": "migrations/040_pre_approved_images.sql" },
       { "version": 41, "description": "Block line items with date_needed closer than 5 days out (BEFORE INSERT trigger)", "up": "migrations/041_min_date_needed.sql" },
       { "version": 42, "description": "Canonical submit trigger: auto screenshot + approval email on request insert (keyless, _config URL) — fixes missing trigger on both prod projects", "up": "migrations/042_submit_trigger.sql" },
-      { "version": 43, "description": "Allow re-decision of approved items (decline/hold/undo) when not yet on a PO", "up": "migrations/043_redecide_after_approval.sql" }
+      { "version": 43, "description": "Allow re-decision of approved items (decline/hold/undo) when not yet on a PO", "up": "migrations/043_redecide_after_approval.sql" },
+    { "version": 44, "description": "Optional receive notes: line_items.receive_notes + receive_line_item(p_notes)", "up": "migrations/044_receive_notes.sql" }
     ],
     "tables": [
       { "name": "locations",         "rls": { "read": "authenticated", "write": "admin" } },
