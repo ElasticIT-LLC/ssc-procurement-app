@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useToast } from '@elasticit-llc/app-bridge'
 import { useProcurementApi, LineItemWithRequest, Location } from '../data/db'
 import { DateInput, todayIso } from '../components/DateInput'
@@ -9,7 +9,8 @@ import { ReDecideActions } from '../components/ReDecideActions'
 import { useSilentPoll } from '../lib/useSilentPoll'
 import { formatDate } from '../lib/constants'
 import { formatItemRef } from '../lib/itemRef'
-import { resolveLocationName } from '../lib/locationLabel'
+import { resolveLocationName, distinctLocationNames } from '../lib/locationLabel'
+import { LocationFilter } from '../components/LocationFilter'
 import { CreatePurchaseOrderForm } from './CreatePurchaseOrderForm'
 
 interface OrderForm {
@@ -30,6 +31,7 @@ export function ReadyForPurchasing() {
 
   const [items, setItems] = useState<LineItemWithRequest[]>([])
   const [locations, setLocations] = useState<Location[]>([])
+  const [locFilter, setLocFilter] = useState('all')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [openFormId, setOpenFormId] = useState<string | null>(null)
@@ -69,6 +71,14 @@ export function ReadyForPurchasing() {
   // z8ygbxp4ch: silent 10s auto-refresh so newly approved items (including
   // pre-approved re-orders) appear without a manual page refresh.
   useSilentPoll(() => load(true), 10000)
+
+  // z8ygbxr03b: location segment filter + alphabetical sort (display only —
+  // `items` stays the full set so selection reconciliation is unaffected).
+  const locOptions = useMemo(() => distinctLocationNames(items, locations), [items, locations])
+  const visibleItems = useMemo(() => {
+    const inLoc = locFilter === 'all' ? items : items.filter((i) => resolveLocationName(i, locations) === locFilter)
+    return [...inLoc].sort((a, b) => (a.item_description ?? '').localeCompare(b.item_description ?? '', undefined, { sensitivity: 'base' }))
+  }, [items, locFilter, locations])
 
   function toggleForm(itemId: string) {
     if (openFormId === itemId) {
@@ -139,8 +149,12 @@ export function ReadyForPurchasing() {
         </div>
       )}
 
-      {!loading && !error && items.length === 0 && (
-        <p className="text-sm text-muted-foreground">No approved items to order.</p>
+      {!loading && !error && visibleItems.length === 0 && (
+        <p className="text-sm text-muted-foreground">{locFilter !== 'all' ? 'No items match this location.' : 'No approved items to order.'}</p>
+      )}
+
+      {!loading && !error && (
+        <LocationFilter locations={locOptions} value={locFilter} onChange={setLocFilter} />
       )}
 
       {selected.size > 0 && (
@@ -159,7 +173,7 @@ export function ReadyForPurchasing() {
         />
       )}
 
-      {!loading && !error && items.map(item => {
+      {!loading && !error && visibleItems.map(item => {
         const form = forms[item.id] ?? emptyForm()
         const isOpen = openFormId === item.id
         const isOther = form.shipping_location_id === '__other__'

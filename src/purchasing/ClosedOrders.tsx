@@ -1,8 +1,9 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useToast } from '@elasticit-llc/app-bridge'
 import { useProcurementApi, PurchaseOrderRow, FavoriteItem, LineItemWithRequest, Location } from '../data/db'
 import { useAppPermissions } from '../lib/useAppPermissions'
-import { resolveLocationName } from '../lib/locationLabel'
+import { resolveLocationName, distinctLocationNames } from '../lib/locationLabel'
+import { LocationFilter } from '../components/LocationFilter'
 import { StatusBadge } from '../requester/StatusBadge'
 import { ReplacementBadge } from '../requester/ReplacementBadge'
 import { HeartIcon } from '../components/HeartIcon'
@@ -20,6 +21,7 @@ export function ClosedOrders() {
   const [error, setError] = useState<string | null>(null)
   const [favorites, setFavorites] = useState<FavoriteItem[]>([])
   const [heartBusyId, setHeartBusyId] = useState<string | null>(null)
+  const [locFilter, setLocFilter] = useState('all')
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -39,6 +41,18 @@ export function ClosedOrders() {
     api.listFavorites().then(setFavorites).catch(() => {})
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // z8ygbxr03b: location segment filter + alphabetical sorts (same rules as
+  // Open Orders).
+  const locOptions = useMemo(() => distinctLocationNames(pos.flatMap((p) => p.line_items), locations), [pos, locations])
+  const visiblePos = useMemo(() => {
+    const filtered = pos
+      .map((po) => ({ ...po, line_items: po.line_items.filter((i) => locFilter === 'all' || resolveLocationName(i, locations) === locFilter) }))
+      .filter((po) => po.line_items.length > 0)
+    return filtered
+      .sort((a, b) => a.po_number.localeCompare(b.po_number))
+      .map((po) => ({ ...po, line_items: [...po.line_items].sort((x, y) => (x.item_description ?? '').localeCompare(y.item_description ?? '', undefined, { sensitivity: 'base' })) }))
+  }, [pos, locFilter, locations])
 
   const favoriteOf = (item: { item_description: string | null }) =>
     favorites.find(
@@ -103,7 +117,11 @@ export function ClosedOrders() {
 
   return (
     <div className="grid gap-4">
-      {pos.map(po => (
+      <LocationFilter locations={locOptions} value={locFilter} onChange={setLocFilter} />
+      {visiblePos.length === 0 && (
+        <p className="text-sm text-muted-foreground">No orders match this location.</p>
+      )}
+      {visiblePos.map(po => (
         <div key={po.id} className="rounded-lg border border-border bg-card p-4 grid gap-3">
           <div>
             <p className="text-sm font-semibold text-foreground">{po.po_number}{po.vendor ? ` · ${po.vendor}` : ''}</p>
@@ -120,6 +138,7 @@ export function ClosedOrders() {
                   <div className="min-w-0">
                     <p className="text-sm text-foreground truncate">{formatItemRef(item.request?.request_number, item.line_no)} — {item.item_description || 'Unnamed item'}</p>
                     {sub && <p className="truncate text-xs text-muted-foreground">{sub}</p>}
+                    {item.receive_notes && <p className="truncate text-xs text-muted-foreground">Notes: {item.receive_notes}</p>}
                   </div>
                   <div className="flex items-center gap-2">
                   {item.item_description?.trim() && (
