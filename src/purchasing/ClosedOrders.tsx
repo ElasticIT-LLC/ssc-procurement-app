@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useToast } from '@elasticit-llc/app-bridge'
 import { useProcurementApi, PurchaseOrderRow, FavoriteItem, LineItemWithRequest, Location } from '../data/db'
 import { useAppPermissions } from '../lib/useAppPermissions'
-import { resolveLocationName, distinctLocationNames } from '../lib/locationLabel'
+import { resolveLocationName, locationCounts, effectiveFilterValue } from '../lib/locationLabel'
 import { LocationFilter } from '../components/LocationFilter'
 import { StatusBadge } from '../requester/StatusBadge'
 import { ReplacementBadge } from '../requester/ReplacementBadge'
@@ -42,17 +42,19 @@ export function ClosedOrders() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // z8ygbxr03b: location segment filter + alphabetical sorts (same rules as
-  // Open Orders).
-  const locOptions = useMemo(() => distinctLocationNames(pos.flatMap((p) => p.line_items), locations), [pos, locations])
+  // z8ygbxr03b (v3.1): location chip filter + alphabetical sorts (same rules
+  // as Open Orders).
+  const allItems = useMemo(() => pos.flatMap((p) => p.line_items), [pos])
+  const locOptions = useMemo(() => locationCounts(allItems, locations), [allItems, locations])
+  const activeLoc = effectiveFilterValue(locFilter, locOptions)
   const visiblePos = useMemo(() => {
     const filtered = pos
-      .map((po) => ({ ...po, line_items: po.line_items.filter((i) => locFilter === 'all' || resolveLocationName(i, locations) === locFilter) }))
+      .map((po) => ({ ...po, line_items: po.line_items.filter((i) => activeLoc === 'all' || resolveLocationName(i, locations) === activeLoc) }))
       .filter((po) => po.line_items.length > 0)
     return filtered
       .sort((a, b) => a.po_number.localeCompare(b.po_number))
       .map((po) => ({ ...po, line_items: [...po.line_items].sort((x, y) => (x.item_description ?? '').localeCompare(y.item_description ?? '', undefined, { sensitivity: 'base' })) }))
-  }, [pos, locFilter, locations])
+  }, [pos, activeLoc, locations])
 
   const favoriteOf = (item: { item_description: string | null }) =>
     favorites.find(
@@ -117,7 +119,7 @@ export function ClosedOrders() {
 
   return (
     <div className="grid gap-4">
-      <LocationFilter locations={locOptions} value={locFilter} onChange={setLocFilter} />
+      <LocationFilter options={locOptions} total={allItems.length} value={activeLoc} onChange={setLocFilter} />
       {visiblePos.length === 0 && (
         <p className="text-sm text-muted-foreground">No orders match this location.</p>
       )}

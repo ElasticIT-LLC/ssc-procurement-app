@@ -9,7 +9,7 @@ import { ReDecideActions } from '../components/ReDecideActions'
 import { useSilentPoll } from '../lib/useSilentPoll'
 import { formatDate } from '../lib/constants'
 import { formatItemRef } from '../lib/itemRef'
-import { resolveLocationName, distinctLocationNames } from '../lib/locationLabel'
+import { resolveLocationName, locationCounts, effectiveFilterValue } from '../lib/locationLabel'
 import { LocationFilter } from '../components/LocationFilter'
 import { CreatePurchaseOrderForm } from './CreatePurchaseOrderForm'
 
@@ -72,13 +72,14 @@ export function ReadyForPurchasing() {
   // pre-approved re-orders) appear without a manual page refresh.
   useSilentPoll(() => load(true), 10000)
 
-  // z8ygbxr03b: location segment filter + alphabetical sort (display only —
+  // z8ygbxr03b (v3.1): location chip filter + alphabetical sort (display only —
   // `items` stays the full set so selection reconciliation is unaffected).
-  const locOptions = useMemo(() => distinctLocationNames(items, locations), [items, locations])
+  const locOptions = useMemo(() => locationCounts(items, locations), [items, locations])
+  const activeLoc = effectiveFilterValue(locFilter, locOptions)
   const visibleItems = useMemo(() => {
-    const inLoc = locFilter === 'all' ? items : items.filter((i) => resolveLocationName(i, locations) === locFilter)
+    const inLoc = activeLoc === 'all' ? items : items.filter((i) => resolveLocationName(i, locations) === activeLoc)
     return [...inLoc].sort((a, b) => (a.item_description ?? '').localeCompare(b.item_description ?? '', undefined, { sensitivity: 'base' }))
-  }, [items, locFilter, locations])
+  }, [items, activeLoc, locations])
 
   function toggleForm(itemId: string) {
     if (openFormId === itemId) {
@@ -154,7 +155,7 @@ export function ReadyForPurchasing() {
       )}
 
       {!loading && !error && (
-        <LocationFilter locations={locOptions} value={locFilter} onChange={setLocFilter} />
+        <LocationFilter options={locOptions} total={items.length} value={activeLoc} onChange={setLocFilter} />
       )}
 
       {selected.size > 0 && (

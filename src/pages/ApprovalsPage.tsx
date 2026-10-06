@@ -5,7 +5,7 @@ import { useProcurementApi, LineItemWithRequest, type RequestCommentRow, Locatio
 import { StatusBadge } from '../requester/StatusBadge'
 import { decisionNotificationKey } from '../lib/decisionNotification'
 import { LocationFilter } from '../components/LocationFilter'
-import { resolveLocationName, distinctLocationNames } from '../lib/locationLabel'
+import { resolveLocationName, locationCounts, effectiveFilterValue } from '../lib/locationLabel'
 import { PreApprovedTab } from '../approvals/PreApprovedTab'
 import { useSilentPoll } from '../lib/useSilentPoll'
 import { PERMS, formatDate } from '../lib/constants'
@@ -136,15 +136,17 @@ export function ApprovalsPage() {
   const threadLink = (requestId: string) =>
     `${window.location.pathname.replace(/[^/]+$/, 'requests')}?request=${encodeURIComponent(requestId)}`
 
-  // z8ygbxr03a/038: location options from the loaded items; For Approval shows
-  // pending only, On Hold shows on_hold only. Location filter + latest-submitted
-  // sort (request.submitted_at desc; ISO strings compare lexicographically).
-  const locOptions = useMemo(() => distinctLocationNames(items, locations), [items, locations])
+  // z8ygbxr03a/038 (v3.1): location chips come from the current tab's items
+  // only (pending on For Approval, on_hold on On Hold), so an empty tab shows
+  // no filter row at all. Latest-submitted sort (request.submitted_at desc;
+  // ISO strings compare lexicographically).
+  const tabItems = useMemo(() => items.filter((i) => (tab === 'onhold' ? i.status === 'on_hold' : i.status === 'pending')), [items, tab])
+  const locOptions = useMemo(() => locationCounts(tabItems, locations), [tabItems, locations])
+  const activeLoc = effectiveFilterValue(locFilter, locOptions)
   const visibleItems = useMemo(() => {
-    const inTab = items.filter((i) => (tab === 'onhold' ? i.status === 'on_hold' : i.status === 'pending'))
-    const inLoc = locFilter === 'all' ? inTab : inTab.filter((i) => resolveLocationName(i, locations) === locFilter)
+    const inLoc = activeLoc === 'all' ? tabItems : tabItems.filter((i) => resolveLocationName(i, locations) === activeLoc)
     return [...inLoc].sort((a, b) => b.request.submitted_at.localeCompare(a.request.submitted_at))
-  }, [items, tab, locFilter, locations])
+  }, [tabItems, activeLoc, locations])
 
   async function saveComment(itemId: string) {
     const item = items.find((it) => it.id === itemId)
@@ -226,7 +228,7 @@ export function ApprovalsPage() {
       </div>
 
       {tab !== 'preapproved' && (
-        <LocationFilter locations={locOptions} value={locFilter} onChange={setLocFilter} />
+        <LocationFilter options={locOptions} total={tabItems.length} value={activeLoc} onChange={setLocFilter} />
       )}
 
       {tab !== 'preapproved' && loading && (
