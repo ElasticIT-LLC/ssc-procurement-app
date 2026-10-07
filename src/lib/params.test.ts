@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { viewFromSearch } from './params'
+import { viewFromSearch, purchasingTabFromSearch } from './params'
 
 describe('viewFromSearch', () => {
   it('defaults to the list view', () => {
@@ -16,5 +16,22 @@ describe('viewFromSearch', () => {
   })
   it('decodes a URL-encoded id', () => {
     expect(viewFromSearch('?request=a%20b')).toEqual({ type: 'detail', id: 'a b' })
+  })
+})
+
+describe('purchasingTabFromSearch', () => {
+  it('defaults to ready when there is no tab param', () => {
+    expect(purchasingTabFromSearch('')).toBe('ready')
+    expect(purchasingTabFromSearch('?request=abc')).toBe('ready')
+  })
+  it('reads each valid tab', () => {
+    expect(purchasingTabFromSearch('?tab=ready')).toBe('ready')
+    expect(purchasingTabFromSearch('?tab=open')).toBe('open')
+    expect(purchasingTabFromSearch('?tab=closed')).toBe('closed')
+    expect(purchasingTabFromSearch('?tab=favorites')).toBe('favorites')
+  })
+  it('falls back to ready for invalid or empty values', () => {
+    expect(purchasingTabFromSearch('?tab=bogus')).toBe('ready')
+    expect(purchasingTabFromSearch('?tab=')).toBe('ready')
   })
 })

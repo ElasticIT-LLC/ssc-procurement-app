@@ -7,8 +7,8 @@ const SCHEMA = 'app_procurement'
 const TABLES = { requests: 'purchase_requests', lineItems: 'line_items', locations: 'locations', departments: 'departments', config: '_config', purchaseOrders: 'purchase_orders', favoriteItems: 'favorite_items', preApprovedItems: 'pre_approved_items', comments: 'request_comments' } as const
 const RPCS = { submit: 'submit_request', submitAnon: 'submit_request_anon', decide: 'decide_line_item', order: 'order_line_item', receive: 'receive_line_item', initiateReturn: 'initiate_return', processReturn: 'process_return', setComment: 'set_line_item_comment', deleteItem: 'delete_line_item', archiveItem: 'archive_line_item', cancel: 'cancel_line_item', getUserNames: 'get_user_names', getFormattingRules: 'get_formatting_rules', createPO: 'create_purchase_order', closePO: 'close_purchase_order', preApprove: 'pre_approve_line_item', orderPreApproved: 'order_pre_approved_item', deletePreApproved: 'delete_pre_approved_item', postComment: 'post_request_comment', mentionCandidates: 'get_mention_candidates' } as const
 
-export interface RequestRow { id: string; requester_id: string | null; requester_name: string | null; requester_email: string | null; requester_type: string; status: RequestStatus; notes: string | null; submitted_at: string; updated_at: string; request_number: number | null; line_items?: { item_description: string | null; item_url: string | null }[] }
-export interface LineItemRow { id: string; request_id: string; item_description: string | null; item_url: string | null; memo: string | null; quantity: number; substitution_ok: boolean; status: LineItemStatus; location_id: string | null; custom_location: string | null; ship_to_name: string | null; shipping_location_id: string | null; custom_shipping_location: string | null; department_id: string | null; custom_department: string | null; date_needed: string | null; eta: string | null; admin_comment: string | null; commented_by: string | null; commented_at: string | null; product_image_path: string | null; return_reason: string | null; return_quantity: number | null; wants_replacement: boolean | null; return_notes: string | null; return_date: string | null; created_at: string; line_no: number | null; return_processed_at: string | null; po_id: string | null; archived_at: string | null; received_at: string | null; cancelled_at: string | null; pre_approved_item_id: string | null; approved_by: string | null; approval_date: string | null; date_purchased: string | null; updated_at: string }
+export interface RequestRow { id: string; requester_id: string | null; requester_name: string | null; requester_email: string | null; requester_type: string; status: RequestStatus; notes: string | null; submitted_at: string; updated_at: string; request_number: number | null; line_items?: { item_description: string | null; item_url: string | null; status: string }[] }
+export interface LineItemRow { id: string; request_id: string; item_description: string | null; item_url: string | null; memo: string | null; quantity: number; substitution_ok: boolean; status: LineItemStatus; location_id: string | null; custom_location: string | null; ship_to_name: string | null; shipping_location_id: string | null; custom_shipping_location: string | null; department_id: string | null; custom_department: string | null; date_needed: string | null; eta: string | null; admin_comment: string | null; commented_by: string | null; commented_at: string | null; product_image_path: string | null; return_reason: string | null; return_quantity: number | null; wants_replacement: boolean | null; return_notes: string | null; receive_notes: string | null; return_date: string | null; created_at: string; line_no: number | null; return_processed_at: string | null; po_id: string | null; archived_at: string | null; received_at: string | null; cancelled_at: string | null; pre_approved_item_id: string | null; approved_by: string | null; approval_date: string | null; date_purchased: string | null; updated_at: string }
 export interface LineItemWithRequest extends LineItemRow {
   request: {
     id: string
@@ -70,7 +70,7 @@ export function useProcurementApi() {
   const ok = <T,>(res: { data: T; error: { message: string } | null }): T => { if (res.error) throw new Error(res.error.message); return res.data }
 
   async function listRequests(requesterId?: string, requesterEmail?: string): Promise<RequestRow[]> {
-    let query = db().from(TABLES.requests).select('*, line_items(item_description, item_url)')
+    let query = db().from(TABLES.requests).select('*, line_items(item_description, item_url, status)')
       .order('line_no', { ascending: true, referencedTable: 'line_items' })
       .order('updated_at', { ascending: false })
     const filters: string[] = []
@@ -80,7 +80,7 @@ export function useProcurementApi() {
     return (ok(await query) ?? []) as RequestRow[]
   }
   async function getRequest(id: string): Promise<RequestRow | null> {
-    return (ok(await db().from(TABLES.requests).select('*').eq('id', id).maybeSingle()) ?? null) as RequestRow | null
+    return (ok(await db().from(TABLES.requests).select('*, line_items(item_description, item_url, status)').eq('id', id).maybeSingle()) ?? null) as RequestRow | null
   }
   async function listLineItems(requestId: string): Promise<LineItemRow[]> {
     return (ok(await db().from(TABLES.lineItems).select('*').eq('request_id', requestId).order('created_at', { ascending: true })) ?? []) as LineItemRow[]
@@ -111,7 +111,13 @@ export function useProcurementApi() {
   async function orderLineItem(id: string, f: { date_purchased?: string; eta?: string; shipping_location_id?: string | null; custom_shipping_location?: string | null; purchase_notes?: string | null }): Promise<void> {
     ok(await db().rpc(RPCS.order, { p_line_item_id: id, p_date_purchased: f.date_purchased ?? null, p_eta: f.eta ?? null, p_shipping_location_id: f.shipping_location_id ?? null, p_custom_shipping_location: f.custom_shipping_location ?? null, p_purchase_notes: f.purchase_notes ?? null }))
   }
-  async function receiveLineItem(id: string): Promise<void> { ok(await db().rpc(RPCS.receive, { p_line_item_id: id })) }
+  async function receiveLineItem(id: string, notes?: string | null): Promise<void> {
+    // z8ygbxr03d: omit p_notes when empty — the defaulted parameter resolves
+    // identically on migrated DBs, and an omitted parameter also resolves
+    // against the pre-044 1-arg function (deployment-ordering safety).
+    const trimmed = (notes ?? '').trim()
+    ok(await db().rpc(RPCS.receive, trimmed ? { p_line_item_id: id, p_notes: trimmed } : { p_line_item_id: id }))
+  }
   async function createPurchaseOrder(lineItemIds: string[], f: { vendor?: string | null; date_purchased?: string; eta?: string; shipping_location_id?: string | null; custom_shipping_location?: string | null; notes?: string | null }): Promise<{ id: string; po_number: string }> {
     const row = ok(await db().rpc(RPCS.createPO, { p_line_item_ids: lineItemIds, p_vendor: f.vendor ?? null, p_date_purchased: f.date_purchased ?? null, p_eta: f.eta ?? null, p_shipping_location_id: f.shipping_location_id ?? null, p_custom_shipping_location: f.custom_shipping_location ?? null, p_notes: f.notes ?? null })) as { id: string; po_number: string }
     return row

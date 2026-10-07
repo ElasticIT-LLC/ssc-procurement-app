@@ -74,6 +74,10 @@ export function FavoritesTab() {
     }
   }
 
+  // z8ygbxr03c: alphabetical display (favorites carry no location data, so the
+  // location filter from the other tabs does not apply here).
+  const sortedFavorites = [...favorites].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }))
+
   if (loading) return <div className="py-8 text-center text-muted-foreground text-sm">Loading…</div>
   if (error) {
     return (
@@ -123,7 +127,7 @@ export function FavoritesTab() {
               </tr>
             </thead>
             <tbody>
-              {favorites.map(fav => (
+              {sortedFavorites.map(fav => (
                 <tr key={fav.id} className="border-t border-border">
                   <td className="px-3 py-2 text-xs text-foreground">{fav.name}</td>
                   <td className="px-3 py-2 text-xs">

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { resolveLocationName } from './locationLabel'
+import { resolveLocationName, locationCounts, effectiveFilterValue } from './locationLabel'
 
 const locations = [
   { id: 'loc-1', name: 'Main Office' },
@@ -22,5 +22,55 @@ describe('resolveLocationName', () => {
   it('returns null when neither source resolves', () => {
     expect(resolveLocationName({ location_id: 'loc-gone', custom_location: null }, locations)).toBeNull()
     expect(resolveLocationName({ location_id: null, custom_location: '   ' }, locations)).toBeNull()
+  })
+})
+
+describe('locationCounts', () => {
+  it('counts items per location and alphabetizes (case-insensitive)', () => {
+    const items = [
+      { location_id: 'loc-2', custom_location: null },
+      { location_id: 'loc-1', custom_location: null },
+      { location_id: 'loc-1', custom_location: null },
+      { location_id: null, custom_location: 'alpha site' },
+    ]
+    expect(locationCounts(items, locations)).toEqual([
+      { value: 'alpha site', count: 1 },
+      { value: 'Main Office', count: 2 },
+      { value: 'Site Number 1', count: 1 },
+    ])
+  })
+
+  it('skips items whose location does not resolve', () => {
+    const items = [
+      { location_id: null, custom_location: null },
+      { location_id: 'loc-gone', custom_location: '   ' },
+      { location_id: 'loc-1', custom_location: null },
+    ]
+    expect(locationCounts(items, locations)).toEqual([{ value: 'Main Office', count: 1 }])
+  })
+
+  it('returns empty for no items', () => {
+    expect(locationCounts([], locations)).toEqual([])
+  })
+})
+
+describe('effectiveFilterValue', () => {
+  const options = [
+    { value: 'Main Office', count: 2 },
+    { value: 'Site Number 1', count: 1 },
+  ]
+
+  it('keeps a valid selection', () => {
+    expect(effectiveFilterValue('Main Office', options)).toBe('Main Office')
+  })
+
+  it('always keeps all', () => {
+    expect(effectiveFilterValue('all', options)).toBe('all')
+    expect(effectiveFilterValue('all', [])).toBe('all')
+  })
+
+  it('falls back to all when the selection is no longer an option', () => {
+    expect(effectiveFilterValue('Gone Site', options)).toBe('all')
+    expect(effectiveFilterValue('Gone Site', [])).toBe('all')
   })
 })

@@ -24,6 +24,7 @@ export interface LineItemDraft {
 
 export interface LineItemDraftErrors {
   item_description?: string
+  item_url?: string
   quantity?: string
   location?: string
   department?: string
@@ -155,7 +156,7 @@ export function LineItemFormRow({
       </Field>
 
       {/* Item URL */}
-      <Field label="Item URL (highly recommended)">
+      <Field label="Item URL (required)" error={errors.item_url}>
         <input
           type="url"
           placeholder="https://..."
@@ -165,7 +166,7 @@ export function LineItemFormRow({
         />
       </Field>
 
-      {/* Quantity + Substitution OK */}
+      {/* Quantity + No Substitution */}
       <div className="grid grid-cols-2 gap-4">
         <Field label="Quantity" error={errors.quantity}>
           <input
@@ -180,11 +181,11 @@ export function LineItemFormRow({
           <input
             type="checkbox"
             id={`subst-${index}`}
-            checked={value.substitution_ok}
-            onChange={(e) => set({ substitution_ok: e.target.checked })}
+            checked={!value.substitution_ok}
+            onChange={(e) => set({ substitution_ok: !e.target.checked })}
             className="h-4 w-4 rounded border-border accent-primary"
           />
-          <label htmlFor={`subst-${index}`} className="text-sm text-foreground">Substitution OK</label>
+          <label htmlFor={`subst-${index}`} className="text-sm text-foreground">No Substitution</label>
         </div>
       </div>
 

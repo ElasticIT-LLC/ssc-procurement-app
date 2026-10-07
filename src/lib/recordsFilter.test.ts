@@ -29,6 +29,7 @@ function makeRow(overrides: Partial<LineItemDetailed> = {}): LineItemDetailed {
     return_quantity: null,
     wants_replacement: null,
     return_notes: null,
+    receive_notes: null,
     return_date: null,
     created_at: '2026-08-27T00:00:00Z',
     line_no: 1,

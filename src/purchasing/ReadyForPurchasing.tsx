@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useToast } from '@elasticit-llc/app-bridge'
 import { useProcurementApi, LineItemWithRequest, Location } from '../data/db'
 import { DateInput, todayIso } from '../components/DateInput'
@@ -9,7 +9,8 @@ import { ReDecideActions } from '../components/ReDecideActions'
 import { useSilentPoll } from '../lib/useSilentPoll'
 import { formatDate } from '../lib/constants'
 import { formatItemRef } from '../lib/itemRef'
-import { resolveLocationName } from '../lib/locationLabel'
+import { resolveLocationName, locationCounts, effectiveFilterValue } from '../lib/locationLabel'
+import { LocationFilter } from '../components/LocationFilter'
 import { CreatePurchaseOrderForm } from './CreatePurchaseOrderForm'
 
 interface OrderForm {
@@ -30,6 +31,7 @@ export function ReadyForPurchasing() {
 
   const [items, setItems] = useState<LineItemWithRequest[]>([])
   const [locations, setLocations] = useState<Location[]>([])
+  const [locFilter, setLocFilter] = useState('all')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [openFormId, setOpenFormId] = useState<string | null>(null)
@@ -69,6 +71,15 @@ export function ReadyForPurchasing() {
   // z8ygbxp4ch: silent 10s auto-refresh so newly approved items (including
   // pre-approved re-orders) appear without a manual page refresh.
   useSilentPoll(() => load(true), 10000)
+
+  // z8ygbxr03b (v3.1): location chip filter + alphabetical sort (display only —
+  // `items` stays the full set so selection reconciliation is unaffected).
+  const locOptions = useMemo(() => locationCounts(items, locations), [items, locations])
+  const activeLoc = effectiveFilterValue(locFilter, locOptions)
+  const visibleItems = useMemo(() => {
+    const inLoc = activeLoc === 'all' ? items : items.filter((i) => resolveLocationName(i, locations) === activeLoc)
+    return [...inLoc].sort((a, b) => (a.item_description ?? '').localeCompare(b.item_description ?? '', undefined, { sensitivity: 'base' }))
+  }, [items, activeLoc, locations])
 
   function toggleForm(itemId: string) {
     if (openFormId === itemId) {
@@ -139,8 +150,12 @@ export function ReadyForPurchasing() {
         </div>
       )}
 
-      {!loading && !error && items.length === 0 && (
-        <p className="text-sm text-muted-foreground">No approved items to order.</p>
+      {!loading && !error && visibleItems.length === 0 && (
+        <p className="text-sm text-muted-foreground">{locFilter !== 'all' ? 'No items match this location.' : 'No approved items to order.'}</p>
+      )}
+
+      {!loading && !error && (
+        <LocationFilter options={locOptions} total={items.length} value={activeLoc} onChange={setLocFilter} />
       )}
 
       {selected.size > 0 && (
@@ -159,7 +174,7 @@ export function ReadyForPurchasing() {
         />
       )}
 
-      {!loading && !error && items.map(item => {
+      {!loading && !error && visibleItems.map(item => {
         const form = forms[item.id] ?? emptyForm()
         const isOpen = openFormId === item.id
         const isOther = form.shipping_location_id === '__other__'
@@ -241,18 +256,21 @@ export function ReadyForPurchasing() {
               </p>
             </div>
 
-            {/* Place Order action */}
-            {!isOpen && (
-              <div className="flex gap-2">
+            {/* Action row: Place Order + post-approval change-of-mind
+                (z8ygbxp4cg) aligned in one row. Place Order hides while
+                the inline form is open. */}
+            <div className="flex flex-wrap items-center gap-1.5">
+              {!isOpen && (
                 <button
                   type="button"
                   onClick={() => toggleForm(item.id)}
-                  className="self-start inline-flex items-center rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:opacity-90"
+                  className="inline-flex items-center rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:opacity-90"
                 >
                   Place Order
                 </button>
-              </div>
-            )}
+              )}
+              <ReDecideActions item={item} onDone={() => load(true)} />
+            </div>
 
             {/* Inline order form */}
             {isOpen && (
@@ -337,9 +355,6 @@ export function ReadyForPurchasing() {
               </div>
             )}
 
-            {/* Post-approval change-of-mind (z8ygbxp4cg): only renders for
-                approved items not yet on a PO, for users with the gate. */}
-            <ReDecideActions item={item} onDone={() => load(true)} />
           </div>
         )
       })}

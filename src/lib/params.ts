@@ -11,3 +11,12 @@ export function viewFromSearch(search: string): RequestsView {
   const id = new URLSearchParams(search).get('request')
   return id ? { type: 'detail', id } : { type: 'list' }
 }
+
+export type PurchasingTab = 'ready' | 'open' | 'closed' | 'favorites'
+
+// z8ygbxr037: ?tab=<key> deep-link (pre-approved Create Order flow).
+// Invalid/missing values fall back to 'ready'.
+export function purchasingTabFromSearch(search: string): PurchasingTab {
+  const t = new URLSearchParams(search).get('tab')
+  return t === 'open' || t === 'closed' || t === 'favorites' ? t : 'ready'
+}

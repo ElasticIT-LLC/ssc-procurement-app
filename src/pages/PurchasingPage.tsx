@@ -1,13 +1,13 @@
 import { useState } from 'react'
 import { useAppPermissions } from '../lib/useAppPermissions'
 import { PERMS } from '../lib/constants'
+import { purchasingTabFromSearch, type PurchasingTab } from '../lib/params'
 import { ReadyForPurchasing } from '../purchasing/ReadyForPurchasing'
 import { OpenOrders } from '../purchasing/OpenOrders'
 import { ClosedOrders } from '../purchasing/ClosedOrders'
 import { FavoritesTab } from '../purchasing/FavoritesTab'
 
-type Tab = 'ready' | 'open' | 'closed' | 'favorites'
-const TABS: { key: Tab; label: string }[] = [
+const TABS: { key: PurchasingTab; label: string }[] = [
   { key: 'ready', label: 'Ready for Purchasing' },
   { key: 'open', label: 'Open Orders' },
   { key: 'closed', label: 'Closed Orders' },
@@ -16,7 +16,7 @@ const TABS: { key: Tab; label: string }[] = [
 
 export function PurchasingPage() {
   const { hasAppPermission } = useAppPermissions()
-  const [tab, setTab] = useState<Tab>('ready')
+  const [tab, setTab] = useState<PurchasingTab>(() => purchasingTabFromSearch(window.location.search))
 
 if (!hasAppPermission(PERMS.purchase) && !hasAppPermission(PERMS.admin)) {
     return (
