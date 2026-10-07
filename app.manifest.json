@@ -75,7 +75,8 @@
       { "version": 41, "description": "Block line items with date_needed closer than 5 days out (BEFORE INSERT trigger)", "up": "migrations/041_min_date_needed.sql" },
       { "version": 42, "description": "Canonical submit trigger: auto screenshot + approval email on request insert (keyless, _config URL) — fixes missing trigger on both prod projects", "up": "migrations/042_submit_trigger.sql" },
       { "version": 43, "description": "Allow re-decision of approved items (decline/hold/undo) when not yet on a PO", "up": "migrations/043_redecide_after_approval.sql" },
-    { "version": 44, "description": "Optional receive notes: line_items.receive_notes + receive_line_item(p_notes)", "up": "migrations/044_receive_notes.sql" }
+    { "version": 44, "description": "Optional receive notes: line_items.receive_notes + receive_line_item(p_notes)", "up": "migrations/044_receive_notes.sql" },
+    { "version": 45, "description": "Security lint remediation: SET search_path on 4 trigger fns; revoke dead PUBLIC RPC surface on trigger_procurement_submit", "up": "migrations/045_security_lints.sql" }
     ],
     "tables": [
       { "name": "locations",         "rls": { "read": "authenticated", "write": "admin" } },
