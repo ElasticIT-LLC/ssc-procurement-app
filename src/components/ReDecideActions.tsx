@@ -66,7 +66,7 @@ export function ReDecideActions({ item, onDone }: ReDecideActionsProps) {
     }
   }
 
-  const btn = 'inline-flex items-center rounded-md border px-2.5 py-1 text-xs font-medium disabled:opacity-50'
+  const btn = 'inline-flex items-center rounded-md border px-2.5 py-1.5 text-xs font-medium disabled:opacity-50'
 
   return (
     <div className="flex flex-wrap gap-1.5">

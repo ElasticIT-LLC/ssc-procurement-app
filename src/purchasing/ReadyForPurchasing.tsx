@@ -256,18 +256,21 @@ export function ReadyForPurchasing() {
               </p>
             </div>
 
-            {/* Place Order action */}
-            {!isOpen && (
-              <div className="flex gap-2">
+            {/* Action row: Place Order + post-approval change-of-mind
+                (z8ygbxp4cg) aligned in one row. Place Order hides while
+                the inline form is open. */}
+            <div className="flex flex-wrap items-center gap-1.5">
+              {!isOpen && (
                 <button
                   type="button"
                   onClick={() => toggleForm(item.id)}
-                  className="self-start inline-flex items-center rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:opacity-90"
+                  className="inline-flex items-center rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:opacity-90"
                 >
                   Place Order
                 </button>
-              </div>
-            )}
+              )}
+              <ReDecideActions item={item} onDone={() => load(true)} />
+            </div>
 
             {/* Inline order form */}
             {isOpen && (
@@ -352,9 +355,6 @@ export function ReadyForPurchasing() {
               </div>
             )}
 
-            {/* Post-approval change-of-mind (z8ygbxp4cg): only renders for
-                approved items not yet on a PO, for users with the gate. */}
-            <ReDecideActions item={item} onDone={() => load(true)} />
           </div>
         )
       })}
