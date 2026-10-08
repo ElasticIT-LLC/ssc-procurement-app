@@ -8,6 +8,8 @@ import { DateInput, minEtaIso } from '../components/DateInput'
 import { ShipToCombobox } from '../requester/ShipToCombobox'
 import { useShipToWorkers } from '../requester/useShipToWorkers'
 import { prefillFromCatalog, draftToRpcPayload, OTHER, type PreApprovedOrderDraft } from './preApproved'
+import { GlCodeChip } from '../components/GlCodeChip'
+import type { GlCategory } from '../lib/glCategories'
 
 const inputClass = 'w-full rounded-md border border-input bg-input px-3 py-1.5 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring'
 
@@ -34,19 +36,22 @@ export function PreApprovedTab() {
   const [submitting, setSubmitting] = useState(false)
   const [removingId, setRemovingId] = useState<string | null>(null)
   const [imageUrls, setImageUrls] = useState<Record<string, string>>({})
+  const [glCats, setGlCats] = useState<GlCategory[]>([])
 
   const load = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
-      const [catalog, locs, depts] = await Promise.all([
+      const [catalog, locs, depts, gls] = await Promise.all([
         api.listPreApprovedItems(),
         api.listLocations(),
         api.listDepartments(),
+        api.listGlCategories().catch(() => [] as GlCategory[]),
       ])
       setItems(catalog)
       setLocations(locs)
       setDepartments(depts)
+      setGlCats(gls)
       setNames(await api.resolveUserNames(catalog.map((i) => i.created_by).filter((x): x is string => !!x)))
       // Signed URLs for catalog product images (best-effort — an image failure
       // must not break the catalog listing).
@@ -71,6 +76,18 @@ export function PreApprovedTab() {
   }, [])
 
   useEffect(() => { load() }, [load])
+
+  // Admin-only GL edit on catalog rows (set_pre_approved_gl_code RPC). Suggest
+  // is live here (advisory) — the admin still confirms by picking.
+  async function saveCatalogGl(item: PreApprovedItem, code: string) {
+    try {
+      await api.setPreApprovedGlCode(item.id, code || null)
+      showToast({ message: 'GL code saved', type: 'success' })
+      await load()
+    } catch (err: unknown) {
+      showToast({ message: err instanceof Error ? err.message : 'Failed to save GL code', type: 'error' })
+    }
+  }
 
   function locName(item: PreApprovedItem): string {
     const loc = item.location_id ? locations.find((l) => l.id === item.location_id) : undefined
@@ -145,7 +162,7 @@ export function PreApprovedTab() {
       )}
 
       {!loading && !error && items.length > 0 && (
-        <div className="rounded-lg border border-border bg-card overflow-hidden">
+        <div className="rounded-lg border border-border bg-card">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border bg-muted/40 text-left text-xs text-muted-foreground">
@@ -154,6 +171,7 @@ export function PreApprovedTab() {
                 <th className="px-3 py-2 font-medium">Qty</th>
                 <th className="px-3 py-2 font-medium">Location</th>
                 <th className="px-3 py-2 font-medium">Department</th>
+                <th className="px-3 py-2 font-medium">GL</th>
                 <th className="px-3 py-2 font-medium">Added by</th>
                 <th className="px-3 py-2 font-medium">Added</th>
                 <th className="px-3 py-2" />
@@ -179,7 +197,21 @@ export function PreApprovedTab() {
                   </td>
                   <td className="px-3 py-2 text-muted-foreground">{item.quantity}</td>
                   <td className="px-3 py-2 text-muted-foreground">{locName(item)}</td>
-                  <td className="px-3 py-2 text-muted-foreground">{deptName(item)}</td>
+                  <td className="px-3 py-2 text-muted-foreground">
+                    {isAdmin ? (
+                      <GlCodeChip
+                        value={item.gl_code ?? ''}
+                        onChange={(code) => void saveCatalogGl(item, code)}
+                        categories={glCats}
+                        suggest={api.classifyItem}
+                        itemName={item.name}
+                        itemUrl={item.item_url ?? ''}
+                        itemMemo={item.memo ?? ''}
+                      />
+                    ) : (
+                      <span>{item.gl_code || '—'}</span>
+                    )}
+                  </td>
                   <td className="px-3 py-2 text-muted-foreground">{item.created_by ? names[item.created_by] || 'Unknown' : '—'}</td>
                   <td className="px-3 py-2 text-muted-foreground">{formatDate(item.created_at)}</td>
                   <td className="px-3 py-2">
@@ -223,6 +255,12 @@ export function PreApprovedTab() {
               <label className="text-xs font-medium text-foreground">Item URL</label>
               <input type="text" value={form.item_url} onChange={(e) => updateForm({ item_url: e.target.value })} placeholder="https://…" className={inputClass} />
             </div>
+            {orderFor.gl_code && (
+              <div className="grid gap-1">
+                <label className="text-xs font-medium text-foreground">GL Code</label>
+                <p className="text-xs text-muted-foreground">{orderFor.gl_code}</p>
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-3">
               <div className="grid gap-1">
                 <label className="text-xs font-medium text-foreground">Quantity</label>

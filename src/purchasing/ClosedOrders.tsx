@@ -132,7 +132,7 @@ export function ClosedOrders() {
           <div className="grid gap-2">
               {po.line_items.map(item => {
                 const locText = resolveLocationName(item, locations)
-                const sub = [locText ? `Location: ${locText}` : '', item.ship_to_name ? `Ship to: ${item.ship_to_name}` : '']
+                const sub = [locText ? `Location: ${locText}` : '', item.gl_code ? `GL: ${item.gl_code}` : '', item.ship_to_name ? `Ship to: ${item.ship_to_name}` : '']
                   .filter(Boolean)
                   .join(' · ')
                 return (

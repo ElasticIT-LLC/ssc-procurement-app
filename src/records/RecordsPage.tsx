@@ -27,7 +27,7 @@ function csvCell(value: string): string {
 }
 
 function exportCsv(rows: LineItemDetailed[], catalog: Record<string, PreApprovedItem>, sourceRef: Record<string, string>, latestByItem: Record<string, RequestCommentRow>) {
-  const headers = ['Submitted', 'Requester', 'Email', 'Item', 'Qty', 'Location', 'Department', 'Status', 'ETA', 'Order ETA', 'Request Notes', 'Latest comment', 'Received', 'Cancelled', 'Pre-approved Item', 'Source Item']
+  const headers = ['Submitted', 'Requester', 'Email', 'Item', 'Qty', 'Location', 'Department', 'GL', 'Status', 'ETA', 'Order ETA', 'Request Notes', 'Latest comment', 'Received', 'Cancelled', 'Pre-approved Item', 'Source Item']
   const lines = [headers.join(',')]
   for (const item of rows) {
     const cat = item.pre_approved_item_id ? catalog[item.pre_approved_item_id] : undefined
@@ -40,6 +40,7 @@ function exportCsv(rows: LineItemDetailed[], catalog: Record<string, PreApproved
       String(item.quantity),
       locationName(item),
       departmentName(item),
+      item.gl_code ?? '',
       item.status.replace(/_/g, ' '),
       formatDate(item.date_needed),
       formatDate(item.eta),
@@ -166,8 +167,8 @@ export function RecordsPage() {
   const cell = 'px-3 py-2 align-top text-xs text-foreground'
   const head = 'px-3 py-2 text-left text-xs font-semibold text-muted-foreground whitespace-nowrap'
   const showActionsColumn = canArchive || canReturn
-  // 11 fixed columns (Submitted…Admin Comment) + the conditional Actions column.
-  const columnCount = 11 + (showActionsColumn ? 1 : 0)
+  // 13 fixed columns (Submitted…Latest comment, GL) + the conditional Actions column.
+  const columnCount = 13 + (showActionsColumn ? 1 : 0)
 
   return (
     <div className="grid gap-6">
@@ -237,6 +238,7 @@ export function RecordsPage() {
                 <th className={head}>Substitution</th>
                 <th className={head}>Location</th>
                 <th className={head}>Department</th>
+                <th className={head}>GL</th>
                 <th className={head}>Status</th>
                 <th className={head}>ETA</th>
                 <th className={head}>Order ETA</th>
@@ -269,6 +271,7 @@ export function RecordsPage() {
                   <td className={cell}>{item.substitution_ok ? 'Yes' : 'No'}</td>
                   <td className={cell}>{locationName(item)}</td>
                   <td className={cell}>{departmentName(item)}</td>
+                  <td className={cell}>{item.gl_code || '—'}</td>
                   <td className={cell}><span className="inline-flex flex-wrap items-center gap-1"><StatusBadge status={item.status} /><ReplacementBadge item={item} /><PreApprovedBadge item={item} />{item.archived_at && <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">Archived</span>}</span></td>
                   <td className={`${cell} whitespace-nowrap`}>{formatDate(item.date_needed) || '—'}</td>
                   <td className={`${cell} whitespace-nowrap`}>{formatDate(item.eta) || '—'}</td>

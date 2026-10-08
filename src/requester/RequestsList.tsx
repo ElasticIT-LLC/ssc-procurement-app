@@ -234,6 +234,9 @@ export function RequestsList({ onNew, onSelect }: RequestsListProps) {
                 <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
                   <span>Submitted: {formatDate(req.submitted_at)}</span>
                   <span>Updated: {formatDate(req.updated_at)}</span>
+                  {req.line_items?.some((li) => li.gl_code) && (
+                    <span>GL: {req.line_items!.find((li) => li.gl_code)!.gl_code}</span>
+                  )}
                 </div>
               </div>
             )

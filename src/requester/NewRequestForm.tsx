@@ -4,6 +4,7 @@ import { useProcurementApi, Location, Department, FavoriteItem } from '../data/d
 import { LineItemFormRow, LineItemDraft, LineItemDraftErrors } from './LineItemFormRow'
 import { minEtaIso } from '../components/DateInput'
 import { useShipToWorkers } from './useShipToWorkers'
+import type { GlCategory } from '../lib/glCategories'
 
 interface NewRequestFormProps {
   onCancel?: () => void
@@ -23,6 +24,7 @@ function emptyItem(): LineItemDraft {
     item_url: '',
     item_description: '',
     memo: '',
+    gl_code: '',
     quantity: 1,
     substitution_ok: false,
     date_needed: '',
@@ -59,12 +61,13 @@ export function NewRequestForm({ onCancel, onSuccess, submitFn }: NewRequestForm
   const [submitting, setSubmitting] = useState(false)
   const [locations, setLocations] = useState<Location[]>([])
   const [departments, setDepartments] = useState<Department[]>([])
+  const [glCategories, setGlCategories] = useState<GlCategory[]>([])
   const [loadError, setLoadError] = useState<string | null>(null)
   const [favorites, setFavorites] = useState<FavoriteItem[]>([])
 
   useEffect(() => {
-    Promise.all([api.listLocations(), api.listDepartments()])
-      .then(([locs, depts]) => { setLocations(locs); setDepartments(depts) })
+    Promise.all([api.listLocations(), api.listDepartments(), api.listGlCategories().catch(() => [])])
+      .then(([locs, depts, gls]) => { setLocations(locs); setDepartments(depts); setGlCategories(gls) })
       .catch((err: unknown) => setLoadError(err instanceof Error ? err.message : 'Failed to load options'))
   }, [])
 
@@ -110,6 +113,7 @@ export function NewRequestForm({ onCancel, onSuccess, submitFn }: NewRequestForm
         item_url: item.item_url || null,
         item_description: item.item_description,
         memo: item.memo,
+        gl_code: item.gl_code || null,
         quantity: item.quantity,
         substitution_ok: item.substitution_ok,
         date_needed: item.date_needed,
@@ -153,6 +157,8 @@ export function NewRequestForm({ onCancel, onSuccess, submitFn }: NewRequestForm
             workersLoading={workersLoading}
             onRefreshWorkers={refreshWorkers}
             favorites={favorites}
+            glCategories={glCategories}
+            onClassify={api.classifyItem}
           />
         ))}
       </div>
