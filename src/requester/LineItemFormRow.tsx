@@ -3,6 +3,8 @@ import { ShipToWorker } from '../data/db'
 import { ShipToCombobox } from './ShipToCombobox'
 import { ItemNameCombobox } from './ItemNameCombobox'
 import { DateInput, minEtaIso } from '../components/DateInput'
+import { GlCodeChip } from '../components/GlCodeChip'
+import type { GlCategory } from '../lib/glCategories'
 
 export interface LineItemDraft {
   ship_to_name: string
@@ -17,6 +19,7 @@ export interface LineItemDraft {
   item_url: string
   item_description: string
   memo: string
+  gl_code: string
   quantity: number
   substitution_ok: boolean
   date_needed: string
@@ -45,6 +48,8 @@ interface LineItemFormRowProps {
   workersLoading: boolean
   onRefreshWorkers: () => void
   favorites: FavoriteItem[]
+  glCategories: GlCategory[]
+  onClassify: (input: { name: string; url: string; memo: string }) => Promise<string | null>
 }
 
 function Field({ label, error, children }: { label: string; error?: string; children: React.ReactNode }) {
@@ -59,7 +64,7 @@ function Field({ label, error, children }: { label: string; error?: string; chil
 
 export function LineItemFormRow({
   index, value, onChange, onRemove, disableRemove, locations, departments, errors,
-  workers, workersLoading, onRefreshWorkers, favorites,
+  workers, workersLoading, onRefreshWorkers, favorites, glCategories, onClassify,
 }: LineItemFormRowProps) {
   const set = (patch: Partial<LineItemDraft>) => onChange({ ...value, ...patch })
 
@@ -197,6 +202,19 @@ export function LineItemFormRow({
           favorites={favorites}
         />
         <p className="text-xs text-muted-foreground">Tip: items on the favorites list are suggested as you type.</p>
+      </Field>
+
+      {/* GL Code (AI-suggested, user can override; blank is allowed) */}
+      <Field label="GL Code">
+        <GlCodeChip
+          value={value.gl_code}
+          onChange={(code) => set({ gl_code: code })}
+          categories={glCategories}
+          suggest={onClassify}
+          itemName={value.item_description}
+          itemUrl={value.item_url}
+          itemMemo={value.memo}
+        />
       </Field>
 
       {/* Memo */}

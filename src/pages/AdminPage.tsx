@@ -6,6 +6,7 @@ import { PERMS, LINE_ITEM_STATUS } from '../lib/constants'
 import { DateInput } from '../components/DateInput'
 import { FIELD_OPTIONS, OPERATOR_OPTIONS, DEFAULT_RULES, type FormatRule, type FormatField, type FormatOperator } from '../formatting/rules'
 import { TONE_OPTIONS } from '../formatting/tones'
+import type { GlCategory } from '../lib/glCategories'
 
 // ─── Collapsible card wrapper ───────────────────────────────────────────────
 // A bordered card whose header (title + optional right-side text) toggles the
@@ -212,6 +213,115 @@ function AdminSection({ title, items, onAdd, onRename, onToggle }: AdminSectionP
           ))}
         </div>
       )}
+      </div>
+    </CollapsibleCard>
+  )
+}
+
+// ─── GL Categories management ───────────────────────────────────────────────
+// Codes are the client's exact labels. No rename (changing a stored label would
+// desync request history) — retire + add is the supported flow.
+
+interface GlCategoryRowProps {
+  id: string
+  code: string
+  isActive: boolean
+  onToggle: (id: string, isActive: boolean) => Promise<void>
+}
+
+function GlCategoryRow({ id, code, isActive, onToggle }: GlCategoryRowProps) {
+  const [busy, setBusy] = useState(false)
+
+  async function handleToggle() {
+    setBusy(true)
+    try {
+      await onToggle(id, !isActive)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className={`flex items-center gap-3 rounded-md border border-border bg-card px-3 py-2.5 ${isActive ? '' : 'opacity-60'}`}>
+      <p className="flex-1 min-w-0 text-sm font-medium text-foreground truncate" title={code}>{code}</p>
+      <span
+        className={`shrink-0 inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${isActive ? 'bg-success/15 text-success' : 'bg-muted text-muted-foreground'}`}
+      >
+        {isActive ? 'Active' : 'Inactive'}
+      </span>
+      <button
+        type="button"
+        disabled={busy}
+        onClick={handleToggle}
+        className={`shrink-0 inline-flex items-center rounded-md px-2.5 py-1 text-xs font-medium disabled:opacity-50 ${isActive ? 'bg-destructive/15 text-destructive hover:bg-destructive/25' : 'bg-success/15 text-success hover:bg-success/25'}`}
+      >
+        {busy ? '…' : isActive ? 'Retire' : 'Reactivate'}
+      </button>
+    </div>
+  )
+}
+
+interface GlCategoriesSectionProps {
+  items: GlCategory[]
+  onAdd: (code: string) => Promise<void>
+  onToggle: (id: string, isActive: boolean) => Promise<void>
+}
+
+function GlCategoriesSection({ items, onAdd, onToggle }: GlCategoriesSectionProps) {
+  const [newCode, setNewCode] = useState('')
+  const [adding, setAdding] = useState(false)
+
+  async function handleAdd() {
+    const trimmed = newCode.trim()
+    if (!trimmed) return
+    setAdding(true)
+    try {
+      await onAdd(trimmed)
+      setNewCode('')
+    } finally {
+      setAdding(false)
+    }
+  }
+
+  return (
+    <CollapsibleCard title="GL Categories" right={`${items.length} total`}>
+      <div className="grid gap-3">
+        {/* Add form */}
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={newCode}
+            onChange={e => setNewCode(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') handleAdd() }}
+            placeholder="e.g. Marketing: New Program"
+            className="flex-1 rounded-md border border-input bg-input px-3 py-1.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+          />
+          <button
+            type="button"
+            disabled={adding || !newCode.trim()}
+            onClick={handleAdd}
+            className="inline-flex items-center rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
+          >
+            {adding ? 'Adding…' : 'Add'}
+          </button>
+        </div>
+
+        {/* List (all — active + inactive) */}
+        {items.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No GL categories yet.</p>
+        ) : (
+          <div className="grid gap-2">
+            {items.map(item => (
+              <GlCategoryRow
+                key={item.id}
+                id={item.id}
+                code={item.code}
+                isActive={item.active}
+                onToggle={onToggle}
+              />
+            ))}
+          </div>
+        )}
       </div>
     </CollapsibleCard>
   )
@@ -517,6 +627,7 @@ export function AdminPage() {
 
   const [locations, setLocations] = useState<Location[]>([])
   const [departments, setDepartments] = useState<Department[]>([])
+  const [glCategories, setGlCategories] = useState<GlCategory[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -526,12 +637,14 @@ export function AdminPage() {
     setLoading(true)
     setError(null)
     try {
-      const [locs, depts] = await Promise.all([
+      const [locs, depts, gls] = await Promise.all([
         api.listAllLocations(),
         api.listAllDepartments(),
+        api.listGlCategories(true),
       ])
       setLocations(locs)
       setDepartments(depts)
+      setGlCategories(gls)
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to load admin data')
     } finally {
@@ -603,6 +716,28 @@ export function AdminPage() {
     }
   }
 
+  // GL Categories (no rename — retire + add; duplicate/empty errors come back
+  // as the DB exception message)
+  async function handleAddGlCategory(code: string) {
+    try {
+      await api.addGlCategory(code)
+      showToast({ message: 'GL category added', type: 'success' })
+      await load()
+    } catch (err: unknown) {
+      showToast({ message: err instanceof Error ? err.message : 'Failed to add GL category', type: 'error' })
+    }
+  }
+
+  async function handleToggleGlCategory(id: string, isActive: boolean) {
+    try {
+      await api.setGlCategoryActive(id, isActive)
+      showToast({ message: isActive ? 'GL category reactivated' : 'GL category retired', type: 'success' })
+      await load()
+    } catch (err: unknown) {
+      showToast({ message: err instanceof Error ? err.message : 'Failed to update GL category', type: 'error' })
+    }
+  }
+
   if (!hasAppPermission(PERMS.admin)) {
     return (
       <div className="rounded-md bg-destructive/10 border border-destructive/30 p-4 text-sm text-destructive">
@@ -648,6 +783,12 @@ export function AdminPage() {
             onAdd={handleAddDepartment}
             onRename={handleRenameDepartment}
             onToggle={handleToggleDepartment}
+          />
+
+          <GlCategoriesSection
+            items={glCategories}
+            onAdd={handleAddGlCategory}
+            onToggle={handleToggleGlCategory}
           />
 
           <FormattingRulesCard />

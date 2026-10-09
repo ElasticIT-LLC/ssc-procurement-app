@@ -5,6 +5,7 @@ import { useProcurementApi, LineItemWithRequest } from '../data/db'
 import { StatusBadge } from '../requester/StatusBadge'
 import { PERMS, formatDate } from '../lib/constants'
 import { formatItemRef } from '../lib/itemRef'
+import { GlCodeLabel } from '../components/GlCodeLabel'
 
 function humanizeReason(reason: string): string {
   if (!reason) return ''
@@ -33,6 +34,7 @@ function ReturnCard({
             {formatItemRef(item.request?.request_number, item.line_no)} — {item.item_description || 'Unnamed item'}
           </p>
           <p className="text-xs text-muted-foreground">Qty: {item.quantity}</p>
+          <GlCodeLabel glCode={item.gl_code} />
         </div>
         <div className="flex items-center gap-2">
           {processed && (

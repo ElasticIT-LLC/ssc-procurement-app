@@ -7,6 +7,7 @@ import { formatDate } from '../lib/constants'
 import { formatItemRef } from '../lib/itemRef'
 import { resolveLocationName, locationCounts, effectiveFilterValue } from '../lib/locationLabel'
 import { LocationFilter } from '../components/LocationFilter'
+import { GlCodeLabel } from '../components/GlCodeLabel'
 import { poReceiveProgress } from './orders'
 import { Modal } from '../components/Modal'
 
@@ -137,6 +138,7 @@ export function OpenOrders() {
                       <p className="text-sm text-foreground truncate">{formatItemRef(item.request?.request_number, item.line_no)} — {item.item_description || 'Unnamed item'}</p>
                       <p className="text-xs text-muted-foreground">Qty: {item.quantity}</p>
                       {locText && <p className="text-xs text-muted-foreground">Location: {locText}</p>}
+               <GlCodeLabel glCode={item.gl_code} />
                       {item.ship_to_name && <p className="text-xs text-muted-foreground">Ship to: {item.ship_to_name}</p>}
                       {item.receive_notes && <p className="text-xs text-muted-foreground">Notes: {item.receive_notes}</p>}
                     </div>

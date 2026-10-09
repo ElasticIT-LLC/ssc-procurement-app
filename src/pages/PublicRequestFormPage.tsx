@@ -5,6 +5,8 @@ import { useProcurementApi, Location, Department } from '../data/db'
 import { NewRequestForm } from '../requester/NewRequestForm'
 import { DateInput, minEtaIso } from '../components/DateInput'
 import { FavoritesLink } from '../components/FavoritesModal'
+import { GlCodeChip } from '../components/GlCodeChip'
+import type { GlCategory } from '../lib/glCategories'
 
 interface AnonLineItemDraft {
   ship_to_name: string
@@ -17,6 +19,7 @@ interface AnonLineItemDraft {
   item_url: string
   item_description: string
   memo: string
+  gl_code: string
   quantity: number
   substitution_ok: boolean
   date_needed: string
@@ -44,6 +47,7 @@ function emptyItem(): AnonLineItemDraft {
     item_url: '',
     item_description: '',
     memo: '',
+    gl_code: '',
     quantity: 1,
     substitution_ok: false,
     date_needed: '',
@@ -94,11 +98,12 @@ export function PublicRequestFormPage() {
   const [requestId, setRequestId] = useState('')
   const [locations, setLocations] = useState<Location[]>([])
   const [departments, setDepartments] = useState<Department[]>([])
+  const [glCategories, setGlCategories] = useState<GlCategory[]>([])
   const [loadError, setLoadError] = useState<string | null>(null)
 
   useEffect(() => {
-    Promise.all([api.listLocations(), api.listDepartments()])
-      .then(([locs, depts]) => { setLocations(locs); setDepartments(depts) })
+    Promise.all([api.listLocations(), api.listDepartments(), api.listGlCategories().catch(() => [])])
+      .then(([locs, depts, gls]) => { setLocations(locs); setDepartments(depts); setGlCategories(gls) })
       .catch((err: unknown) => setLoadError(err instanceof Error ? err.message : 'Failed to load options'))
   }, [])
 
@@ -142,6 +147,7 @@ export function PublicRequestFormPage() {
         item_url: item.item_url || null,
         item_description: item.item_description,
         memo: item.memo,
+        gl_code: item.gl_code || null,
         quantity: item.quantity,
         substitution_ok: item.substitution_ok,
         date_needed: item.date_needed,
@@ -334,6 +340,19 @@ export function PublicRequestFormPage() {
                   onChange={(e) => updateItem(index, { ...item, item_description: e.target.value })}
                   placeholder="e.g. Dell 27&quot; Monitor"
                   className="w-full rounded-md border border-border bg-input px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                />
+              </Field>
+
+              {/* GL Code (AI-suggested, user can override; blank is allowed) */}
+              <Field label="GL Code">
+                <GlCodeChip
+                  value={item.gl_code}
+                  onChange={(code) => updateItem(index, { ...item, gl_code: code })}
+                  categories={glCategories}
+                  suggest={api.classifyItem}
+                  itemName={item.item_description}
+                  itemUrl={item.item_url}
+                  itemMemo={item.memo}
                 />
               </Field>
 

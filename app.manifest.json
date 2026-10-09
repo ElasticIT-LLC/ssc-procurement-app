@@ -3,7 +3,7 @@
   "slug": "procurement",
   "name": "Solterra Procurement",
   "icon": "Package",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "permissions": [
     { "key": "apps/procurement/*", "label": "Full Access", "description": "Full access to Procurement", "group": "Administration" },
     { "key": "apps/procurement/requests/create", "label": "Create requests", "description": "Create and submit purchase requests; mark items received; initiate returns", "group": "Requests" },
@@ -75,7 +75,9 @@
       { "version": 41, "description": "Block line items with date_needed closer than 5 days out (BEFORE INSERT trigger)", "up": "migrations/041_min_date_needed.sql" },
       { "version": 42, "description": "Canonical submit trigger: auto screenshot + approval email on request insert (keyless, _config URL) — fixes missing trigger on both prod projects", "up": "migrations/042_submit_trigger.sql" },
       { "version": 43, "description": "Allow re-decision of approved items (decline/hold/undo) when not yet on a PO", "up": "migrations/043_redecide_after_approval.sql" },
-    { "version": 44, "description": "Optional receive notes: line_items.receive_notes + receive_line_item(p_notes)", "up": "migrations/044_receive_notes.sql" }
+    { "version": 44, "description": "Optional receive notes: line_items.receive_notes + receive_line_item(p_notes)", "up": "migrations/044_receive_notes.sql" },
+    { "version": 45, "description": "Security lint remediation: SET search_path on 4 trigger fns; revoke dead PUBLIC RPC surface on trigger_procurement_submit", "up": "migrations/045_security_lints.sql" },
+    { "version": 46, "description": "GL codes: gl_categories table (18 seeded) + line_items/pre_approved_items.gl_code + submit/order/pre-approve RPCs copy gl_code + set_line_item_gl_code / set_pre_approved_gl_code / admin category RPCs", "up": "migrations/046_gl_codes.sql" }
     ],
     "tables": [
       { "name": "locations",         "rls": { "read": "authenticated", "write": "admin" } },
@@ -85,7 +87,8 @@
       { "name": "_config",           "rls": { "read": "admin", "write": "admin" } },
       { "name": "purchase_orders",   "rls": { "read": "authenticated", "write": "admin" } },
       { "name": "favorite_items",    "rls": { "read": "authenticated", "write": "admin" } },
-      { "name": "pre_approved_items","rls": { "read": "authenticated", "write": "admin" } }
+      { "name": "pre_approved_items","rls": { "read": "authenticated", "write": "admin" } },
+      { "name": "gl_categories",     "rls": { "read": "anon", "write": "admin" } }
     ]
   },
   "config": [
@@ -103,9 +106,11 @@
   ],
   "edge_functions": [
     { "name": "procurement-capture-and-notify", "entrypoint": "supabase/functions/procurement-capture-and-notify/index.ts", "verify_jwt": false },
-    { "name": "procurement-rippling-proxy", "entrypoint": "supabase/functions/procurement-rippling-proxy/index.ts", "verify_jwt": false, "inherit_secrets": ["CREDENTIAL_ENCRYPTION_KEY"] }
+    { "name": "procurement-rippling-proxy", "entrypoint": "supabase/functions/procurement-rippling-proxy/index.ts", "verify_jwt": false, "inherit_secrets": ["CREDENTIAL_ENCRYPTION_KEY"] },
+    { "name": "procurement-gl-classify", "entrypoint": "supabase/functions/procurement-gl-classify/index.ts", "verify_jwt": false }
   ],
   "vault_secrets": [
-    { "name": "SCREENSHOT_API_KEY", "source": "admin-input", "description": "x-api-key for the msr-screenshot Azure container app (used server-side by procurement-capture-and-notify to capture product screenshots)." }
+    { "name": "SCREENSHOT_API_KEY", "source": "admin-input", "description": "x-api-key for the msr-screenshot Azure container app (used server-side by procurement-capture-and-notify to capture product screenshots)." },
+    { "name": "ANTHROPIC_API_KEY", "source": "admin-input", "description": "Anthropic API key for GL auto-classification (used server-side by procurement-gl-classify)." }
   ]
 }

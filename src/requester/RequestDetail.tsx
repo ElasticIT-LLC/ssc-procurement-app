@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { useToast } from '@elasticit-llc/app-bridge'
+import { useToast, useShellContext } from '@elasticit-llc/app-bridge'
 import { useProcurementApi, RequestRow, LineItemRow, FavoriteItem, type RequestCommentRow } from '../data/db'
 import { useAppPermissions } from '../lib/useAppPermissions'
 import { StatusBadge } from './StatusBadge'
@@ -13,6 +13,10 @@ import { displayRequestStatus } from '../lib/requestDisplay'
 import { formatItemRef } from '../lib/itemRef'
 import { RequestActivity } from '../components/RequestActivity'
 import { RequestThread } from '../components/RequestThread'
+import { GlCodeLabel } from '../components/GlCodeLabel'
+import { GlCodeChip } from '../components/GlCodeChip'
+import { Modal } from '../components/Modal'
+import type { GlCategory } from '../lib/glCategories'
 import { buildTimeline } from '../lib/timeline'
 
 interface RequestDetailProps {
@@ -38,6 +42,42 @@ export function RequestDetail({ requestId, onBack }: RequestDetailProps) {
   const [heartBusyId, setHeartBusyId] = useState<string | null>(null)
   const [comments, setComments] = useState<RequestCommentRow[]>([])
   const [approvedNames, setApprovedNames] = useState<Record<string, string>>({})
+
+  const { user } = useShellContext()
+  // Requester (portal uid, or email match for email-submission requesters) or admin
+  // can set the GL code after submit (same rule as set_line_item_gl_code RPC).
+  const canEditGl = !!request && (
+    isAdmin
+    || (!!user && request.requester_id !== null && user.id === request.requester_id)
+    || (!!user && request.requester_id === null && !!user.email && !!request.requester_email
+      && user.email.toLowerCase() === request.requester_email.toLowerCase())
+  )
+
+  const [glEditItem, setGlEditItem] = useState<LineItemRow | null>(null)
+  const [glDraft, setGlDraft] = useState('')
+  const [glCats, setGlCats] = useState<GlCategory[]>([])
+  const [glSaving, setGlSaving] = useState(false)
+
+  function openGlEdit(item: LineItemRow) {
+    setGlEditItem(item)
+    setGlDraft(item.gl_code ?? '')
+    api.listGlCategories().then(setGlCats).catch(() => setGlCats([]))
+  }
+
+  async function saveGl(code: string | null) {
+    if (!glEditItem) return
+    setGlSaving(true)
+    try {
+      await api.setLineItemGlCode(glEditItem.id, code)
+      showToast({ message: 'GL code saved', type: 'success' })
+      setGlEditItem(null)
+      await load(true)
+    } catch (err: unknown) {
+      showToast({ message: err instanceof Error ? err.message : 'Failed to save GL code', type: 'error' })
+    } finally {
+      setGlSaving(false)
+    }
+  }
 
   useEffect(() => {
     // Best-effort: a failed favorites fetch never blocks the request view.
@@ -289,6 +329,18 @@ export function RequestDetail({ requestId, onBack }: RequestDetailProps) {
               <p className="text-xs text-muted-foreground">Memo: {item.memo}</p>
             )}
 
+            {canEditGl ? (
+              <button
+                type="button"
+                onClick={() => openGlEdit(item)}
+                className="text-xs text-primary underline hover:no-underline"
+              >
+                GL: {item.gl_code || '—'} <span className="text-muted-foreground">(edit)</span>
+              </button>
+            ) : (
+              <GlCodeLabel glCode={item.gl_code} />
+            )}
+
             {item.date_needed && (
               <p className="text-xs text-muted-foreground">
                 ETA: {formatDate(item.date_needed)}
@@ -346,6 +398,41 @@ export function RequestDetail({ requestId, onBack }: RequestDetailProps) {
           onPosted={() => { void api.listRequestComments(requestId).then(setComments).catch(() => {}) }}
         />
       </div>
+
+      {/* GL code edit (requester or admin) - manual pick only; no re-suggest on edit */}
+      {glEditItem && (
+        <Modal title="Edit GL Code" onClose={() => setGlEditItem(null)}>
+          <div className="grid gap-4">
+            <GlCodeChip
+              value={glDraft}
+              onChange={setGlDraft}
+              categories={glCats}
+              suggest={null}
+              itemName={glEditItem.item_description ?? ''}
+              itemUrl={glEditItem.item_url ?? ''}
+              itemMemo={glEditItem.memo ?? ''}
+            />
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                disabled={glSaving}
+                onClick={() => void saveGl(null)}
+                className="rounded-md border border-border px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted disabled:opacity-50"
+              >
+                Clear
+              </button>
+              <button
+                type="button"
+                disabled={glSaving}
+                onClick={() => void saveGl(glDraft || null)}
+                className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
+              >
+                {glSaving ? 'Saving…' : 'Save'}
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   )
 }
