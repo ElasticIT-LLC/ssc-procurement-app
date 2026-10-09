@@ -259,7 +259,7 @@ export function ApprovalsPage() {
               <p className="text-xs text-muted-foreground">Qty: {item.quantity}</p>
               <p className="text-xs text-muted-foreground">Substitution: {item.substitution_ok ? 'Yes' : 'No'}</p>
               {locText && <p className="text-xs text-muted-foreground">Location: {locText}</p>}
-                <GlCodeLabel glCode={item.gl_code} />
+              <GlCodeLabel glCode={item.gl_code} />
             </div>
             <div className="flex items-center gap-1.5">
               {preApprovedNames.has((item.item_description ?? '').toLowerCase()) && (

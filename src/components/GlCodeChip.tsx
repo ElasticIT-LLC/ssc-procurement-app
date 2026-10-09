@@ -34,6 +34,15 @@ export function GlCodeChip({ value, onChange, categories, suggest, itemName, ite
   // stale replies.
   const tokenRef = useRef(0)
   const timerRef = useRef<number | null>(null)
+  // CRITICAL (final-review BLOCKER-1): useProcurementApi() returns a fresh object on
+  // every render, so `suggest` (api.classifyItem) has a fresh identity each render.
+  // The auto-suggest effect must depend on itemName ONLY and read suggest/onChange
+  // via refs — otherwise every parent re-render re-runs the effect, wiping the chip
+  // value (and firing DB writes on the admin catalog) with no user action.
+  const suggestRef = useRef(suggest)
+  suggestRef.current = suggest
+  const onChangeRef = useRef(onChange)
+  onChangeRef.current = onChange
 
   useEffect(() => {
     if (firstRun.current) {
@@ -42,21 +51,22 @@ export function GlCodeChip({ value, onChange, categories, suggest, itemName, ite
     }
     dispatch({ type: 'INPUT_CHANGED', name: itemName })
     tokenRef.current += 1
-    if (valueRef.current !== '') onChange('') // discard the stale pick/suggestion for the new item
-    if (!itemName.trim() || !suggest) return
+    if (valueRef.current !== '') onChangeRef.current('') // discard the stale pick/suggestion for the new item
+    const suggestFn = suggestRef.current // narrowed local (ref narrowing doesn't survive into the async callback)
+    if (!itemName.trim() || !suggestFn) return
     const myToken = tokenRef.current
     const input = { name: itemName, url: itemUrl, memo: itemMemo } // context at fire time
     timerRef.current = window.setTimeout(async () => {
       let code: string | null = null
       try {
-        code = await suggest(input)
+        code = await suggestFn(input)
       } catch {
         code = null
       }
       if (tokenRef.current !== myToken) return // re-typed or picked while in flight
       if (code) {
         dispatch({ type: 'SUGGESTED', token: myToken, code })
-        onChange(code)
+        onChangeRef.current(code)
       } else {
         dispatch({ type: 'SUGGEST_FAILED', token: myToken })
       }
@@ -64,9 +74,12 @@ export function GlCodeChip({ value, onChange, categories, suggest, itemName, ite
     return () => {
       if (timerRef.current !== null) window.clearTimeout(timerRef.current)
     }
-    // itemUrl/itemMemo are read at fire time (suggestion context), not triggers.
+    // itemName is the only trigger (deps). suggest/onChange are read via refs —
+    // useProcurementApi() returns a fresh object every render, so dep-listing them
+    // would re-fire the effect on every parent re-render (final-review BLOCKER-1).
+    // itemUrl/itemMemo are suggestion context at fire time, not triggers.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [itemName, suggest])
+  }, [itemName])
 
   function handlePick(code: string) {
     dispatch({ type: 'USER_PICKED', code })

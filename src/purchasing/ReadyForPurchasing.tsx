@@ -194,7 +194,7 @@ export function ReadyForPurchasing() {
                 </p>
                  <p className="text-xs text-muted-foreground">Qty: {item.quantity}</p>
                  {locText && <p className="text-xs text-muted-foreground">Location: {locText}</p>}
-                <GlCodeLabel glCode={item.gl_code} />
+               <GlCodeLabel glCode={item.gl_code} />
                  {item.ship_to_name && <p className="text-xs text-muted-foreground">Ship to: {item.ship_to_name}</p>}
                 </div>
                <div className="flex items-start gap-2">
