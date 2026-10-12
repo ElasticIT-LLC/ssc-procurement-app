@@ -49,7 +49,7 @@ function emptyItem(): AnonLineItemDraft {
     memo: '',
     gl_code: '',
     quantity: 1,
-    substitution_ok: false,
+    substitution_ok: true,
     date_needed: '',
   }
 }
@@ -298,6 +298,17 @@ export function PublicRequestFormPage() {
                 )}
               </Field>
 
+              {/* Item Name - above the URL per v4 z8ygbxrhck */}
+              <Field label="Item Name (required)" error={itemErrors[index]?.item_description}>
+                <input
+                  type="text"
+                  value={item.item_description}
+                  onChange={(e) => updateItem(index, { ...item, item_description: e.target.value })}
+                  placeholder="e.g. Dell 27&quot; Monitor"
+                  className="w-full rounded-md border border-border bg-input px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                />
+              </Field>
+
               {/* Item URL */}
               <Field label="Item URL (required)" error={itemErrors[index]?.item_url}>
                 <input
@@ -331,17 +342,6 @@ export function PublicRequestFormPage() {
                   <label htmlFor={`subst-${index}`} className="text-sm text-foreground">No Substitution</label>
                 </div>
               </div>
-
-              {/* Item Name */}
-              <Field label="Item Name" error={itemErrors[index]?.item_description}>
-                <input
-                  type="text"
-                  value={item.item_description}
-                  onChange={(e) => updateItem(index, { ...item, item_description: e.target.value })}
-                  placeholder="e.g. Dell 27&quot; Monitor"
-                  className="w-full rounded-md border border-border bg-input px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                />
-              </Field>
 
               {/* GL Code (AI-suggested, user can override; blank is allowed) */}
               <Field label="GL Code">

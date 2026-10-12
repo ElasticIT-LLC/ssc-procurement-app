@@ -26,7 +26,7 @@ function emptyItem(): LineItemDraft {
     memo: '',
     gl_code: '',
     quantity: 1,
-    substitution_ok: false,
+    substitution_ok: true,
     date_needed: '',
   }
 }

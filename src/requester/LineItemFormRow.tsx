@@ -160,6 +160,16 @@ export function LineItemFormRow({
         )}
       </Field>
 
+      {/* Item Name (stored as item_description) - above the URL per v4 z8ygbxrhck */}
+      <Field label="Item Name (required)" error={errors.item_description}>
+        <ItemNameCombobox
+          value={value.item_description}
+          onChange={(name, url) => set({ item_description: name, ...(url && !value.item_url ? { item_url: url } : {}) })}
+          favorites={favorites}
+        />
+        <p className="text-xs text-muted-foreground">Tip: items on the favorites list are suggested as you type.</p>
+      </Field>
+
       {/* Item URL */}
       <Field label="Item URL (required)" error={errors.item_url}>
         <input
@@ -193,16 +203,6 @@ export function LineItemFormRow({
           <label htmlFor={`subst-${index}`} className="text-sm text-foreground">No Substitution</label>
         </div>
       </div>
-
-      {/* Item Name (stored as item_description) */}
-      <Field label="Item Name" error={errors.item_description}>
-        <ItemNameCombobox
-          value={value.item_description}
-          onChange={(name, url) => set({ item_description: name, ...(url && !value.item_url ? { item_url: url } : {}) })}
-          favorites={favorites}
-        />
-        <p className="text-xs text-muted-foreground">Tip: items on the favorites list are suggested as you type.</p>
-      </Field>
 
       {/* GL Code (AI-suggested, user can override; blank is allowed) */}
       <Field label="GL Code">
