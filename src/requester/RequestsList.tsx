@@ -292,7 +292,6 @@ export function RequestsList({ onNew, onSelect }: RequestsListProps) {
                     {formatRequestNo(req.request_number)}
                     {' · '}
                     {name}
-                    {loc ? ` — ${loc}` : ''}
                   </span>
                   <div className="flex items-center gap-2 shrink-0">
                     {heartName && canCurate && (
@@ -317,6 +316,7 @@ export function RequestsList({ onNew, onSelect }: RequestsListProps) {
                     <StatusBadge status={displayRequestStatus(req)} />
                   </div>
                 </div>
+                {loc && <div className="text-xs text-muted-foreground">{loc}</div>}
                 <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
                   <span>Requested by {req.requester_name?.trim() || req.requester_email?.trim() || 'Unknown'}</span>
                   <span>Submitted: {formatDate(req.submitted_at)}</span>
