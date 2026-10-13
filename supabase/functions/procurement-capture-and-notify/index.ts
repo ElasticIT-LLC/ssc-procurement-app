@@ -77,7 +77,7 @@ async function handleRequest(req: Request) {
   // 1. Load request + line items (skip for generic notifications that may lack a request_id).
   let request: Record<string, any> | null = null
   if (requestId) {
-    const { data: reqData, error: reqErr } = await db.schema('app_procurement').from('purchase_requests').select('id, requester_name, requester_email, requester_id, notes, submitted_at, approval_notified_at').eq('id', requestId).maybeSingle()
+    const { data: reqData, error: reqErr } = await db.schema('app_procurement').from('purchase_requests').select('id, request_number, requester_name, requester_email, requester_id, notes, submitted_at, approval_notified_at').eq('id', requestId).maybeSingle()
     if (reqErr) return json({ error: 'request lookup failed' }, 500)
     request = reqData as Record<string, any> | null
     if (!request) return json({ error: 'request not found' }, 404)
@@ -430,7 +430,37 @@ async function handleRequest(req: Request) {
       return_initiated: returnsUrl,
     }
     const linkUrl = linkMap[key] ?? ''
-    const bodyText = (body.details ?? `A procurement event occurred: ${label}`) as string
+    // Approve / decline / on-hold only ever send this generic notification (there is
+    // no rich counterpart), so the one-line body must carry the item context. The app
+    // never passes `details`; when a request + item ids are present, look the item(s) up.
+    // Falls back to the original generic line when ids are missing or the lookup misses.
+    const DECISION_VERBS: Record<string, [string, string]> = {
+      item_approved: ['was approved', 'were approved'],
+      item_declined: ['was declined', 'were declined'],
+      item_on_hold: ['was put on hold', 'were put on hold'],
+    }
+    let bodyText = (body.details ?? null) as string | null
+    const decisionVerb = DECISION_VERBS[key]
+    if (!bodyText && decisionVerb && requestId) {
+      try {
+        let itemLookup = db.schema('app_procurement').from('line_items').select('item_description')
+        if (body.line_item_ids?.length) itemLookup = itemLookup.in('id', body.line_item_ids)
+        const { data: liRows, error: liErr } = await itemLookup.eq('request_id', requestId)
+        if (liErr) console.error('decision notification item lookup failed:', liErr.message)
+        const rows = (liRows ?? []) as any[]
+        if (rows.length) {
+          const reqNum = request?.request_number
+          const ref = reqNum != null ? `Request #${reqNum}` : 'your request'
+          const names = rows.map((r: any) => (r.item_description ?? '').trim()).filter((n: string) => n.length > 0)
+          const singular = names.length <= 1
+          const subject = singular ? (names[0] ?? 'An item') : names.join(', ')
+          bodyText = `${subject} ${singular ? decisionVerb[0] : decisionVerb[1]} (${ref}).`
+        }
+      } catch (e) {
+        console.error('decision notification enrichment failed:', e instanceof Error ? e.message : e)
+      }
+    }
+    if (!bodyText) bodyText = `A procurement event occurred: ${label}`
     const inAppTitle = `${clientName ? `${clientName} Procurement` : 'Procurement'}: ${label}`
     const inAppRows = recipients.filter((r) => r.user_id).map((r) => ({
       user_id: r.user_id,
